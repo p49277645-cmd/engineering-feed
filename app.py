@@ -3,56 +3,15 @@ import requests
 from bs4 import BeautifulSoup
 from flask import Flask, render_template_string, redirect, request
 import os
-import time
 import re
-import datetime
 
 app = Flask(__name__)
 
 news_db = []
-last_update_time = 0
-
 SOURCE_STYLES = {
     "Хабр": {"color": "#bb86fc", "letter": "Х"},
     "Hackaday": {"color": "#cf6679", "letter": "H"},
     "Mathus": {"color": "#0f9d58", "letter": "M"}
-}
-
-# ==========================================
-# БАЗА ЗНАНИЙ: ФИЗИКА
-# ==========================================
-PHYSICS_DB = {
-    "kinematics": {
-        "title": "Кинематика: Язык движения",
-        "content": """
-        <p>Физика начинается там, где мы задаем вопрос: <i>«Где?»</i> и <i>«Когда?»</i>. Кинематика — это искусство описывать движение, не задумываясь о причинах, его вызвавших. Это как смотреть на танец, не зная хореографии.</p>
-        <h4>Равноускоренное движение</h4>
-        <p>Если скорость тела меняется одинаково за равные промежутки времени, движение называется равноускоренным. Ускорение (\(a\)) — это быстрота изменения скорости. В инженерии это критически важная величина.</p>
-        <div class="formula">\[ v = v_0 + at \]</div>
-        <div class="formula">\[ S = v_0t + \\frac{at^2}{2} \]</div>
-        <p>Геометрический смысл: площадь под графиком скорости — это и есть пройденный путь.</p>
-        """
-    },
-    "dynamics": {
-        "title": "Динамика: Архитектура сил",
-        "content": """
-        <p>Почему тела движутся? Ответ дает динамика. В основе лежат три закона, сформулированные Исааком Ньютоном.</p>
-        <h4>Второй закон Ньютона</h4>
-        <p>Ускорение прямо пропорционально силе и обратно пропорционально массе. Это главное уравнение механики:</p>
-        <div class="formula">\[ \\vec{F} = m\\vec{a} \]</div>
-        <p>Чтобы придать массивной ракете такое же ускорение, как легкому велосипеду, нужна колоссальная сила тяги.</p>
-        """
-    },
-    "quantum_atom": {
-        "title": "Атом и квантовый мир",
-        "content": """
-        <p>В начале 20 века физики заглянули в микромир и обнаружили, что классические законы Ньютона там не работают. На смену пришла квантовая физика.</p>
-        <h4>Строение атома</h4>
-        <p>Модель Резерфорда-Бора: в центре находится тяжелое положительное ядро, а вокруг него движутся электроны.</p>
-        <div class="formula">\[ E = mc^2 \]</div>
-        <p>Формула Эйнштейна показывает, что масса и энергия — это разные формы одного и того же. Инженеры лазерных установок (твоя будущая профессия!) отлично знают эту физику.</p>
-        """
-    }
 }
 
 # ==========================================
@@ -156,7 +115,6 @@ HTML_TEMPLATE = """
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-rust.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
-    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <style>
         :root[data-theme="dark"] {
             --bg-base: #0b0b0d; --bg-card: #161619; --border: rgba(255, 255, 255, 0.05);
@@ -202,7 +160,6 @@ HTML_TEMPLATE = """
         .wiki-content p { font-size: 15px; color: #a2a2a8; line-height: 1.6; margin-bottom: 16px; }
         .wiki-content ul { margin-left: 20px; margin-bottom: 16px; color: #a2a2a8; line-height: 1.6; }
         .wiki-content pre { border-radius: 12px !important; margin: 16px 0 !important; }
-        .formula { background: rgba(255,255,255,0.03); padding: 16px; border-radius: 12px; text-align: center; font-size: 20px; margin: 16px 0; color: var(--accent); border: 1px solid var(--border); overflow-x: auto; }
 
         @media (max-width: 768px) {
             .wiki-layout { flex-direction: column; }
@@ -222,7 +179,6 @@ HTML_TEMPLATE = """
             </div>
             <div class="nav-tabs">
                 <a href="/" class="nav-tab {{ 'active' if active_tab == 'feed' else '' }}">Лента</a>
-                <a href="/wiki/physics" class="nav-tab {{ 'active' if active_tab == 'physics' else '' }}">Физика</a>
                 <a href="/wiki/rust" class="nav-tab {{ 'active' if active_tab == 'rust' else '' }}">Rust</a>
                 <a href="/wiki/python" class="nav-tab {{ 'active' if active_tab == 'python' else '' }}">Python</a>
             </div>
@@ -252,7 +208,7 @@ HTML_TEMPLATE = """
     </main>
     {% endif %}
 
-    {% if active_tab in ['physics', 'rust', 'python'] %}
+    {% if active_tab in ['rust', 'python'] %}
     <div class="wiki-layout">
         <aside class="wiki-sidebar">
             <ul class="wiki-menu">
@@ -280,7 +236,6 @@ HTML_TEMPLATE = """
             const newTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
             document.documentElement.setAttribute('data-theme', newTheme);
             localStorage.setItem('theme', newTheme);
-            if(window.MathJax) MathJax.typeset();
         });
     </script>
 </body>
@@ -298,11 +253,6 @@ def index():
 def refresh():
     fetch_all_news()
     return redirect('/')
-
-@app.route('/wiki/physics')
-def wiki_physics():
-    topic = request.args.get('topic', list(PHYSICS_DB.keys())[0])
-    return render_template_string(HTML_TEMPLATE, active_tab='physics', db=PHYSICS_DB, current_topic=topic, news=[])
 
 @app.route('/wiki/rust')
 def wiki_rust():
