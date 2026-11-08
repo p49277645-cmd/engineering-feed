@@ -6,6 +6,7 @@ import os
 import time
 import re
 import datetime
+from collections import Counter
 
 app = Flask(__name__)
 
@@ -20,12 +21,16 @@ SOURCE_STYLES = {
     "Росатом": {"color": "#f4b400", "letter": "Р"}
 }
 
+def hex_to_rgba(hex_color, alpha):
+    h = hex_color.lstrip('#')
+    return f"rgba({int(h[0:2], 16)}, {int(h[2:4], 16)}, {int(h[4:6], 16)}, {alpha})"
+
 def clean_snippet(raw_html):
     if not raw_html: return ""
     text = re.sub(r'<.*?>', '', raw_html)
     text = re.sub(r'([.!?])([А-ЯA-Z])', r'\1 \2', text)
     text = text.strip()
-    return text[:130] + "..." if len(text) > 130 else text
+    return text[:140] + "..." if len(text) > 140 else text
 
 def get_relative_time(ts):
     if not ts: return "Только что"
@@ -39,7 +44,6 @@ def get_relative_time(ts):
         return dt.strftime("%d %b, %H:%M")
 
 def save_to_memory(title, link, source, snippet="", pub_time=None):
-    # Делаем первую букву заголовка заглавной
     title = title.strip()
     if title:
         title = title[0].upper() + title[1:]
@@ -52,6 +56,16 @@ def save_to_memory(title, link, source, snippet="", pub_time=None):
 
         style = SOURCE_STYLES.get(source, {"color": "#8b8b90", "letter": source[0]})
         
+        # Формируем дату для группировки
+        dt_obj = datetime.datetime.fromtimestamp(pub_time)
+        today = datetime.date.today()
+        if dt_obj.date() == today:
+            date_label = "Сегодня"
+        elif dt_obj.date() == today - datetime.timedelta(days=1):
+            date_label = "Вчера"
+        else:
+            date_label = dt_obj.strftime("%d %B")
+            
         news_db.append({
             'title': title,
             'link': link,
@@ -60,7 +74,10 @@ def save_to_memory(title, link, source, snippet="", pub_time=None):
             'color': style["color"],
             'letter': style["letter"],
             'time_str': get_relative_time(pub_time),
-            'raw_time': pub_time
+            'raw_time': pub_time,
+            'date_label': date_label,
+            'tag_bg': hex_to_rgba(style["color"], 0.14),
+            'tag_text': style["color"]
         })
 
 def get_rss_feed(url, source_name, limit=6):
@@ -84,20 +101,14 @@ def scrape_mathus(url, source_name):
         soup = BeautifulSoup(response.text, 'html.parser')
         links = soup.find_all('a')
         count = 0
-        # Черный список мусорных ссылок с сайта
         blacklist = ['олимпиадам', 'дви мгу', 'telegram', 'на главную', 'физика', 'математика']
         
         for link in links:
             href = link.get('href')
             text = link.text.strip()
-            
-            # Пропускаем, если текст короткий или в черном списке
-            if not text or len(text) < 5 or text.lower() in blacklist:
-                continue
-                
+            if not text or len(text) < 5 or text.lower() in blacklist: continue
             if count < 3:
-                if href.startswith('/'):
-                    href = url + href
+                if href.startswith('/'): href = url + href
                 save_to_memory(text, href, source_name, "Олимпиадная задача. Проверьте свои силы!", time.time() - 3600)
                 count += 1
     except Exception as e:
@@ -107,9 +118,8 @@ def fetch_all_news():
     global news_db, last_update_time
     news_db.clear()
     
-    get_rss_feed("https://habr.com/ru/rss/best/daily/?fl=ru", "Хабр", limit=10)
-    get_rss_feed("https://hackaday.com/feed/", "Hackaday", limit=5)
-    
+    get_rss_feed("https://habr.com/ru/rss/best/daily/?fl=ru", "Хабр", limit=12)
+    get_rss_feed("https://hackaday.com/feed/", "Hackaday", limit=8)
     scrape_mathus("https://mathus.ru/phys/", "Mathus")
     
     news_db.sort(key=lambda x: x['raw_time'], reverse=True)
@@ -121,103 +131,166 @@ HTML_TEMPLATE = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0b0b0d">
     <title>Engineering Feed</title>
     <style>
         :root[data-theme="dark"] {
-            --bg-base: #0b0b0d; --bg-card: #17171a; --bg-hover: #1f1f23;
-            --bg-header: rgba(11, 11, 13, 0.75); --border: rgba(255, 255, 255, 0.06);
-            --text-main: #f2f2f5; --text-muted: #8b8b90; --accent: #bb86fc;
+            --bg-base: #0b0b0d;
+            --bg-card: #161619;
+            --bg-card-hover: #1a1a1f;
+            --bg-card-unread: #18181c;
+            --bg-header: rgba(11, 11, 13, 0.75);
+            --border: rgba(255, 255, 255, 0.05);
+            --border-hover: rgba(255, 255, 255, 0.09);
+            --text-main: #f4f4f6;
+            --text-muted: #b8b8c0; /* Источник */
+            --text-snippet: #9a9aa2;
+            --text-time: #7c7c84;
+            --accent: #bb86fc;
         }
         :root[data-theme="light"] {
-            --bg-base: #f0f2f5; --bg-card: #ffffff; --bg-hover: #f8f9fa;
-            --bg-header: rgba(255, 255, 255, 0.85); --border: rgba(0, 0, 0, 0.08);
-            --text-main: #1c1c1e; --text-muted: #6b7280; --accent: #7c3aed;
+            --bg-base: #f0f2f5;
+            --bg-card: #ffffff;
+            --bg-card-hover: #f8f9fa;
+            --bg-card-unread: #ffffff;
+            --bg-header: rgba(255, 255, 255, 0.85);
+            --border: rgba(0, 0, 0, 0.06);
+            --border-hover: rgba(0, 0, 0, 0.1);
+            --text-main: #1c1c1e;
+            --text-muted: #6b7280;
+            --text-snippet: #4b5563;
+            --text-time: #9ca3af;
+            --accent: #7c3aed;
         }
+
+        /* Кастомный скроллбар */
+        ::-webkit-scrollbar { width: 10px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #2a2a30; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #3a3a40; }
+
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg-base); color: var(--text-main); -webkit-font-smoothing: antialiased; padding-top: 64px; transition: background 0.3s; }
         
-        /* Шапка */
-        header { position: fixed; top: 0; left: 0; right: 0; height: 64px; background: var(--bg-header); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: center; z-index: 100; }
-        .header-content { width: 100%; max-width: 720px; display: flex; justify-content: space-between; align-items: center; padding: 0 16px; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            background-color: var(--bg-base); 
+            /* Тот самый радиальный градиент */
+            background-image: radial-gradient(800px 400px at 50% -100px, rgba(124,92,246,.07), transparent);
+            color: var(--text-main); 
+            -webkit-font-smoothing: antialiased; 
+            padding-top: 64px; 
+        }
+
+        ::selection { background: var(--accent); color: #000; }
+
+        /* --- ШАПКА (64px, Sticky, Blur) --- */
+        header { 
+            position: fixed; top: 0; left: 0; right: 0; height: 64px; 
+            background: var(--bg-header); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); 
+            border-bottom: 1px solid var(--border); 
+            display: flex; align-items: center; justify-content: center; z-index: 100; 
+        }
+        .header-content { 
+            width: 100%; max-width: 720px; display: flex; justify-content: space-between; align-items: center; padding: 0 16px; 
+        }
         .logo-wrap { display: flex; flex-direction: column; }
         .logo { font-weight: 700; font-size: 1.1rem; display: flex; align-items: center; gap: 8px;}
-        .last-updated { font-size: 0.7rem; color: var(--text-muted); margin-top: 2px; }
-        .unread-count { background: rgba(187, 134, 252, 0.16); color: var(--accent); font-size: 0.75rem; padding: 2px 8px; border-radius: 999px; font-weight: 600; }
+        .updated-time { font-size: 12px; color: var(--text-time); margin-top: 2px; }
+        .unread-badge { background: rgba(187, 134, 252, 0.16); color: var(--accent); font-size: 12px; padding: 2px 8px; border-radius: 999px; font-weight: 600; }
         
-        /* Идеальные кнопки 36x36 */
         .header-actions { display: flex; gap: 8px; align-items: center; }
-        .btn-icon { width: 36px; height: 36px; background: transparent; border: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; border-radius: 10px; transition: background 0.2s; }
+        .btn-icon { width: 36px; height: 36px; background: transparent; border: none; color: var(--text-time); cursor: pointer; display: flex; align-items: center; justify-content: center; border-radius: 10px; transition: all 0.2s; }
         .btn-icon:hover { background: rgba(255,255,255,.07); color: var(--text-main); }
         .btn-icon:active { background: rgba(255,255,255,.12); }
         .btn-icon svg { width: 20px; height: 20px; fill: currentColor; }
         @keyframes spin { 100% { transform: rotate(360deg); } }
         .spin-anim svg { animation: spin 1s linear infinite; }
 
-        /* Поиск и Фильтры */
+        /* --- ПОИСК И ЧИПЫ (Плотные) --- */
         .controls { max-width: 720px; margin: 16px auto 8px; padding: 0 16px; }
         .search-wrapper { position: relative; margin-bottom: 12px; }
-        .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; stroke: var(--text-muted); fill: none; stroke-width: 2; pointer-events: none; }
-        .search-input { width: 100%; height: 44px; padding: 0 40px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-main); font-size: 0.95rem; outline: none; transition: border-color 0.2s, box-shadow 0.2s; }
+        .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; stroke: var(--text-time); fill: none; stroke-width: 2; pointer-events: none; }
+        .search-input { width: 100%; height: 44px; padding: 0 40px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-main); font-size: 14px; outline: none; transition: all 0.2s; }
         .search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(187, 134, 252, 0.22); }
         
-        /* Kbd-подсказка и крестик */
-        .kbd-hint { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: 0.75rem; color: var(--text-muted); background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1); pointer-events: none; }
-        .clear-btn { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-muted); cursor: pointer; display: none; align-items: center; justify-content: center; }
-        .clear-btn:hover { color: var(--text-main); }
+        .kbd-hint { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--text-time); background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1); pointer-events: none; }
+        .clear-btn { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-time); cursor: pointer; display: none; align-items: center; justify-content: center; }
         
-        /* Чипы с горизонтальным скроллом и градиентом */
         .chips-container { position: relative; }
         .chips-container::after { content: ''; position: absolute; right: 0; top: 0; bottom: 8px; width: 40px; background: linear-gradient(to right, transparent, var(--bg-base)); pointer-events: none; }
         .chips-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none; }
         .chips-row::-webkit-scrollbar { display: none; }
-        .chip { height: 32px; background: transparent; border: 1px solid rgba(255,255,255,.1); color: #b4b4ba; padding: 0 12px; border-radius: 999px; font-size: 0.8rem; cursor: pointer; white-space: nowrap; transition: all 0.2s; display: flex; align-items: center; }
+        .chip { height: 32px; background: transparent; border: 1px solid rgba(255,255,255,.1); color: var(--text-muted); padding: 0 12px; border-radius: 999px; font-size: 13px; cursor: pointer; white-space: nowrap; transition: all 0.2s; display: flex; align-items: center; gap: 6px; }
         .chip:hover { background: rgba(255,255,255,.05); }
         .chip.active { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 600; box-shadow: 0 2px 8px rgba(187, 134, 252, 0.35); }
+        .chip-count { background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 10px; font-size: 11px; }
         
-        /* Лента */
+        /* --- ЛЕНТА И ДНИ --- */
         .container { width: 100%; max-width: 720px; margin: 0 auto; padding: 0 16px 40px; }
-        .card { background-color: var(--bg-card); border-radius: 16px; padding: 16px; margin-bottom: 12px; border: 1px solid var(--border); transition: background-color 0.2s, opacity 0.2s, transform 0.1s; animation: slideUp 0.18s ease forwards; opacity: 0; transform: translateY(6px); display: flex; gap: 12px; position: relative; cursor: pointer; }
-        .card:hover { background-color: var(--bg-hover); box-shadow: 0 6px 20px rgba(0,0,0,.35); }
+        
+        .day-header { 
+            position: sticky; top: 64px; z-index: 10; 
+            background: var(--bg-header); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+            font-size: 13px; font-weight: 600; color: var(--text-muted); 
+            padding: 12px 0 8px; margin-top: 8px; border-bottom: 1px solid var(--border);
+        }
+
+        /* --- КАРТОЧКА (Плотная и Глубокая) --- */
+        .card { 
+            background-color: var(--bg-card-unread); 
+            border-radius: 16px; padding: 20px; margin-top: 12px; 
+            border: 1px solid var(--border); 
+            transition: all 160ms ease; 
+            animation: slideUp 0.18s ease forwards; opacity: 0; transform: translateY(6px); 
+            display: flex; gap: 12px; position: relative; cursor: pointer; 
+        }
+        .card:hover { 
+            background-color: var(--bg-card-hover); 
+            border-color: var(--border-hover); 
+            box-shadow: 0 8px 24px rgba(0,0,0,.35); 
+            transform: translateY(-1px); 
+        }
         .card:active { transform: scale(0.995); }
         
-        /* Состояние прочитанного (гасим) */
-        .card.read { opacity: 0.5; }
-        .card.read .card-title { color: #8f8f96; }
+        /* Прочитанное гасим */
+        .card.read { opacity: 0.6; background-color: var(--bg-card); }
+        .card.read .card-title { color: var(--text-time); }
         .card.read .avatar { opacity: 0.85; }
         .card.read .unread-dot { display: none; }
-        
+
         @keyframes slideUp { to { opacity: 1; transform: translateY(0); } }
         
         .avatar-wrap { position: relative; flex-shrink: 0; }
-        .avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #000; font-size: 1rem; }
-        /* Точка с кольцом */
-        .unread-dot { position: absolute; top: -2px; right: -2px; width: 9px; height: 9px; background: var(--accent); border-radius: 50%; box-shadow: 0 0 0 2px var(--bg-card); }
+        .avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #000; font-size: 15px; }
+        .unread-dot { position: absolute; top: -2px; right: -2px; width: 9px; height: 9px; background: var(--accent); border-radius: 50%; box-shadow: 0 0 0 2px var(--bg-card-unread); }
         
         .card-body { flex-grow: 1; min-width: 0; }
-        .meta-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
-        .source-name { font-weight: 600; font-size: 0.8rem; color: #e6e6ea; }
-        .time { font-size: 0.75rem; color: #8b8b90; font-variant-numeric: tabular-nums; }
+        .meta-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+        .source-name { font-weight: 600; font-size: 13px; color: var(--text-muted); }
+        .time { font-size: 12px; color: var(--text-time); font-variant-numeric: tabular-nums; }
         
-        .card-title { font-size: 0.95rem; font-weight: 600; line-height: 1.4; margin-bottom: 6px; display: block; color: inherit; text-decoration: none; transition: color 0.15s; }
+        .card-title { font-size: 17px; font-weight: 600; line-height: 1.35; margin-bottom: 6px; display: block; color: var(--text-main); text-decoration: none; transition: color 0.15s; }
         .card-title:hover { color: var(--accent); }
         
-        /* Сниппет */
-        .card-snippet { font-size: 0.85rem; color: #a2a2a8; line-height: 1.5; margin-bottom: 12px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .card-snippet { font-size: 14px; color: var(--text-snippet); line-height: 1.55; margin-bottom: 12px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         
-        /* Футер без разделителя, с отступом */
         .card-footer { display: flex; justify-content: space-between; align-items: center; }
-        .tag { font-size: 0.7rem; color: var(--accent); background: rgba(187, 134, 252, 0.1); padding: 3px 8px; border-radius: 6px; cursor: pointer; transition: background 0.2s; }
-        .tag:hover { background: rgba(187, 134, 252, 0.2); }
+        .tag { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 6px; cursor: pointer; transition: opacity 0.2s; }
+        .tag:hover { opacity: 0.8; }
         
         .actions-group { display: flex; gap: 4px; }
-        .action-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 4px; font-size: 0.75rem; transition: color 0.2s; padding: 4px 8px; border-radius: 6px; }
+        .action-btn { background: none; border: none; color: var(--text-time); cursor: pointer; display: flex; align-items: center; gap: 4px; font-size: 12px; transition: color 0.2s; padding: 4px 8px; border-radius: 6px; }
         .action-btn:hover { background: rgba(255,255,255,.06); color: var(--text-main); }
         .action-btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; }
         .action-btn.active { color: var(--accent); }
         .action-btn.active svg { fill: var(--accent); stroke: var(--accent); }
 
-        /* Скрываем стандартные состояния браузера */
-        ::selection { background: var(--accent); color: #000; }
+        /* --- ТОСТ И СКЕЛЕТОНЫ --- */
+        .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(100px); background: var(--bg-card); border: 1px solid var(--border); padding: 12px 24px; border-radius: 12px; font-size: 14px; font-weight: 500; box-shadow: 0 8px 32px rgba(0,0,0,0.5); transition: transform 0.3s ease; z-index: 1000; display: flex; align-items: center; gap: 12px; }
+        .toast.show { transform: translateX(-50%) translateY(0); }
+        
+        .skeleton { background: linear-gradient(90deg, #161619 25%, #1f1f23 50%, #161619 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 16px; height: 140px; margin-top: 12px; border: 1px solid var(--border); }
+        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
     </style>
 </head>
 <body>
@@ -227,9 +300,9 @@ HTML_TEMPLATE = """
                 <div class="logo">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="var(--accent)" stroke="none"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
                     <span>EngFeed</span>
-                    <span class="unread-count" id="unread-counter">0</span>
+                    <span class="unread-badge" id="unread-counter">0</span>
                 </div>
-                <div class="last-updated">обновлено в {{ update_time }}</div>
+                <div class="updated-time" id="updated-time">обновлено только что</div>
             </div>
             <div class="header-actions">
                 <button class="btn-icon" id="theme-toggle" title="Сменить тему">
@@ -257,85 +330,116 @@ HTML_TEMPLATE = """
                 <div class="chip active" data-filter="all">Все</div>
                 <div class="chip" data-filter="unread">Непрочитанные</div>
                 <div class="chip" data-filter="bookmarks">Закладки</div>
-                <div class="chip" data-filter="Хабр">Хабр</div>
-                <div class="chip" data-filter="Hackaday">Hackaday</div>
-                <div class="chip" data-filter="Mathus">Mathus</div>
-                <div class="chip" data-filter="МИФИ">МИФИ</div>
-                <div class="chip" data-filter="Росатом">Росатом</div>
+                <!-- Сюда JS добавит чипы с счетчиками -->
             </div>
         </div>
     </div>
 
     <main class="container" id="feed-container">
-        {% for item in news %}
-        <div class="card" data-link="{{ item.link }}" data-source="{{ item.source }}" style="animation-delay: {{ loop.index0 * 0.03 }}s;">
-            <div class="avatar-wrap">
-                <div class="avatar" style="background-color: {{ item.color }};">{{ item.letter }}</div>
-                <div class="unread-dot"></div>
-            </div>
-            <div class="card-body">
-                <div class="meta-info">
-                    <span class="source-name">{{ item.source }}</span>
-                    <span class="time">{{ item.time_str }}</span>
-                </div>
-                <a href="{{ item.link }}" target="_blank" class="card-title">{{ item.title }}</a>
-                <div class="card-snippet">{{ item.snippet }}</div>
+        <!-- Скелетоны при загрузке -->
+        <div id="skeletons" style="display: none;">
+            <div class="skeleton"></div>
+            <div class="skeleton"></div>
+            <div class="skeleton"></div>
+        </div>
+
+        <div id="actual-feed">
+            {% set ns = namespace(current_date="") %}
+            {% for item in news %}
+                {% if item.date_label != ns.current_date %}
+                    {% set ns.current_date = item.date_label %}
+                    <div class="day-header">{{ ns.current_date }}</div>
+                {% endif %}
                 
-                <div class="card-footer">
-                    <span class="tag">#{{ item.source.split(': ')[-1] }}</span>
-                    <div class="actions-group">
-                        <button class="action-btn copy-btn" data-link="{{ item.link }}" title="Скопировать ссылку">
-                            <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                        </button>
-                        <button class="action-btn bookmark-btn" data-link="{{ item.link }}">
-                            <svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
-                            <span>В закладки</span>
-                        </button>
+                <div class="card" data-link="{{ item.link }}" data-source="{{ item.source }}" style="animation-delay: {{ loop.index0 * 0.03 }}s;">
+                    <div class="avatar-wrap">
+                        <div class="avatar" style="background-color: {{ item.color }};">{{ item.letter }}</div>
+                        <div class="unread-dot"></div>
+                    </div>
+                    <div class="card-body">
+                        <div class="meta-info">
+                            <span class="source-name">{{ item.source }}</span>
+                            <span class="time">{{ item.time_str }}</span>
+                        </div>
+                        <a href="{{ item.link }}" target="_blank" class="card-title">{{ item.title }}</a>
+                        <div class="card-snippet">{{ item.snippet }}</div>
+                        
+                        <div class="card-footer">
+                            <span class="tag" style="background: {{ item.tag_bg }}; color: {{ item.tag_text }};">{{ item.source }}</span>
+                            <div class="actions-group">
+                                <button class="action-btn copy-btn" data-link="{{ item.link }}" title="Скопировать ссылку">
+                                    <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                                </button>
+                                <button class="action-btn bookmark-btn" data-link="{{ item.link }}">
+                                    <svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+                                    <span>В закладки</span>
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
+            {% endfor %}
+            
+            <div id="empty-state" style="display: none; text-align: center; color: var(--text-time); margin-top: 40px;">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom: 16px;"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>
+                <p>Ничего не нашлось. Попробуйте изменить запрос.</p>
             </div>
         </div>
-        {% endfor %}
     </main>
 
+    <!-- Тост -->
+    <div class="toast" id="toast">
+        <span id="toast-text">+3 новых поста</span>
+        <button style="background: none; border: none; color: var(--accent); cursor: pointer; font-weight: 600;" onclick="document.getElementById('toast').classList.remove('show')">ОК</button>
+    </div>
+
     <script>
+        // Сбор данных из Python
+        const sourceCounts = {
+            {% for source, count in source_counts.items() %}
+                "{{ source }}": {{ count }},
+            {% endfor %}
+        };
+
+        // Генерация чипов с счетчиками
+        const chipsRow = document.getElementById('filter-chips');
+        for (const [source, count] of Object.entries(sourceCounts)) {
+            if (count > 0) {
+                const chip = document.createElement('div');
+                chip.className = 'chip';
+                chip.dataset.filter = source;
+                chip.innerHTML = `${source} <span class="chip-count">${count}</span>`;
+                chipsRow.appendChild(chip);
+            }
+        }
+
+        // Логика обновления и скелетонов
         function refreshFeed() {
             const btn = document.getElementById('refresh-btn');
             btn.classList.add('spin-anim');
+            
+            document.getElementById('actual-feed').style.display = 'none';
+            document.getElementById('skeletons').style.display = 'block';
+
             setTimeout(() => {
                 window.location.href = '/refresh?t=' + Date.now();
-            }, 500);
+            }, 800);
         }
 
-        // Хоткей "/" для фокуса на поиске
+        // Показ тоста, если есть параметр в URL
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('new')) {
+            document.getElementById('toast-text').innerText = `+${urlParams.get('new')} новых постов`;
+            setTimeout(() => document.getElementById('toast').classList.add('show'), 500);
+            setTimeout(() => document.getElementById('toast').classList.remove('show'), 3500);
+        }
+
+        // Хоткей "/"
         document.addEventListener('keydown', (e) => {
             if (e.key === '/' && document.activeElement.tagName !== 'INPUT') {
                 e.preventDefault();
                 document.getElementById('search-input').focus();
             }
-        });
-
-        // Логика кнопки очистки поиска
-        const searchInput = document.getElementById('search-input');
-        const clearBtn = document.getElementById('clear-btn');
-        const kbdHint = document.getElementById('kbd-hint');
-
-        searchInput.addEventListener('input', () => {
-            if (searchInput.value.length > 0) {
-                clearBtn.style.display = 'flex';
-                kbdHint.style.display = 'none';
-            } else {
-                clearBtn.style.display = 'none';
-                kbdHint.style.display = 'block';
-            }
-        });
-
-        clearBtn.addEventListener('click', () => {
-            searchInput.value = '';
-            clearBtn.style.display = 'none';
-            kbdHint.style.display = 'block';
-            searchInput.focus();
-            filterCards(); // Вызываем фильтрацию после очистки
         });
 
         // Тема
@@ -353,6 +457,7 @@ HTML_TEMPLATE = """
         let bookmarks = JSON.parse(localStorage.getItem('bookmarks')) || [];
         const cards = document.querySelectorAll('.card');
         const unreadCounter = document.getElementById('unread-counter');
+        const emptyState = document.getElementById('empty-state');
 
         function updateUnreadCount() {
             let count = 0;
@@ -366,13 +471,15 @@ HTML_TEMPLATE = """
                 if (readLinks.includes(link)) card.classList.add('read');
                 
                 const btn = card.querySelector('.bookmark-btn');
-                const textSpan = btn.querySelector('span');
-                if (bookmarks.includes(link)) {
-                    btn.classList.add('active');
-                    textSpan.innerText = 'В закладках';
-                } else {
-                    btn.classList.remove('active');
-                    textSpan.innerText = 'В закладки';
+                if(btn) {
+                    const textSpan = btn.querySelector('span');
+                    if (bookmarks.includes(link)) {
+                        btn.classList.add('active');
+                        textSpan.innerText = 'В закладках';
+                    } else {
+                        btn.classList.remove('active');
+                        textSpan.innerText = 'В закладки';
+                    }
                 }
 
                 card.onclick = (e) => {
@@ -413,22 +520,13 @@ HTML_TEMPLATE = """
             };
         });
 
-        // Теги
-        document.querySelectorAll('.tag').forEach(tag => {
-            tag.onclick = (e) => {
-                e.stopPropagation();
-                const sourceName = tag.innerText.replace('#', '');
-                const chip = document.querySelector(`.chip[data-filter="${sourceName}"]`);
-                if (chip) chip.click();
-            };
-        });
-
         // Фильтрация
         let activeFilter = 'all';
-        const chips = document.querySelectorAll('.chip');
-
+        
         function filterCards() {
-            const query = searchInput.value.toLowerCase();
+            const query = document.getElementById('search-input').value.toLowerCase();
+            let visibleCount = 0;
+
             cards.forEach(card => {
                 const title = card.querySelector('.card-title').innerText.toLowerCase();
                 const source = card.dataset.source;
@@ -438,23 +536,29 @@ HTML_TEMPLATE = """
                 if (activeFilter === 'all') matchesFilter = true;
                 else if (activeFilter === 'unread') matchesFilter = !readLinks.includes(link);
                 else if (activeFilter === 'bookmarks') matchesFilter = bookmarks.includes(link);
-                else matchesFilter = source.includes(activeFilter);
+                else matchesFilter = source === activeFilter;
 
                 const matchesSearch = title.includes(query);
-                card.style.display = (matchesFilter && matchesSearch) ? 'flex' : 'none';
+                const isVisible = (matchesFilter && matchesSearch);
+                
+                card.style.display = isVisible ? 'flex' : 'none';
+                if (isVisible) visibleCount++;
             });
+
+            // Скрываем заголовки дней, если под ними пусто (опционально, но JS для этого сложноват, оставим просто проверку на пустоту)
+            emptyState.style.display = visibleCount === 0 ? 'block' : 'none';
         }
 
-        chips.forEach(chip => {
+        document.querySelectorAll('.chip').forEach(chip => {
             chip.onclick = () => {
-                chips.forEach(c => c.classList.remove('active'));
+                document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
                 chip.classList.add('active');
                 activeFilter = chip.dataset.filter;
                 filterCards();
             };
         });
         
-        searchInput.oninput = filterCards;
+        document.getElementById('search-input').oninput = filterCards;
         
         // Инициализация
         applyState();
@@ -465,16 +569,30 @@ HTML_TEMPLATE = """
 
 @app.route('/')
 def index():
-    if not news_db or (time.time() - last_update_time > 3600):
-        fetch_all_news()
+    global news_db, last_update_time
+    # Параметр new показывает, сколько статей пришло с последнего обновления (симуляция)
+    new_count = 0
     
+    if not news_db:
+        fetch_all_news()
+    elif time.time() - last_update_time > 3600:
+        old_links = set(item['link'] for item in news_db)
+        fetch_all_news()
+        new_count = len([item for item in news_db if item['link'] not in old_links])
+
+    source_counts = Counter(item['source'] for item in news_db)
     update_time = datetime.datetime.now().strftime("%H:%M")
-    return render_template_string(HTML_TEMPLATE, news=news_db, update_time=update_time)
+    
+    # Передаем new_count в шаблон (для тоста)
+    return render_template_string(HTML_TEMPLATE, news=news_db, update_time=update_time, source_counts=source_counts) + f"<script>if({new_count}>0) window.location.href='/ ?new={new_count}';</script>" if new_count else render_template_string(HTML_TEMPLATE, news=news_db, update_time=update_time, source_counts=source_counts)
 
 @app.route('/refresh')
 def refresh():
+    global news_db
+    old_links = set(item['link'] for item in news_db)
     fetch_all_news()
-    return redirect('/')
+    new_count = len([item for item in news_db if item['link'] not in old_links])
+    return redirect(f'/?new={new_count}')
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
