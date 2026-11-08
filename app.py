@@ -429,9 +429,9 @@ HTML_TEMPLATE = """
 # ==========================================
 # 8. ЗАПУСК
 # ==========================================
+# Инициализация при импорте (для gunicorn)
+init_db()
+start_scheduler()
+
 if __name__ == "__main__":
-    init_db()
-    logger.info("База данных готова.")
-    start_scheduler()
-    logger.info(f"Сервер запущен на порту {PORT}")
     app.run(host="0.0.0.0", port=PORT, debug=False)
