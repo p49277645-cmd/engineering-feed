@@ -4,36 +4,23 @@ import time
 import datetime
 import html
 import sqlite3
-import threading
 import logging
 import sys
 from contextlib import contextmanager
-from concurrent.futures import ThreadPoolExecutor
-from cachetools import TTLCache
 
 import feedparser
 import requests
 from bs4 import BeautifulSoup
 from flask import Flask, render_template_string, jsonify, request
 
-# ==========================================
-# ЛОГИРОВАНИЕ
-# ==========================================
 logger = logging.getLogger("engfeed")
 handler = logging.StreamHandler(sys.stdout)
-handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s", datefmt="%H:%M:%S"))
+handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S"))
 logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 
-# ==========================================
-# КОНФИГУРАЦИЯ
-# ==========================================
 DB_PATH = os.environ.get("DB_PATH", "engfeed.db")
-CACHE_TTL = int(os.environ.get("CACHE_TTL", 20 * 60))
 PORT = int(os.environ.get("PORT", 5000))
-
-feed_cache = TTLCache(maxsize=1, ttl=CACHE_TTL)
-cache_lock = threading.Lock()
 
 SESSION = requests.Session()
 SESSION.headers.update({
@@ -41,45 +28,32 @@ SESSION.headers.update({
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
 })
 
-# ==========================================
-# ИСТОЧНИКИ (ТО ЧТО ТЫ ПРОСИЛ)
-# ==========================================
+# ИСТОЧНИКИ
 SOURCES = [
-    # ФИЗИКА И ОЛИМПИАДЫ
     {"type": "rss", "url": "https://elementy.ru/rss/news", "source": "Элементы", "category": "physics", "limit": 8},
-    {"type": "scrape", "url": "https://mathus.ru/phys/", "source": "Mathus: Физика 9", "category": "physics", "limit": 6},
-    {"type": "scrape", "url": "https://olimpiada.ru/activity/394", "source": "Олимпиада Физтех", "category": "olympiad", "limit": 5},
-    {"type": "scrape", "url": "https://olimpiada.ru/activity/5878", "source": "Росатом", "category": "olympiad", "limit": 5},
-    
-    # УНИВЕРСИТЕТЫ
-    {"type": "scrape", "url": "https://mipt.ru/news", "source": "МФТИ", "category": "university", "limit": 6},
-    {"type": "scrape", "url": "https://mephi.ru/press-center/news/", "source": "МИФИ", "category": "university", "limit": 6},
-    
-    # МАТЕМАТИКА
-    {"type": "scrape", "url": "https://mathus.ru/math/", "source": "Mathus: Математика", "category": "math", "limit": 6},
-    
-    # ПРОГРАММИРОВАНИЕ
+    {"type": "rss", "url": "https://nplus1.ru/rss", "source": "N+1", "category": "science", "limit": 6},
     {"type": "rss", "url": "https://habr.com/ru/rss/hub/python/daily/?fl=ru", "source": "Хабр: Python", "category": "code", "limit": 6},
     {"type": "rss", "url": "https://habr.com/ru/rss/hub/rust/daily/?fl=ru", "source": "Хабр: Rust", "category": "code", "limit": 6},
-    
-    # ЭЛЕКТРОНИКА
     {"type": "rss", "url": "https://habr.com/ru/rss/hub/electronics/daily/?fl=ru", "source": "Хабр: Электроника", "category": "tech", "limit": 6},
     {"type": "rss", "url": "https://hackaday.com/feed/", "source": "Hackaday", "category": "tech", "limit": 5},
+    {"type": "scrape", "url": "https://mathus.ru/phys/", "source": "Mathus: Физика", "category": "physics", "limit": 6},
+    {"type": "scrape", "url": "https://mathus.ru/math/", "source": "Mathus: Математика", "category": "math", "limit": 6},
+    {"type": "scrape", "url": "https://mipt.ru/news", "source": "МФТИ", "category": "university", "limit": 6},
+    {"type": "scrape", "url": "https://mephi.ru/press-center/news/", "source": "МИФИ", "category": "university", "limit": 6},
+    {"type": "scrape", "url": "https://olimpiada.ru/activity/394", "source": "Физтех", "category": "olympiad", "limit": 5},
+    {"type": "scrape", "url": "https://olimpiada.ru/activity/5878", "source": "Росатом", "category": "olympiad", "limit": 5},
 ]
 
-# ЦВЕТА
 STYLES = {
     "physics": {"color": "#10b981", "letter": "Ф"},
+    "science": {"color": "#8b5cf6", "letter": "Н"},
     "olympiad": {"color": "#ef4444", "letter": "О"},
     "university": {"color": "#3b82f6", "letter": "В"},
-    "math": {"color": "#8b5cf6", "letter": "М"},
+    "math": {"color": "#a855f7", "letter": "М"},
     "code": {"color": "#f59e0b", "letter": "К"},
     "tech": {"color": "#06b6d4", "letter": "Э"},
 }
 
-# ==========================================
-# WIKI (STEPik КУРСЫ)
-# ==========================================
 RUST_DB = {
     "ownership": {
         "title": "Владение и заимствование",
@@ -93,7 +67,7 @@ RUST_DB = {
         </ul>
         <pre><code class="language-rust">fn main() {
     let s1 = String::from("hello");
-    let s2 = s1; // владение перемещается
+    let s2 = s1;
     println!("{}", s2);
 }</code></pre>
         <a href="https://stepik.org/course/195449/promo" target="_blank" style="display:inline-block;margin-top:16px;padding:12px 24px;background:#ff9060;color:#000;text-decoration:none;border-radius:8px;font-weight:600;">Пройти курс на Stepik →</a>
@@ -120,9 +94,6 @@ print(next(counter)) # 1</code></pre>
     }
 }
 
-# ==========================================
-# ПАРСИНГ
-# ==========================================
 def clean_text(text):
     if not text: return ""
     text = html.unescape(text)
@@ -132,7 +103,7 @@ def clean_text(text):
 
 def parse_rss(item):
     try:
-        resp = SESSION.get(item["url"], timeout=10)
+        resp = SESSION.get(item["url"], timeout=8)
         feed = feedparser.parse(resp.content)
         results = []
         for entry in feed.entries[:item["limit"]]:
@@ -153,43 +124,34 @@ def parse_rss(item):
 
 def scrape_html(item):
     try:
-        resp = SESSION.get(item["url"], timeout=10)
+        resp = SESSION.get(item["url"], timeout=8)
         soup = BeautifulSoup(resp.text, "html.parser")
         results = []
         
-        # Селекторы для разных сайтов
-        if "mipt.ru" in item["url"]:
-            nodes = soup.select("h3 a, .news-item a")
-        elif "mephi.ru" in item["url"]:
-            nodes = soup.select(".news-item__title a, .news-list a")
-        elif "olimpiada.ru" in item["url"]:
-            nodes = soup.select("h3 a, .activity-news a")
-        elif "mathus.ru" in item["url"]:
-            nodes = soup.select("h2 a, h3 a")
-        else:
-            nodes = soup.find_all("a", href=True)[:50]
-            
+        nodes = soup.select("h2 a, h3 a, h4 a, .news-item a, .news-list a")[:30]
+        
         seen = set()
         for node in nodes:
             href = node.get("href", "")
             title = clean_text(node.get_text())
             
             if not title or len(title) < 10: continue
-            if "login" in href or "tag" in href: continue
+            if "login" in href or "tag" in href or "category" in href: continue
             
             if href.startswith("/"):
-                href = item["url"].split("/")[2] + href
+                base = "/".join(item["url"].split("/")[:3])
+                href = base + href
             elif not href.startswith("http"):
-                href = item["url"] + "/" + href
+                href = item["url"].rstrip("/") + "/" + href.lstrip("/")
             
             if href in seen: continue
             seen.add(href)
             
             results.append({
                 "title": title[:100],
-                "link": "https://" + href if not href.startswith("http") else href,
+                "link": href,
                 "source": item["source"],
-                "snippet": "Задания и материалы олимпиады",
+                "snippet": "Материалы и задания",
                 "pub_time": time.time(),
                 "category": item["category"]
             })
@@ -204,10 +166,11 @@ def scrape_html(item):
 
 def fetch_all_data():
     all_items = []
-    with ThreadPoolExecutor(max_workers=6) as pool:
-        futures = [pool.submit(parse_rss if item["type"] == "rss" else scrape_html, item) for item in SOURCES]
-        for future in futures:
-            all_items.extend(future.result())
+    for item in SOURCES:
+        if item["type"] == "rss":
+            all_items.extend(parse_rss(item))
+        else:
+            all_items.extend(scrape_html(item))
     
     all_items.sort(key=lambda x: x["pub_time"], reverse=True)
     
@@ -226,9 +189,6 @@ def fetch_all_data():
         })
     return enriched
 
-# ==========================================
-# БАЗА ДАННЫХ
-# ==========================================
 @contextmanager
 def get_db():
     conn = sqlite3.connect(DB_PATH)
@@ -266,46 +226,21 @@ def load_from_db(limit=100):
         cursor = conn.execute("SELECT * FROM posts ORDER BY fetched_at DESC LIMIT ?", (limit,))
         return [dict(row) for row in cursor.fetchall()]
 
-# ==========================================
-# ФОНОВОЕ ОБНОВЛЕНИЕ
-# ==========================================
-def background_update():
-    def worker():
-        try:
-            logger.info("Обновление ленты...")
-            items = fetch_all_data()
-            save_to_db(items)
-            with cache_lock:
-                feed_cache["data"] = items
-                feed_cache["last_update"] = time.time()
-            logger.info(f"Готово: {len(items)} записей")
-        except Exception as e:
-            logger.error(f"Ошибка: {e}")
-    threading.Thread(target=worker, daemon=True).start()
-
-def start_scheduler():
-    def loop():
-        time.sleep(5)
-        background_update()
-        while True:
-            time.sleep(CACHE_TTL)
-            background_update()
-    threading.Thread(target=loop, daemon=True).start()
-
-# ==========================================
-# FLASK
-# ==========================================
 app = Flask(__name__)
 
 @app.route('/')
 def index():
-    with cache_lock:
-        data = feed_cache.get("data")
-    if not data:
-        data = load_from_db()
-        if not data:
-            background_update()
-    return render_template_string(HTML_TEMPLATE, news=data or [])
+    news = load_from_db()
+    if not news:
+        logger.info("База пустая, загружаем данные...")
+        try:
+            items = fetch_all_data()
+            save_to_db(items)
+            news = items
+            logger.info(f"Загружено {len(news)} записей")
+        except Exception as e:
+            logger.error(f"Ошибка загрузки: {e}")
+    return render_template_string(HTML_TEMPLATE, news=news)
 
 @app.route('/wiki/rust')
 def wiki_rust():
@@ -319,19 +254,20 @@ def wiki_python():
 
 @app.route('/api/refresh')
 def api_refresh():
-    background_update()
-    return jsonify({"status": "ok"})
+    try:
+        items = fetch_all_data()
+        save_to_db(items)
+        return jsonify({"status": "ok", "count": len(items)})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/health')
 def health():
     return jsonify({"status": "ok", "sources": len(SOURCES)})
 
-# ==========================================
-# HTML ШАБЛОН
-# ==========================================
 HTML_TEMPLATE = """
 <!DOCTYPE html>
-<html lang="ru" data-theme="dark">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -383,26 +319,22 @@ HTML_TEMPLATE = """
         .wiki-content p { font-size:15px; line-height:1.7; color:var(--text-2); margin-bottom:16px; }
         .wiki-content pre { background:#101013; border-radius:12px; padding:16px; margin:16px 0; }
         .wiki-content code { font-family:'JetBrains Mono',monospace; font-size:13.5px; }
+        .empty-state { text-align:center; padding:60px 20px; color:var(--text-3); }
+        .empty-state button { margin-top:20px; padding:12px 24px; background:#8b5cf6; color:#fff; border:none; border-radius:8px; cursor:pointer; font-weight:600; }
+        .empty-state button:hover { background:#7c3aed; }
         @media(max-width:768px) { .wiki-layout{flex-direction:column;} .wiki-sidebar{width:100%;position:static;} }
     </style>
-    <script>
-        function refresh() {
-            const btn = document.querySelector('.refresh-btn svg');
-            btn.classList.add('spin');
-            fetch('/api/refresh').then(() => setTimeout(() => location.reload(), 1500));
-        }
-    </script>
 </head>
 <body>
     <header>
         <div class="header-inner">
             <div class="logo"><div class="logo-icon">EF</div><span>EngFeed</span></div>
             <div class="nav-tabs">
-                <button onclick="location.href='/'" class="nav-tab {{ 'active' if active_tab=='feed' else '' }}">Лента</button>
+                <button onclick="location.href='/'" class="nav-tab {{ 'active' if active_tab=='feed' or not active_tab else '' }}">Лента</button>
                 <button onclick="location.href='/wiki/rust'" class="nav-tab {{ 'active' if active_tab=='rust' else '' }}">Rust</button>
                 <button onclick="location.href='/wiki/python'" class="nav-tab {{ 'active' if active_tab=='python' else '' }}">Python</button>
             </div>
-            {% if active_tab=='feed' or not active_tab %}
+            {% if not active_tab or active_tab=='feed' %}
             <button class="refresh-btn" onclick="refresh()"><svg viewBox="0 0 24 24"><path d="M21 2v6h-6M3 12a9 9 0 1 0 9-9"/></svg></button>
             {% endif %}
         </div>
@@ -427,8 +359,10 @@ HTML_TEMPLATE = """
     {% else %}
     <main class="container">
         {% if not news %}
-        <div style="text-align:center;padding:60px 20px;color:var(--text-3);">
-            <p>Загрузка данных...<br><small>Нажми кнопку обновления</small></p>
+        <div class="empty-state">
+            <p style="font-size:18px;margin-bottom:8px;">Лента пуста</p>
+            <p style="font-size:14px;">Нажми кнопку ниже, чтобы загрузить новости</p>
+            <button onclick="refresh()">Загрузить новости</button>
         </div>
         {% endif %}
         {% set current_day="" %}
@@ -445,15 +379,18 @@ HTML_TEMPLATE = """
         {% endfor %}
     </main>
     {% endif %}
+    <script>
+        function refresh() {
+            const btn = document.querySelector('.refresh-btn svg');
+            if(btn) btn.classList.add('spin');
+            fetch('/api/refresh').then(() => setTimeout(() => location.reload(), 2000));
+        }
+    </script>
 </body>
 </html>
 """
 
-# ==========================================
-# ЗАПУСК (ВАЖНО: ИНИЦИАЛИЗАЦИЯ ДО if __name__)
-# ==========================================
 init_db()
-start_scheduler()
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=PORT, debug=False)
