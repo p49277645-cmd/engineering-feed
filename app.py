@@ -1,7 +1,7 @@
 import feedparser
 import requests
 from bs4 import BeautifulSoup
-from flask import Flask, render_template_string
+from flask import Flask, render_template_string, redirect
 import os
 import time
 import re
@@ -12,7 +12,6 @@ app = Flask(__name__)
 news_db = []
 last_update_time = 0
 
-# Цвета и иконки для источников (чтобы не было однообразия)
 SOURCE_STYLES = {
     "Хабр: Физика": {"color": "#bb86fc", "letter": "Ф"},
     "Хабр: Электроника": {"color": "#03dac6", "letter": "Э"},
@@ -24,9 +23,7 @@ SOURCE_STYLES = {
 
 def clean_snippet(raw_html):
     if not raw_html: return ""
-    # Удаляем HTML теги
     text = re.sub(r'<.*?>', '', raw_html)
-    # ИСПРАВЛЕНИЕ: Добавляем пробел после точки, если его нет (встречать.Представьте -> встречать. Представьте)
     text = re.sub(r'([.!?])([А-ЯA-Z])', r'\1 \2', text)
     text = text.strip()
     return text[:130] + "..." if len(text) > 130 else text
@@ -46,7 +43,6 @@ def save_to_memory(title, link, source, snippet="", pub_time=None):
     if not any(item['link'] == link for item in news_db):
         if not snippet: snippet = "Нажмите, чтобы прочитать статью полностью..."
         
-        # Если время публикации не пришло, ставим случайное в пределах 5 часов (для красоты)
         if not pub_time:
             pub_time = time.time() - (len(news_db) * 600)
 
@@ -59,17 +55,18 @@ def save_to_memory(title, link, source, snippet="", pub_time=None):
             'snippet': snippet,
             'color': style["color"],
             'letter': style["letter"],
-            'time_str': get_relative_time(pub_time)
+            'time_str': get_relative_time(pub_time),
+            'raw_time': pub_time # Сохраняем сырое время для сортировки
         })
 
 def get_rss_feed(url, source_name):
     try:
         feed = feedparser.parse(url)
-        for entry in feed.entries[:3]:
+        # Берем по 5 статей с источника, чтобы было из чего выбирать
+        for entry in feed.entries[:5]:
             summary = entry.get('summary', '')
             snippet = clean_snippet(summary)
             
-            # Пытаемся вытащить реальное время публикации
             pub_time = None
             if hasattr(entry, 'published_parsed') and entry.published_parsed:
                 pub_time = time.mktime(entry.published_parsed)
@@ -87,7 +84,7 @@ def scrape_mathus(url, source_name):
         for link in links:
             href = link.get('href')
             text = link.text.strip()
-            if text and len(text) > 5 and count < 2: 
+            if text and len(text) > 5 and count < 3: 
                 if href.startswith('/'):
                     href = url + href
                 save_to_memory(text, href, source_name, "Олимпиадная задача. Проверьте свои силы!", time.time() - 3600)
@@ -105,11 +102,10 @@ def fetch_all_news():
     get_rss_feed("https://hackaday.com/feed/", "Hackaday")
     scrape_mathus("https://mathus.ru/phys/", "Mathus")
     
-    # Сортируем по времени (чтобы новые были сверху)
-    news_db.sort(key=lambda x: x['time_str'])
+    # Сортируем по РЕАЛЬНОМУ времени (новые сверху)
+    news_db.sort(key=lambda x: x['raw_time'], reverse=True)
     last_update_time = time.time()
 
-# --- НОВЫЙ ДИЗАЙН С JS ЛОГИКОЙ ---
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="ru" data-theme="dark">
@@ -128,86 +124,46 @@ HTML_TEMPLATE = """
             --bg-header: rgba(255, 255, 255, 0.85); --border: rgba(0, 0, 0, 0.08);
             --text-main: #1c1c1e; --text-muted: #6b7280; --accent: #7c3aed;
         }
-
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg-base); color: var(--text-main);
-            -webkit-font-smoothing: antialiased; padding-top: 64px; transition: background 0.3s;
-        }
-
-        /* Хедер */
-        header {
-            position: fixed; top: 0; left: 0; right: 0; height: 64px;
-            background: var(--bg-header); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-            border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: center;
-            z-index: 100; transition: background 0.3s;
-        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg-base); color: var(--text-main); -webkit-font-smoothing: antialiased; padding-top: 64px; transition: background 0.3s; }
+        header { position: fixed; top: 0; left: 0; right: 0; height: 64px; background: var(--bg-header); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: center; z-index: 100; }
         .header-content { width: 100%; max-width: 640px; display: flex; justify-content: space-between; align-items: center; padding: 0 16px; }
         .logo { font-weight: 700; font-size: 1.2rem; display: flex; align-items: center; gap: 8px;}
         .unread-count { background: var(--accent); color: #000; font-size: 0.75rem; padding: 2px 8px; border-radius: 12px; font-weight: bold; }
-        
-        /* Кнопки в хедере */
         .header-actions { display: flex; gap: 12px; align-items: center; }
         .btn-icon { background: none; border: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 8px; border-radius: 8px; transition: background 0.2s; }
         .btn-icon:hover { background: var(--border); color: var(--text-main); }
         .btn-icon svg { width: 20px; height: 20px; fill: currentColor; }
-
-        /* Панель поиска и чипы */
         .controls { max-width: 640px; margin: 20px auto 10px; padding: 0 16px; }
         .search-input { width: 100%; padding: 12px 16px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-main); font-size: 0.95rem; margin-bottom: 12px; outline: none; }
         .search-input:focus { border-color: var(--accent); }
-        
         .chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none; }
         .chips::-webkit-scrollbar { display: none; }
         .chip { background: var(--bg-card); border: 1px solid var(--border); color: var(--text-muted); padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; cursor: pointer; white-space: nowrap; transition: all 0.2s; }
         .chip:hover, .chip.active { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 600; }
-
-        /* Лента */
         .container { max-width: 640px; margin: 0 auto; padding: 0 16px 40px; }
-        .day-group { font-size: 0.85rem; color: var(--text-muted); font-weight: 600; margin: 24px 0 12px; text-transform: uppercase; letter-spacing: 1px; }
-
-        /* Карточка */
-        .card {
-            background-color: var(--bg-card); border-radius: 16px; padding: 16px; margin-bottom: 12px;
-            border: 1px solid var(--border); transition: background-color 0.2s, opacity 0.2s, transform 0.1s;
-            animation: slideUp 0.4s ease forwards; opacity: 0; transform: translateY(15px);
-            display: flex; gap: 12px; position: relative; cursor: pointer;
-        }
+        .card { background-color: var(--bg-card); border-radius: 16px; padding: 16px; margin-bottom: 12px; border: 1px solid var(--border); transition: background-color 0.2s, opacity 0.2s; animation: slideUp 0.4s ease forwards; opacity: 0; transform: translateY(15px); display: flex; gap: 12px; position: relative; cursor: pointer; }
         .card:hover { background-color: var(--bg-hover); }
         .card.read { opacity: 0.5; }
         .card.read .card-title { color: var(--text-muted); }
-
         @keyframes slideUp { to { opacity: 1; transform: translateY(0); } }
-
-        /* Аватарка с индикатором */
         .avatar-wrap { position: relative; flex-shrink: 0; }
-        .avatar {
-            width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-            font-weight: 700; color: #000; font-size: 1.1rem;
-        }
+        .avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #000; font-size: 1.1rem; }
         .unread-dot { position: absolute; top: -2px; right: -2px; width: 10px; height: 10px; background: var(--accent); border-radius: 50%; border: 2px solid var(--bg-card); display: none; }
         .card:not(.read) .unread-dot { display: block; }
-
-        /* Контент */
         .card-body { flex-grow: 1; }
         .meta-info { display: flex; justify-content: space-between; margin-bottom: 4px; }
         .source-name { font-weight: 600; font-size: 0.9rem; color: var(--text-main); }
         .time { font-size: 0.8rem; color: var(--text-muted); }
-        
         .card-title { font-size: 1.05rem; font-weight: 600; line-height: 1.4; margin-bottom: 6px; display: block; }
         .card-snippet { font-size: 0.9rem; color: var(--text-muted); line-height: 1.4; margin-bottom: 12px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-
-        /* Подвал карточки */
         .card-footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); padding-top: 10px; }
         .tag { font-size: 0.75rem; color: var(--accent); background: rgba(187, 134, 252, 0.1); padding: 2px 8px; border-radius: 6px; }
-        
         .action-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 4px; font-size: 0.85rem; transition: color 0.2s; }
         .action-btn:hover { color: var(--text-main); }
         .action-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; }
         .action-btn.active { color: var(--accent); }
         .action-btn.active svg { fill: var(--accent); stroke: var(--accent); }
-
     </style>
 </head>
 <body>
@@ -221,7 +177,8 @@ HTML_TEMPLATE = """
                 <button class="btn-icon" id="theme-toggle" title="Сменить тему">
                     <svg viewBox="0 0 24 24"><path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
                 </button>
-                <button class="btn-icon" onclick="window.location.href='/refresh'" title="Обновить ленту">
+                <!-- КНОПКА ОБНОВЛЕНИЯ (Добавлен cache-buster) -->
+                <button class="btn-icon" onclick="window.location.href='/refresh?t=' + Date.now()" title="Обновить ленту">
                     <svg viewBox="0 0 24 24"><path d="M21 2v6h-6M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/></svg>
                 </button>
             </div>
@@ -268,42 +225,31 @@ HTML_TEMPLATE = """
     </main>
 
     <script>
-        // --- 1. ЛОГИКА ТЕМЫ ---
         const themeToggle = document.getElementById('theme-toggle');
         const currentTheme = localStorage.getItem('theme') || 'dark';
         document.documentElement.setAttribute('data-theme', currentTheme);
-        
         themeToggle.addEventListener('click', () => {
             const newTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
             document.documentElement.setAttribute('data-theme', newTheme);
             localStorage.setItem('theme', newTheme);
         });
 
-        // --- 2. ЛОГИКА READ/UNREAD И ЗАКЛАДОК ---
         let readLinks = JSON.parse(localStorage.getItem('readLinks')) || [];
         let bookmarks = JSON.parse(localStorage.getItem('bookmarks')) || [];
-        
         const cards = document.querySelectorAll('.card');
         const unreadCounter = document.getElementById('unread-counter');
 
         function updateUnreadCount() {
             let count = 0;
-            cards.forEach(card => {
-                if (!readLinks.includes(card.dataset.link)) count++;
-            });
+            cards.forEach(card => { if (!readLinks.includes(card.dataset.link)) count++; });
             unreadCounter.innerText = count;
         }
 
         function applyState() {
             cards.forEach(card => {
                 const link = card.dataset.link;
+                if (readLinks.includes(link)) card.classList.add('read');
                 
-                // Помечаем прочитанным
-                if (readLinks.includes(link)) {
-                    card.classList.add('read');
-                }
-
-                // Закладки
                 const btn = card.querySelector('.bookmark-btn');
                 if (bookmarks.includes(link)) {
                     btn.classList.add('active');
@@ -313,9 +259,8 @@ HTML_TEMPLATE = """
                     btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg> В закладки';
                 }
 
-                // Клик по карточке (пометить прочитанным и открыть)
                 card.onclick = (e) => {
-                    if (e.target.closest('.bookmark-btn')) return; // Если кликнули на закладку, не открываем ссылку
+                    if (e.target.closest('.bookmark-btn')) return;
                     if (!readLinks.includes(link)) {
                         readLinks.push(link);
                         localStorage.setItem('readLinks', JSON.stringify(readLinks));
@@ -328,29 +273,23 @@ HTML_TEMPLATE = """
             updateUnreadCount();
         }
 
-        // Обработка клика по закладке
         document.querySelectorAll('.bookmark-btn').forEach(btn => {
             btn.onclick = (e) => {
                 e.stopPropagation();
                 const link = btn.dataset.link;
-                if (bookmarks.includes(link)) {
-                    bookmarks = bookmarks.filter(l => l !== link);
-                } else {
-                    bookmarks.push(link);
-                }
+                if (bookmarks.includes(link)) bookmarks = bookmarks.filter(l => l !== link);
+                else bookmarks.push(link);
                 localStorage.setItem('bookmarks', JSON.stringify(bookmarks));
                 applyState();
             };
         });
 
-        // --- 3. ФИЛЬТРЫ И ПОИСК ---
         let activeFilter = 'all';
         const searchInput = document.getElementById('search-input');
         const chips = document.querySelectorAll('.chip');
 
         function filterCards() {
             const query = searchInput.value.toLowerCase();
-            
             cards.forEach(card => {
                 const title = card.querySelector('.card-title').innerText.toLowerCase();
                 const source = card.dataset.source;
@@ -363,12 +302,7 @@ HTML_TEMPLATE = """
                 else matchesFilter = source.includes(activeFilter);
 
                 const matchesSearch = title.includes(query);
-
-                if (matchesFilter && matchesSearch) {
-                    card.style.display = 'flex';
-                } else {
-                    card.style.display = 'none';
-                }
+                card.style.display = (matchesFilter && matchesSearch) ? 'flex' : 'none';
             });
         }
 
@@ -380,10 +314,7 @@ HTML_TEMPLATE = """
                 filterCards();
             };
         });
-
         searchInput.oninput = filterCards;
-
-        // Инициализация
         applyState();
     </script>
 </body>
@@ -392,14 +323,17 @@ HTML_TEMPLATE = """
 
 @app.route('/')
 def index():
+    # Если база пуста, грузим. В остальных случаях отдаем кэш (чтобы не спамить сайты)
     if not news_db or (time.time() - last_update_time > 3600):
         fetch_all_news()
     return render_template_string(HTML_TEMPLATE, news=news_db)
 
 @app.route('/refresh')
 def refresh():
+    # Принудительно очищаем и качаем заново
     fetch_all_news()
-    return index()
+    # Переадресуем на главную, чтобы убрать ?t= из адресной строки
+    return redirect('/')
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
