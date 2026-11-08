@@ -6,14 +6,12 @@ from flask import Flask, render_template_string
 import os
 
 app = Flask(__name__)
+DB_FILE = 'engineer_feed.db'
 
 # --- БАЗА ДАННЫХ ---
 def get_db_connection():
-    conn = sqlite3.connect('engineer_feed.db')
-    return conn
-
-def setup_database():
-    conn = get_db_connection()
+    conn = sqlite3.connect(DB_FILE)
+    # Эта строчка ГАРАНТИРОВАННО создаст таблицу при каждом подключении
     conn.execute('''
         CREATE TABLE IF NOT EXISTS news (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -22,8 +20,7 @@ def setup_database():
             source TEXT
         )
     ''')
-    conn.commit()
-    conn.close()
+    return conn
 
 def save_to_db(title, link, source):
     conn = get_db_connection()
@@ -39,7 +36,7 @@ def save_to_db(title, link, source):
 def get_rss_feed(url, source_name):
     try:
         feed = feedparser.parse(url)
-        for entry in feed.entries[:5]: # Берем 5 статей
+        for entry in feed.entries[:5]:
             save_to_db(entry.title, entry.link, source_name)
     except Exception as e:
         print(f"Ошибка RSS {source_name}: {e}")
@@ -102,26 +99,24 @@ def index():
     news_items = conn.execute("SELECT title, link, source FROM news ORDER BY id DESC LIMIT 20").fetchall()
     conn.close()
     
-    # Если база пустая (первый запуск в облаке), скачиваем данные
+    # Если база пустая (первый запуск), качаем данные
     if not news_items:
-        return refresh()
+        get_rss_feed("https://habr.com/ru/rss/hubs/physics/articles/all/?fl=ru", "Хабр: Физика")
+        get_rss_feed("https://hackaday.com/feed/", "Hackaday")
+        scrape_mathus("https://mathus.ru/phys/", "Mathus")
+        
+        conn = get_db_connection()
+        news_items = conn.execute("SELECT title, link, source FROM news ORDER BY id DESC LIMIT 20").fetchall()
+        conn.close()
         
     return render_template_string(HTML_TEMPLATE, news=news_items)
 
 @app.route('/refresh')
 def refresh():
-    setup_database()
     get_rss_feed("https://habr.com/ru/rss/hubs/physics/articles/all/?fl=ru", "Хабр: Физика")
     get_rss_feed("https://hackaday.com/feed/", "Hackaday")
     scrape_mathus("https://mathus.ru/phys/", "Mathus")
-    
-    conn = get_db_connection()
-    news_items = conn.execute("SELECT title, link, source FROM news ORDER BY id DESC LIMIT 20").fetchall()
-    conn.close()
-    return render_template_string(HTML_TEMPLATE, news=news_items)
-
-# Инициализация базы при старте
-setup_database()
+    return index()
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
