@@ -7,7 +7,7 @@
 Агрегатор RSS: Хабр, Quanta Magazine, arXiv, Nature Physics, Physics World,
 Элементы, N+1, IEEE Spectrum, Hackaday и др. + wiki-разделы Rust/Python.
 
-![Feed](assets/feed-dark.png)
+
 
 ## Фичи
 - 12 источников, параллельный парсинг, обновление каждые 15 минут
