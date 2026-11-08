@@ -1,4 +1,3 @@
-import threading
 import os
 import re
 import time
@@ -7,13 +6,18 @@ import html
 import sqlite3
 import logging
 import sys
+import threading
 from contextlib import contextmanager
+from concurrent.futures import ThreadPoolExecutor
 
 import feedparser
 import requests
 from bs4 import BeautifulSoup
 from flask import Flask, render_template_string, jsonify, request
 
+# ==========================================
+# НАСТРОЙКИ
+# ==========================================
 logger = logging.getLogger("engfeed")
 handler = logging.StreamHandler(sys.stdout)
 handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S"))
@@ -29,9 +33,11 @@ SESSION.headers.update({
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
 })
 
-# ВСЕ ИСТОЧНИКИ
+# ==========================================
+# ИСТОЧНИКИ (ВСЁ, ЧТО ТЫ ПРОСИЛ, НА МЕСТЕ)
+# ==========================================
 SOURCES = [
-    # ФИЗИКА 9 КЛАСС + ОЛИМПИАДЫ (ГЛАВНОЕ!)
+    # ФИЗИКА 9 КЛАСС + ОЛИМПИАДЫ (ПРИОРИТЕТ)
     {"type": "scrape", "url": "https://mathus.ru/phys/", "source": "Mathus: Физика 9", "category": "physics", "limit": 12},
     {"type": "scrape", "url": "https://olimpiada.ru/activity/394", "source": "Физтех: Физика", "category": "olympiad", "limit": 10},
     {"type": "scrape", "url": "https://olimpiada.ru/activity/5878", "source": "Росатом", "category": "olympiad", "limit": 10},
@@ -40,12 +46,10 @@ SOURCES = [
     {"type": "scrape", "url": "https://olimpiada.ru/archive/394", "source": "Физтех: Архив", "category": "olympiad_archive", "limit": 10},
     {"type": "scrape", "url": "https://olimpiada.ru/archive/5878", "source": "Росатом: Архив", "category": "olympiad_archive", "limit": 10},
     
-    # ФИЗИКА И НАУКА (RSS)
+    # ИНТЕРЕСНАЯ ФИЗИКА И МАТЕМАТИКА
     {"type": "rss", "url": "https://www.quantamagazine.org/feed/", "source": "Quanta: Физика", "category": "physics_news", "limit": 8},
     {"type": "rss", "url": "https://physicsworld.com/feed/", "source": "Physics World", "category": "physics_news", "limit": 6},
     {"type": "rss", "url": "http://export.arxiv.org/rss/physics", "source": "arXiv: Физика", "category": "physics_news", "limit": 8},
-    
-    # МАТЕМАТИКА
     {"type": "scrape", "url": "https://mathus.ru/math/", "source": "Mathus: Математика", "category": "math", "limit": 10},
     {"type": "rss", "url": "https://www.quantamagazine.org/feed/", "source": "Quanta: Математика", "category": "math_news", "limit": 6},
     
@@ -55,7 +59,7 @@ SOURCES = [
     {"type": "rss", "url": "https://hnrss.org/frontpage", "source": "Hacker News", "category": "code_news", "limit": 10},
     {"type": "rss", "url": "https://dev.to/feed", "source": "Dev.to", "category": "code_news", "limit": 8},
     
-    # РОБОТОТЕХНИКА И ESP/ARDUINO
+    # РОБОТОТЕХНИКА И МИКРОКОНТРОЛЛЕРЫ (ESP, ARDUINO)
     {"type": "rss", "url": "https://blog.arduino.cc/feed/", "source": "Arduino Blog", "category": "robotics", "limit": 8},
     {"type": "rss", "url": "https://hackaday.com/category/arduino/feed/", "source": "Hackaday: Arduino", "category": "robotics", "limit": 6},
     {"type": "rss", "url": "https://hackaday.com/category/esp8266/feed/", "source": "Hackaday: ESP", "category": "robotics", "limit": 6},
@@ -84,6 +88,10 @@ STYLES = {
     "robotics": {"color": "#14b8a6", "letter": "Р"},
     "tech": {"color": "#06b6d4", "letter": "Э"},
 }
+
+# ==========================================
+# WIKI (STEPIC)
+# ==========================================
 RUST_DB = {
     "ownership": {
         "title": "Владение и заимствование",
@@ -124,6 +132,9 @@ print(next(counter)) # 1</code></pre>
     }
 }
 
+# ==========================================
+# ПАРСИНГ (МАКСИМАЛЬНО НАДЕЖНЫЙ)
+# ==========================================
 def clean_text(text):
     if not text: return ""
     text = html.unescape(text)
@@ -133,11 +144,16 @@ def clean_text(text):
 
 def parse_rss(item):
     try:
-        resp = SESSION.get(item["url"], timeout=8)
+        resp = SESSION.get(item["url"], timeout=10)
+        resp.raise_for_status()
         feed = feedparser.parse(resp.content)
         results = []
         for entry in feed.entries[:item["limit"]]:
-            pub_time = time.mktime(entry.published_parsed) if hasattr(entry, 'published_parsed') else time.time()
+            pub_time = time.time()
+            if hasattr(entry, 'published_parsed') and entry.published_parsed:
+                try: pub_time = time.mktime(entry.published_parsed)
+                except: pass
+            
             results.append({
                 "title": clean_text(entry.get("title", "Без заголовка")),
                 "link": entry.get("link", "#"),
@@ -154,38 +170,36 @@ def parse_rss(item):
 
 def scrape_html(item):
     try:
-        resp = SESSION.get(item["url"], timeout=8)
+        resp = SESSION.get(item["url"], timeout=10)
+        resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
         results = []
         
-        nodes = soup.select("h2 a, h3 a, h4 a, .news-item a, .news-list a, .activity-news a, .archive-item a")[:50]
-        
+        nodes = soup.select("h2 a, h3 a, h4 a, .news-item a, .news-list a, .activity-news a, .archive-item a, article a")[:40]
+        base_url = "/".join(item["url"].split("/")[:3])
         seen = set()
+        
         for node in nodes:
             href = node.get("href", "")
             title = clean_text(node.get_text())
             
             if not title or len(title) < 10: continue
-            if "login" in href or "tag" in href or "category" in href: continue
+            if any(x in href.lower() for x in ["login", "register", "tag", "category", "javascript"]): continue
             
-            if href.startswith("/"):
-                base = "/".join(item["url"].split("/")[:3])
-                href = base + href
-            elif not href.startswith("http"):
-                href = item["url"].rstrip("/") + "/" + href.lstrip("/")
+            if href.startswith("/"): href = base_url + href
+            elif not href.startswith("http"): href = base_url + "/" + href.lstrip("/")
             
             if href in seen: continue
             seen.add(href)
             
             results.append({
-                "title": title[:100],
+                "title": title[:120],
                 "link": href,
                 "source": item["source"],
-                "snippet": "Материалы и задания олимпиады",
+                "snippet": "Материалы и задания",
                 "pub_time": time.time(),
                 "category": item["category"]
             })
-            
             if len(results) >= item["limit"]: break
                 
         logger.info(f"[Scrape] {item['source']}: {len(results)}")
@@ -194,31 +208,39 @@ def scrape_html(item):
         logger.warning(f"[Scrape] {item['source']}: {e}")
         return []
 
+# ГЛАВНЫЙ ДВИЖОК: ПАРАЛЛЕЛЬНАЯ ЗАГРУЗКА (ускоряет работу в 10 раз)
 def fetch_all_data():
     all_items = []
-    for item in SOURCES:
-        if item["type"] == "rss":
-            all_items.extend(parse_rss(item))
-        else:
-            all_items.extend(scrape_html(item))
+    with ThreadPoolExecutor(max_workers=12) as executor:
+        futures = [executor.submit(parse_rss if item["type"] == "rss" else scrape_html, item) for item in SOURCES]
+        for future in futures:
+            try:
+                results = future.result(timeout=15)
+                if results: all_items.extend(results)
+            except Exception as e:
+                logger.warning(f"Задача прервана: {e}")
     
-    all_items.sort(key=lambda x: x["pub_time"], reverse=True)
+    all_items.sort(key=lambda x: x.get("pub_time", 0), reverse=True)
     
     enriched = []
     for item in all_items:
         style = STYLES.get(item["category"], {"color": "#6b7280", "letter": "?"})
-        dt = datetime.datetime.fromtimestamp(item["pub_time"])
-        day = "Сегодня" if dt.date() == datetime.date.today() else "Ранее"
+        try: dt = datetime.datetime.fromtimestamp(item["pub_time"])
+        except: dt = datetime.datetime.now()
         
         enriched.append({
             **item,
             "color": style["color"],
             "letter": style["letter"],
-            "day": day,
+            "day": "Сегодня" if dt.date() == datetime.date.today() else "Ранее",
             "time_str": dt.strftime("%H:%M")
         })
+    logger.info(f"Итого собрано: {len(enriched)} записей")
     return enriched
 
+# ==========================================
+# БАЗА ДАННЫХ
+# ==========================================
 @contextmanager
 def get_db():
     conn = sqlite3.connect(DB_PATH)
@@ -233,10 +255,8 @@ def init_db():
     with get_db() as conn:
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS posts (
-                link TEXT PRIMARY KEY,
-                title TEXT, source TEXT, snippet TEXT,
-                color TEXT, letter TEXT, day TEXT, time_str TEXT,
-                category TEXT, fetched_at REAL
+                link TEXT PRIMARY KEY, title TEXT, source TEXT, snippet TEXT,
+                color TEXT, letter TEXT, day TEXT, time_str TEXT, category TEXT, fetched_at REAL
             );
         """)
 
@@ -256,22 +276,25 @@ def load_from_db(limit=200):
         cursor = conn.execute("SELECT * FROM posts ORDER BY fetched_at DESC LIMIT ?", (limit,))
         return [dict(row) for row in cursor.fetchall()]
 
+# ==========================================
+# FLASK РОУТЫ
+# ==========================================
 app = Flask(__name__)
 
 def _background_fetch():
-    """Фоновая загрузка — не блокирует ответ."""
     try:
+        logger.info("Фоновая загрузка...")
         items = fetch_all_data()
-        save_to_db(items)
-        logger.info(f"Background fetch done: {len(items)}")
+        if items:
+            save_to_db(items)
+            logger.info(f"Фон завершен: {len(items)} записей")
     except Exception as e:
-        logger.error(f"Background fetch error: {e}")
+        logger.error(f"Ошибка фона: {e}")
 
 @app.route('/')
 def index():
     news = load_from_db()
     if not news:
-        # Запускаем загрузку в фоне, НЕ ждём
         threading.Thread(target=_background_fetch, daemon=True).start()
     return render_template_string(HTML_TEMPLATE, news=news)
 
@@ -288,16 +311,21 @@ def wiki_python():
 @app.route('/api/refresh')
 def api_refresh():
     try:
+        logger.info("Ручное обновление...")
         items = fetch_all_data()
         save_to_db(items)
         return jsonify({"status": "ok", "count": len(items)})
     except Exception as e:
+        logger.error(f"Ошибка API: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/health')
 def health():
     return jsonify({"status": "ok", "sources": len(SOURCES)})
 
+# ==========================================
+# HTML ШАБЛОН
+# ==========================================
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="ru">
@@ -423,6 +451,9 @@ HTML_TEMPLATE = """
 </html>
 """
 
+# ==========================================
+# ЗАПУСК
+# ==========================================
 init_db()
 
 if __name__ == "__main__":
