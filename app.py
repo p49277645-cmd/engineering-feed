@@ -56,7 +56,6 @@ def save_to_memory(title, link, source, snippet="", pub_time=None):
 
         style = SOURCE_STYLES.get(source, {"color": "#8b8b90", "letter": source[0]})
         
-        # Формируем дату для группировки
         dt_obj = datetime.datetime.fromtimestamp(pub_time)
         today = datetime.date.today()
         if dt_obj.date() == today:
@@ -86,11 +85,9 @@ def get_rss_feed(url, source_name, limit=6):
         for entry in feed.entries[:limit]:
             summary = entry.get('summary', '')
             snippet = clean_snippet(summary)
-            
             pub_time = None
             if hasattr(entry, 'published_parsed') and entry.published_parsed:
                 pub_time = time.mktime(entry.published_parsed)
-                
             save_to_memory(entry.title, entry.link, source_name, snippet, pub_time)
     except Exception as e:
         print(f"Ошибка RSS {source_name}: {e}")
@@ -102,7 +99,6 @@ def scrape_mathus(url, source_name):
         links = soup.find_all('a')
         count = 0
         blacklist = ['олимпиадам', 'дви мгу', 'telegram', 'на главную', 'физика', 'математика']
-        
         for link in links:
             href = link.get('href')
             text = link.text.strip()
@@ -117,7 +113,6 @@ def scrape_mathus(url, source_name):
 def fetch_all_news():
     global news_db, last_update_time
     news_db.clear()
-    
     get_rss_feed("https://habr.com/ru/rss/best/daily/?fl=ru", "Хабр", limit=12)
     get_rss_feed("https://hackaday.com/feed/", "Hackaday", limit=8)
     scrape_mathus("https://mathus.ru/phys/", "Mathus")
@@ -143,7 +138,7 @@ HTML_TEMPLATE = """
             --border: rgba(255, 255, 255, 0.05);
             --border-hover: rgba(255, 255, 255, 0.09);
             --text-main: #f4f4f6;
-            --text-muted: #b8b8c0; /* Источник */
+            --text-muted: #b8b8c0;
             --text-snippet: #9a9aa2;
             --text-time: #7c7c84;
             --accent: #bb86fc;
@@ -163,19 +158,18 @@ HTML_TEMPLATE = """
             --accent: #7c3aed;
         }
 
-        /* Кастомный скроллбар */
-        ::-webkit-scrollbar { width: 10px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #2a2a30; border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: #3a3a40; }
+        /* Скроллбар */
+        ::-webkit-scrollbar { width: 10px !important; }
+        ::-webkit-scrollbar-track { background: transparent !important; }
+        ::-webkit-scrollbar-thumb { background: #2a2a30 !important; border-radius: 8px !important; }
+        ::-webkit-scrollbar-thumb:hover { background: #3a3a40 !important; }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
         
         body { 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
             background-color: var(--bg-base); 
-            /* Тот самый радиальный градиент */
-            background-image: radial-gradient(800px 400px at 50% -100px, rgba(124,92,246,.07), transparent);
+            background-image: radial-gradient(900px 420px at 50% -120px, rgba(124,92,246,.07), transparent);
             color: var(--text-main); 
             -webkit-font-smoothing: antialiased; 
             padding-top: 64px; 
@@ -183,66 +177,71 @@ HTML_TEMPLATE = """
 
         ::selection { background: var(--accent); color: #000; }
 
-        /* --- ШАПКА (64px, Sticky, Blur) --- */
+        /* Шапка 64px */
         header { 
-            position: fixed; top: 0; left: 0; right: 0; height: 64px; 
+            position: fixed; top: 0; left: 0; right: 0; height: 64px !important; 
             background: var(--bg-header); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); 
             border-bottom: 1px solid var(--border); 
             display: flex; align-items: center; justify-content: center; z-index: 100; 
         }
         .header-content { 
-            width: 100%; max-width: 720px; display: flex; justify-content: space-between; align-items: center; padding: 0 16px; 
+            width: 100%; max-width: 740px !important; display: flex; justify-content: space-between; align-items: center; padding: 0 16px; 
         }
-        .logo-wrap { display: flex; flex-direction: column; }
-        .logo { font-weight: 700; font-size: 1.1rem; display: flex; align-items: center; gap: 8px;}
-        .updated-time { font-size: 12px; color: var(--text-time); margin-top: 2px; }
-        .unread-badge { background: rgba(187, 134, 252, 0.16); color: var(--accent); font-size: 12px; padding: 2px 8px; border-radius: 999px; font-weight: 600; }
+        .logo-wrap { display: flex; align-items: center; gap: 12px; }
+        .logo { font-weight: 700; font-size: 16px !important; display: flex; align-items: center; gap: 8px;}
+        .unread-badge { background: rgba(187, 134, 252, 0.16); color: var(--accent); font-size: 11px !important; padding: 2px 6px; border-radius: 999px; font-weight: 600; }
         
         .header-actions { display: flex; gap: 8px; align-items: center; }
-        .btn-icon { width: 36px; height: 36px; background: transparent; border: none; color: var(--text-time); cursor: pointer; display: flex; align-items: center; justify-content: center; border-radius: 10px; transition: all 0.2s; }
+        .updated-time { font-size: 12px !important; color: var(--text-time); margin-right: 8px; }
+        
+        .btn-icon { width: 36px !important; height: 36px !important; background: transparent; border: none; color: var(--text-time); cursor: pointer; display: flex; align-items: center; justify-content: center; border-radius: 10px; transition: all 0.2s; }
         .btn-icon:hover { background: rgba(255,255,255,.07); color: var(--text-main); }
         .btn-icon:active { background: rgba(255,255,255,.12); }
-        .btn-icon svg { width: 20px; height: 20px; fill: currentColor; }
+        .btn-icon svg { width: 20px !important; height: 20px !important; fill: currentColor; }
         @keyframes spin { 100% { transform: rotate(360deg); } }
         .spin-anim svg { animation: spin 1s linear infinite; }
 
-        /* --- ПОИСК И ЧИПЫ (Плотные) --- */
-        .controls { max-width: 720px; margin: 16px auto 8px; padding: 0 16px; }
+        /* Поиск и Чипы */
+        .controls { max-width: 740px !important; margin: 20px auto 8px; padding: 0 16px; }
         .search-wrapper { position: relative; margin-bottom: 12px; }
-        .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; stroke: var(--text-time); fill: none; stroke-width: 2; pointer-events: none; }
-        .search-input { width: 100%; height: 44px; padding: 0 40px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-main); font-size: 14px; outline: none; transition: all 0.2s; }
+        .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 18px !important; height: 18px !important; stroke: var(--text-time); fill: none; stroke-width: 2; pointer-events: none; }
+        .search-input { width: 100%; height: 44px !important; padding: 0 40px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-main); font-size: 14px !important; outline: none; transition: all 0.2s; }
         .search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(187, 134, 252, 0.22); }
         
-        .kbd-hint { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--text-time); background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1); pointer-events: none; }
+        .kbd-hint { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: 11px !important; color: var(--text-time); background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1); pointer-events: none; }
         .clear-btn { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-time); cursor: pointer; display: none; align-items: center; justify-content: center; }
         
         .chips-container { position: relative; }
         .chips-container::after { content: ''; position: absolute; right: 0; top: 0; bottom: 8px; width: 40px; background: linear-gradient(to right, transparent, var(--bg-base)); pointer-events: none; }
         .chips-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none; }
         .chips-row::-webkit-scrollbar { display: none; }
-        .chip { height: 32px; background: transparent; border: 1px solid rgba(255,255,255,.1); color: var(--text-muted); padding: 0 12px; border-radius: 999px; font-size: 13px; cursor: pointer; white-space: nowrap; transition: all 0.2s; display: flex; align-items: center; gap: 6px; }
+        .chip { height: 32px !important; background: transparent; border: 1px solid rgba(255,255,255,.1); color: var(--text-muted); padding: 0 12px; border-radius: 999px; font-size: 13px !important; cursor: pointer; white-space: nowrap; transition: all 0.2s; display: flex; align-items: center; gap: 6px; }
         .chip:hover { background: rgba(255,255,255,.05); }
         .chip.active { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 600; box-shadow: 0 2px 8px rgba(187, 134, 252, 0.35); }
-        .chip-count { background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 10px; font-size: 11px; }
+        .chip-count { background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 10px; font-size: 11px !important; font-weight: 600; }
         
-        /* --- ЛЕНТА И ДНИ --- */
-        .container { width: 100%; max-width: 720px; margin: 0 auto; padding: 0 16px 40px; }
+        /* Лента */
+        .container { width: 100%; max-width: 740px !important; margin: 0 auto; padding: 0 16px 40px; }
         
+        /* Липкие заголовки */
         .day-header { 
-            position: sticky; top: 64px; z-index: 10; 
+            position: sticky; top: 64px !important; z-index: 10; 
             background: var(--bg-header); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-            font-size: 13px; font-weight: 600; color: var(--text-muted); 
+            font-size: 12px !important; font-weight: 600; color: var(--text-muted); 
             padding: 12px 0 8px; margin-top: 8px; border-bottom: 1px solid var(--border);
+            text-transform: uppercase; letter-spacing: 0.5px;
         }
 
-        /* --- КАРТОЧКА (Плотная и Глубокая) --- */
+        /* Карточка (Строго 20-22px, 16px, 12px gap) */
         .card { 
             background-color: var(--bg-card-unread); 
-            border-radius: 16px; padding: 20px; margin-top: 12px; 
+            border-radius: 16px !important; 
+            padding: 20px 22px !important; 
+            margin-top: 12px !important; 
             border: 1px solid var(--border); 
             transition: all 160ms ease; 
             animation: slideUp 0.18s ease forwards; opacity: 0; transform: translateY(6px); 
-            display: flex; gap: 12px; position: relative; cursor: pointer; 
+            display: flex; gap: 12px !important; position: relative; cursor: pointer; 
         }
         .card:hover { 
             background-color: var(--bg-card-hover); 
@@ -252,40 +251,43 @@ HTML_TEMPLATE = """
         }
         .card:active { transform: scale(0.995); }
         
-        /* Прочитанное гасим */
+        /* Прочитанное */
         .card.read { opacity: 0.6; background-color: var(--bg-card); }
-        .card.read .card-title { color: var(--text-time); }
+        .card.read .card-title { color: #8a8a92 !important; }
         .card.read .avatar { opacity: 0.85; }
-        .card.read .unread-dot { display: none; }
+        .card.read .unread-dot { display: none !important; }
 
         @keyframes slideUp { to { opacity: 1; transform: translateY(0); } }
         
         .avatar-wrap { position: relative; flex-shrink: 0; }
-        .avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #000; font-size: 15px; }
-        .unread-dot { position: absolute; top: -2px; right: -2px; width: 9px; height: 9px; background: var(--accent); border-radius: 50%; box-shadow: 0 0 0 2px var(--bg-card-unread); }
+        .avatar { width: 42px !important; height: 42px !important; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #000; font-size: 16px !important; }
+        .unread-dot { position: absolute; top: -2px; right: -2px; width: 9px !important; height: 9px !important; background: var(--accent); border-radius: 50%; box-shadow: 0 0 0 2px var(--bg-card-unread); }
         
         .card-body { flex-grow: 1; min-width: 0; }
-        .meta-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-        .source-name { font-weight: 600; font-size: 13px; color: var(--text-muted); }
-        .time { font-size: 12px; color: var(--text-time); font-variant-numeric: tabular-nums; }
+        .meta-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+        .source-name { font-weight: 600; font-size: 13px !important; color: var(--text-muted); }
+        .time { font-size: 12px !important; color: var(--text-time); font-variant-numeric: tabular-nums; }
         
-        .card-title { font-size: 17px; font-weight: 600; line-height: 1.35; margin-bottom: 6px; display: block; color: var(--text-main); text-decoration: none; transition: color 0.15s; }
+        .card-title { font-size: 17px !important; font-weight: 600; line-height: 1.35 !important; margin-bottom: 6px; display: block; color: var(--text-main); text-decoration: none; transition: color 0.15s; }
         .card-title:hover { color: var(--accent); }
         
-        .card-snippet { font-size: 14px; color: var(--text-snippet); line-height: 1.55; margin-bottom: 12px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .card-snippet { font-size: 14px !important; color: var(--text-snippet); line-height: 1.55 !important; margin-bottom: 12px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         
-        .card-footer { display: flex; justify-content: space-between; align-items: center; }
-        .tag { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 6px; cursor: pointer; transition: opacity 0.2s; }
+        .card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
+        .tag { font-size: 11px !important; font-weight: 600; padding: 3px 8px; border-radius: 6px; cursor: pointer; transition: opacity 0.2s; }
         .tag:hover { opacity: 0.8; }
         
         .actions-group { display: flex; gap: 4px; }
-        .action-btn { background: none; border: none; color: var(--text-time); cursor: pointer; display: flex; align-items: center; gap: 4px; font-size: 12px; transition: color 0.2s; padding: 4px 8px; border-radius: 6px; }
+        .action-btn { background: none; border: none; color: var(--text-time); cursor: pointer; display: flex; align-items: center; gap: 4px; font-size: 12px !important; transition: color 0.2s; padding: 4px 8px; border-radius: 6px; }
         .action-btn:hover { background: rgba(255,255,255,.06); color: var(--text-main); }
-        .action-btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; }
-        .action-btn.active { color: var(--accent); }
-        .action-btn.active svg { fill: var(--accent); stroke: var(--accent); }
+        .action-btn svg { width: 14px !important; height: 14px !important; fill: none; stroke: currentColor; stroke-width: 2; }
+        
+        /* Активная закладка */
+        .action-btn.active { color: var(--accent) !important; }
+        .action-btn.active svg { fill: var(--accent) !important; stroke: var(--accent) !important; }
+        .action-btn.active span { color: var(--accent) !important; }
 
-        /* --- ТОСТ И СКЕЛЕТОНЫ --- */
+        /* Тост и Скелетоны */
         .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(100px); background: var(--bg-card); border: 1px solid var(--border); padding: 12px 24px; border-radius: 12px; font-size: 14px; font-weight: 500; box-shadow: 0 8px 32px rgba(0,0,0,0.5); transition: transform 0.3s ease; z-index: 1000; display: flex; align-items: center; gap: 12px; }
         .toast.show { transform: translateX(-50%) translateY(0); }
         
@@ -300,11 +302,11 @@ HTML_TEMPLATE = """
                 <div class="logo">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="var(--accent)" stroke="none"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
                     <span>EngFeed</span>
-                    <span class="unread-badge" id="unread-counter">0</span>
                 </div>
-                <div class="updated-time" id="updated-time">обновлено только что</div>
+                <span class="unread-badge" id="unread-counter">0</span>
             </div>
             <div class="header-actions">
+                <span class="updated-time" id="updated-time">обновлено в {{ update_time }}</span>
                 <button class="btn-icon" id="theme-toggle" title="Сменить тему">
                     <svg viewBox="0 0 24 24"><path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" stroke="currentColor" fill="none" stroke-width="2"/></svg>
                 </button>
@@ -330,13 +332,11 @@ HTML_TEMPLATE = """
                 <div class="chip active" data-filter="all">Все</div>
                 <div class="chip" data-filter="unread">Непрочитанные</div>
                 <div class="chip" data-filter="bookmarks">Закладки</div>
-                <!-- Сюда JS добавит чипы с счетчиками -->
             </div>
         </div>
     </div>
 
     <main class="container" id="feed-container">
-        <!-- Скелетоны при загрузке -->
         <div id="skeletons" style="display: none;">
             <div class="skeleton"></div>
             <div class="skeleton"></div>
@@ -387,21 +387,18 @@ HTML_TEMPLATE = """
         </div>
     </main>
 
-    <!-- Тост -->
     <div class="toast" id="toast">
         <span id="toast-text">+3 новых поста</span>
         <button style="background: none; border: none; color: var(--accent); cursor: pointer; font-weight: 600;" onclick="document.getElementById('toast').classList.remove('show')">ОК</button>
     </div>
 
     <script>
-        // Сбор данных из Python
         const sourceCounts = {
             {% for source, count in source_counts.items() %}
                 "{{ source }}": {{ count }},
             {% endfor %}
         };
 
-        // Генерация чипов с счетчиками
         const chipsRow = document.getElementById('filter-chips');
         for (const [source, count] of Object.entries(sourceCounts)) {
             if (count > 0) {
@@ -413,20 +410,16 @@ HTML_TEMPLATE = """
             }
         }
 
-        // Логика обновления и скелетонов
         function refreshFeed() {
             const btn = document.getElementById('refresh-btn');
             btn.classList.add('spin-anim');
-            
             document.getElementById('actual-feed').style.display = 'none';
             document.getElementById('skeletons').style.display = 'block';
-
             setTimeout(() => {
                 window.location.href = '/refresh?t=' + Date.now();
             }, 800);
         }
 
-        // Показ тоста, если есть параметр в URL
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('new')) {
             document.getElementById('toast-text').innerText = `+${urlParams.get('new')} новых постов`;
@@ -434,7 +427,6 @@ HTML_TEMPLATE = """
             setTimeout(() => document.getElementById('toast').classList.remove('show'), 3500);
         }
 
-        // Хоткей "/"
         document.addEventListener('keydown', (e) => {
             if (e.key === '/' && document.activeElement.tagName !== 'INPUT') {
                 e.preventDefault();
@@ -442,7 +434,6 @@ HTML_TEMPLATE = """
             }
         });
 
-        // Тема
         const themeToggle = document.getElementById('theme-toggle');
         const currentTheme = localStorage.getItem('theme') || 'dark';
         document.documentElement.setAttribute('data-theme', currentTheme);
@@ -452,7 +443,6 @@ HTML_TEMPLATE = """
             localStorage.setItem('theme', newTheme);
         });
 
-        // Read/Unread и Закладки
         let readLinks = JSON.parse(localStorage.getItem('readLinks')) || [];
         let bookmarks = JSON.parse(localStorage.getItem('bookmarks')) || [];
         const cards = document.querySelectorAll('.card');
@@ -496,7 +486,6 @@ HTML_TEMPLATE = """
             updateUnreadCount();
         }
 
-        // Кнопки копирования и закладок
         document.querySelectorAll('.bookmark-btn').forEach(btn => {
             btn.onclick = (e) => {
                 e.stopPropagation();
@@ -520,7 +509,6 @@ HTML_TEMPLATE = """
             };
         });
 
-        // Фильтрация
         let activeFilter = 'all';
         
         function filterCards() {
@@ -545,7 +533,6 @@ HTML_TEMPLATE = """
                 if (isVisible) visibleCount++;
             });
 
-            // Скрываем заголовки дней, если под ними пусто (опционально, но JS для этого сложноват, оставим просто проверку на пустоту)
             emptyState.style.display = visibleCount === 0 ? 'block' : 'none';
         }
 
@@ -559,8 +546,6 @@ HTML_TEMPLATE = """
         });
         
         document.getElementById('search-input').oninput = filterCards;
-        
-        // Инициализация
         applyState();
     </script>
 </body>
@@ -570,7 +555,6 @@ HTML_TEMPLATE = """
 @app.route('/')
 def index():
     global news_db, last_update_time
-    # Параметр new показывает, сколько статей пришло с последнего обновления (симуляция)
     new_count = 0
     
     if not news_db:
@@ -583,8 +567,7 @@ def index():
     source_counts = Counter(item['source'] for item in news_db)
     update_time = datetime.datetime.now().strftime("%H:%M")
     
-    # Передаем new_count в шаблон (для тоста)
-    return render_template_string(HTML_TEMPLATE, news=news_db, update_time=update_time, source_counts=source_counts) + f"<script>if({new_count}>0) window.location.href='/ ?new={new_count}';</script>" if new_count else render_template_string(HTML_TEMPLATE, news=news_db, update_time=update_time, source_counts=source_counts)
+    return render_template_string(HTML_TEMPLATE, news=news_db, update_time=update_time, source_counts=source_counts)
 
 @app.route('/refresh')
 def refresh():
