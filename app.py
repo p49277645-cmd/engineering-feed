@@ -13,12 +13,11 @@ news_db = []
 last_update_time = 0
 
 SOURCE_STYLES = {
-    "Хабр: Физика": {"color": "#bb86fc", "letter": "Ф"},
-    "Хабр: Электроника": {"color": "#03dac6", "letter": "Э"},
-    "Хабр: Python": {"color": "#f4b400", "letter": "P"},
-    "Хабр: C++": {"color": "#4285f4", "letter": "C"},
+    "Хабр": {"color": "#bb86fc", "letter": "Х"},
     "Hackaday": {"color": "#cf6679", "letter": "H"},
-    "Mathus": {"color": "#0f9d58", "letter": "M"}
+    "Mathus": {"color": "#0f9d58", "letter": "M"},
+    "МИФИ": {"color": "#4285f4", "letter": "М"},
+    "Росатом": {"color": "#f4b400", "letter": "Р"}
 }
 
 def clean_snippet(raw_html):
@@ -35,7 +34,7 @@ def get_relative_time(ts):
     if diff < 60: return "Только что"
     elif diff < 3600: return f"{int(diff // 60)} мин назад"
     elif diff < 86400: return f"{int(diff // 3600)} ч назад"
-    else: 
+    else:
         dt = datetime.datetime.fromtimestamp(ts)
         return dt.strftime("%d %b, %H:%M")
 
@@ -49,9 +48,9 @@ def save_to_memory(title, link, source, snippet="", pub_time=None):
         style = SOURCE_STYLES.get(source, {"color": "#8b8b90", "letter": source[0]})
         
         news_db.append({
-            'title': title, 
-            'link': link, 
-            'source': source, 
+            'title': title,
+            'link': link,
+            'source': source,
             'snippet': snippet,
             'color': style["color"],
             'letter': style["letter"],
@@ -59,10 +58,10 @@ def save_to_memory(title, link, source, snippet="", pub_time=None):
             'raw_time': pub_time
         })
 
-def get_rss_feed(url, source_name):
+def get_rss_feed(url, source_name, limit=6):
     try:
         feed = feedparser.parse(url)
-        for entry in feed.entries[:6]: # Берем 6 статей с каждого хаба
+        for entry in feed.entries[:limit]:
             summary = entry.get('summary', '')
             snippet = clean_snippet(summary)
             
@@ -83,7 +82,7 @@ def scrape_mathus(url, source_name):
         for link in links:
             href = link.get('href')
             text = link.text.strip()
-            if text and len(text) > 5 and count < 3: 
+            if text and len(text) > 5 and count < 3:
                 if href.startswith('/'):
                     href = url + href
                 save_to_memory(text, href, source_name, "Олимпиадная задача. Проверьте свои силы!", time.time() - 3600)
@@ -91,15 +90,39 @@ def scrape_mathus(url, source_name):
     except Exception as e:
         print(f"Ошибка парсинга {source_name}: {e}")
 
+def scrape_mephi(url, source_name):
+    try:
+        response = requests.get(url, timeout=10)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        # Ищем заголовки новостей (примерный селектор, может потребовать уточнения)
+        articles = soup.find_all('a', class_='news-item') or soup.find_all('h3')
+        count = 0
+        for article in articles:
+            if count >= 2: break
+            link_tag = article.find('a') if article.name != 'a' else article
+            if link_tag and link_tag.get('href'):
+                href = link_tag.get('href')
+                title = link_tag.text.strip()
+                if title and len(title) > 5:
+                    if href.startswith('/'):
+                        href = url + href
+                    save_to_memory(title, href, source_name, "Новости и объявления МИФИ.", time.time() - 7200)
+                    count += 1
+    except Exception as e:
+        print(f"Ошибка парсинга {source_name}: {e}")
+
 def fetch_all_news():
     global news_db, last_update_time
-    news_db.clear() 
-    get_rss_feed("https://habr.com/ru/rss/hubs/physics/articles/all/?fl=ru", "Хабр: Физика")
-    get_rss_feed("https://habr.com/ru/rss/hubs/easyelectronics/articles/all/?fl=ru", "Хабр: Электроника")
-    get_rss_feed("https://habr.com/ru/rss/hubs/python/articles/all/?fl=ru", "Хабр: Python")
-    get_rss_feed("https://habr.com/ru/rss/hubs/cpp/articles/all/?fl=ru", "Хабр: C++")
-    get_rss_feed("https://hackaday.com/feed/", "Hackaday")
+    news_db.clear()
+    
+    # Стабильная общая лента Хабра
+    get_rss_feed("https://habr.com/ru/rss/best/daily/?fl=ru", "Хабр", limit=10)
+    get_rss_feed("https://hackaday.com/feed/", "Hackaday", limit=5)
+    
+    # Парсинг сайтов без RSS
     scrape_mathus("https://mathus.ru/phys/", "Mathus")
+    scrape_mephi("https://olymp.mephi.ru/", "МИФИ")
+    scrape_mephi("https://rosatom.ru/press-center/news/", "Росатом")
     
     news_db.sort(key=lambda x: x['raw_time'], reverse=True)
     last_update_time = time.time()
@@ -125,55 +148,57 @@ HTML_TEMPLATE = """
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg-base); color: var(--text-main); -webkit-font-smoothing: antialiased; padding-top: 64px; transition: background 0.3s; }
         
-        header { position: fixed; top: 0; left: 0; right: 0; height: 64px; background: var(--bg-header); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: center; z-index: 100; }
-        .header-content { width: 100%; max-width: 640px; display: flex; justify-content: space-between; align-items: center; padding: 0 16px; }
-        
+        header { position: fixed; top: 0; left: 0; right: 0; height: 64px; background: var(--bg-header); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: center; z-index: 100; }
+        .header-content { width: 100%; max-width: 720px; display: flex; justify-content: space-between; align-items: center; padding: 0 16px; }
         .logo-wrap { display: flex; flex-direction: column; }
         .logo { font-weight: 700; font-size: 1.1rem; display: flex; align-items: center; gap: 8px;}
         .last-updated { font-size: 0.7rem; color: var(--text-muted); margin-top: 2px; }
-        
-        .unread-count { background: var(--accent); color: #000; font-size: 0.75rem; padding: 2px 8px; border-radius: 12px; font-weight: bold; }
-        .header-actions { display: flex; gap: 12px; align-items: center; }
-        
-        .btn-icon { background: none; border: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 8px; border-radius: 8px; transition: background 0.2s, transform 0.2s; }
-        .btn-icon:hover { background: var(--border); color: var(--text-main); }
+        .unread-count { background: rgba(187, 134, 252, 0.16); color: var(--accent); font-size: 0.75rem; padding: 2px 8px; border-radius: 12px; font-weight: 600; }
+        .header-actions { display: flex; gap: 8px; align-items: center; }
+        .btn-icon { background: none; border: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 8px; border-radius: 10px; transition: background 0.2s, transform 0.2s; }
+        .btn-icon:hover { background: rgba(255,255,255,.07); color: var(--text-main); }
+        .btn-icon:active { background: rgba(255,255,255,.12); }
         .btn-icon svg { width: 20px; height: 20px; fill: currentColor; }
-        
-        /* Анимация вращения для кнопки обновления */
         @keyframes spin { 100% { transform: rotate(360deg); } }
         .spin-anim svg { animation: spin 1s linear infinite; }
 
-        .controls { max-width: 640px; margin: 20px auto 10px; padding: 0 16px; }
-        .search-input { width: 100%; padding: 12px 16px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-main); font-size: 0.95rem; margin-bottom: 12px; outline: none; }
-        .search-input:focus { border-color: var(--accent); }
-        .chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none; }
-        .chips::-webkit-scrollbar { display: none; }
-        .chip { background: var(--bg-card); border: 1px solid var(--border); color: var(--text-muted); padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; cursor: pointer; white-space: nowrap; transition: all 0.2s; }
-        .chip:hover, .chip.active { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 600; }
+        .controls { max-width: 720px; margin: 20px auto 10px; padding: 0 16px; }
+        .search-wrapper { position: relative; margin-bottom: 12px; }
+        .search-wrapper svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; stroke: var(--text-muted); fill: none; stroke-width: 2; pointer-events: none; }
+        .search-input { width: 100%; padding: 12px 16px 12px 40px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-main); font-size: 0.95rem; outline: none; transition: border-color 0.2s, box-shadow 0.2s; }
+        .search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(187, 134, 252, 0.22); }
         
-        .container { max-width: 640px; margin: 0 auto; padding: 0 16px 40px; }
-        .card { background-color: var(--bg-card); border-radius: 16px; padding: 16px; margin-bottom: 12px; border: 1px solid var(--border); transition: background-color 0.2s, opacity 0.2s; animation: slideUp 0.4s ease forwards; opacity: 0; transform: translateY(15px); display: flex; gap: 12px; position: relative; cursor: pointer; }
-        .card:hover { background-color: var(--bg-hover); }
+        .chips-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none; }
+        .chips-row::-webkit-scrollbar { display: none; }
+        .chip { background: transparent; border: 1px solid rgba(255,255,255,.1); color: #b4b4ba; padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; cursor: pointer; white-space: nowrap; transition: all 0.2s; }
+        .chip:hover { background: rgba(255,255,255,.05); }
+        .chip.active { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 600; box-shadow: 0 2px 8px rgba(187, 134, 252, 0.35); }
+        
+        .container { max-width: 720px; margin: 0 auto; padding: 0 16px 40px; }
+        .card { background-color: var(--bg-card); border-radius: 16px; padding: 20px; margin-bottom: 14px; border: 1px solid var(--border); transition: background-color 0.2s, opacity 0.2s, transform 0.1s; animation: slideUp 0.18s ease forwards; opacity: 0; transform: translateY(6px); display: flex; gap: 16px; position: relative; cursor: pointer; }
+        .card:hover { background-color: var(--bg-hover); box-shadow: 0 6px 20px rgba(0,0,0,.35); }
+        .card:active { transform: scale(0.995); }
         .card.read { opacity: 0.5; }
-        .card.read .card-title { color: var(--text-muted); }
+        .card.read .card-title { color: #8f8f96; }
         @keyframes slideUp { to { opacity: 1; transform: translateY(0); } }
         
         .avatar-wrap { position: relative; flex-shrink: 0; }
-        .avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #000; font-size: 1.1rem; }
-        .unread-dot { position: absolute; top: -2px; right: -2px; width: 10px; height: 10px; background: var(--accent); border-radius: 50%; border: 2px solid var(--bg-card); display: none; }
+        .avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #000; font-size: 1rem; box-shadow: 0 0 0 2px var(--bg-card); }
+        .unread-dot { position: absolute; top: -2px; right: -2px; width: 9px; height: 9px; background: var(--accent); border-radius: 50%; border: 2px solid var(--bg-card); display: none; }
         .card:not(.read) .unread-dot { display: block; }
         
         .card-body { flex-grow: 1; }
         .meta-info { display: flex; justify-content: space-between; margin-bottom: 4px; }
-        .source-name { font-weight: 600; font-size: 0.9rem; color: var(--text-main); }
-        .time { font-size: 0.8rem; color: var(--text-muted); }
-        .card-title { font-size: 1.05rem; font-weight: 600; line-height: 1.4; margin-bottom: 6px; display: block; }
-        .card-snippet { font-size: 0.9rem; color: var(--text-muted); line-height: 1.4; margin-bottom: 12px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .source-name { font-weight: 600; font-size: 0.875rem; color: #e6e6ea; }
+        .time { font-size: 0.75rem; color: #8b8b90; font-variant-numeric: tabular-nums; }
+        .card-title { font-size: 1.05rem; font-weight: 600; line-height: 1.4; margin-bottom: 6px; display: block; color: inherit; text-decoration: none; transition: color 0.15s; }
+        .card-title:hover { color: var(--accent); }
+        .card-snippet { font-size: 0.875rem; color: #a2a2a8; line-height: 1.55; margin-bottom: 12px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
         
-        .card-footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); padding-top: 10px; }
-        .tag { font-size: 0.75rem; color: var(--accent); background: rgba(187, 134, 252, 0.1); padding: 2px 8px; border-radius: 6px; }
-        .action-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 4px; font-size: 0.85rem; transition: color 0.2s; }
-        .action-btn:hover { color: var(--text-main); }
+        .card-footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,.05); padding-top: 10px; }
+        .tag { font-size: 0.75rem; color: var(--accent); background: rgba(187, 134, 252, 0.1); padding: 2px 8px; border-radius: 6px; cursor: pointer; }
+        .action-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 4px; font-size: 0.85rem; transition: color 0.2s; padding: 4px 8px; border-radius: 6px; }
+        .action-btn:hover { background: rgba(255,255,255,.06); color: var(--text-main); }
         .action-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; }
         .action-btn.active { color: var(--accent); }
         .action-btn.active svg { fill: var(--accent); stroke: var(--accent); }
@@ -184,17 +209,16 @@ HTML_TEMPLATE = """
         <div class="header-content">
             <div class="logo-wrap">
                 <div class="logo">
-                    <span>⚡ EngFeed</span>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="var(--accent)" stroke="none"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                    <span>EngFeed</span>
                     <span class="unread-count" id="unread-counter">0</span>
                 </div>
-                <!-- Показываем время последнего обновления -->
                 <div class="last-updated">обновлено в {{ update_time }}</div>
             </div>
             <div class="header-actions">
                 <button class="btn-icon" id="theme-toggle" title="Сменить тему">
                     <svg viewBox="0 0 24 24"><path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
                 </button>
-                <!-- Кнопка обновления с анимацией вращения -->
                 <button class="btn-icon" id="refresh-btn" onclick="refreshFeed()" title="Обновить ленту">
                     <svg viewBox="0 0 24 24"><path d="M21 2v6h-6M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/></svg>
                 </button>
@@ -203,14 +227,19 @@ HTML_TEMPLATE = """
     </header>
 
     <div class="controls">
-        <input type="text" id="search-input" class="search-input" placeholder="Поиск по заголовкам...">
-        <div class="chips" id="filter-chips">
+        <div class="search-wrapper">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>
+            <input type="text" id="search-input" class="search-input" placeholder="Поиск по заголовкам...">
+        </div>
+        <div class="chips-row" id="filter-chips">
             <div class="chip active" data-filter="all">Все</div>
             <div class="chip" data-filter="unread">Непрочитанные</div>
             <div class="chip" data-filter="bookmarks">Закладки</div>
             <div class="chip" data-filter="Хабр">Хабр</div>
             <div class="chip" data-filter="Hackaday">Hackaday</div>
             <div class="chip" data-filter="Mathus">Mathus</div>
+            <div class="chip" data-filter="МИФИ">МИФИ</div>
+            <div class="chip" data-filter="Росатом">Росатом</div>
         </div>
     </div>
 
@@ -242,13 +271,12 @@ HTML_TEMPLATE = """
     </main>
 
     <script>
-        // Логика кнопки обновления с анимацией
         function refreshFeed() {
             const btn = document.getElementById('refresh-btn');
             btn.classList.add('spin-anim');
             setTimeout(() => {
                 window.location.href = '/refresh?t=' + Date.now();
-            }, 500); // Ждем полсекунды для красоты
+            }, 500);
         }
 
         const themeToggle = document.getElementById('theme-toggle');
@@ -286,7 +314,7 @@ HTML_TEMPLATE = """
                 }
 
                 card.onclick = (e) => {
-                    if (e.target.closest('.bookmark-btn')) return;
+                    if (e.target.closest('.bookmark-btn') || e.target.closest('.tag')) return;
                     if (!readLinks.includes(link)) {
                         readLinks.push(link);
                         localStorage.setItem('readLinks', JSON.stringify(readLinks));
@@ -307,6 +335,15 @@ HTML_TEMPLATE = """
                 else bookmarks.push(link);
                 localStorage.setItem('bookmarks', JSON.stringify(bookmarks));
                 applyState();
+            };
+        });
+
+        document.querySelectorAll('.tag').forEach(tag => {
+            tag.onclick = (e) => {
+                e.stopPropagation();
+                const sourceName = tag.innerText.replace('#', '');
+                const chip = document.querySelector(`.chip[data-filter="${sourceName}"]`);
+                if (chip) chip.click();
             };
         });
 
@@ -352,7 +389,6 @@ def index():
     if not news_db or (time.time() - last_update_time > 3600):
         fetch_all_news()
     
-    # Получаем текущее время для отображения в хедере
     update_time = datetime.datetime.now().strftime("%H:%M")
     return render_template_string(HTML_TEMPLATE, news=news_db, update_time=update_time)
 
