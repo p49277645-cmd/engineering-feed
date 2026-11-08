@@ -95,11 +95,16 @@ SOURCE_STYLES = {
     "Олимпиада Физтех": {"color": "#f59e0b", "letter": "ФТ"},
     "Росатом": {"color": "#06b6d4", "letter": "Р"},
     "Хабр: DIY": {"color": "#ef4444", "letter": "DIY"},
-    "Хабр:
+    "Хабр: Электроника": {"color": "#14b8a6", "letter": "Эл"},
+    "Хабр: Python": {"color": "#7cb8ea", "letter": "Py"},
+    "Хабр: Rust": {"color": "#ff9060", "letter": "Rs"},
+}
+
 LANG_STYLES = {
     "Rust": {"color": "#ff9060"},
     "Python": {"color": "#7cb8ea"}
 }
+
 
 # ==========================================
 # БАЗА ДАННЫХ
