@@ -1,4 +1,3 @@
-import sqlite3
 import feedparser
 import requests
 from bs4 import BeautifulSoup
@@ -6,38 +5,20 @@ from flask import Flask, render_template_string
 import os
 
 app = Flask(__name__)
-DB_FILE = 'engineer_feed.db'
 
-# --- БАЗА ДАННЫХ ---
-def get_db_connection():
-    conn = sqlite3.connect(DB_FILE)
-    # Эта строчка ГАРАНТИРОВАННО создаст таблицу при каждом подключении
-    conn.execute('''
-        CREATE TABLE IF NOT EXISTS news (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT UNIQUE,
-            link TEXT UNIQUE,
-            source TEXT
-        )
-    ''')
-    return conn
+# Вместо базы данных используем обычный список в памяти
+news_db = []
 
-def save_to_db(title, link, source):
-    conn = get_db_connection()
-    try:
-        conn.execute('INSERT OR IGNORE INTO news (title, link, source) VALUES (?, ?, ?)', (title, link, source))
-        conn.commit()
-    except Exception:
-        pass
-    finally:
-        conn.close()
+def save_to_memory(title, link, source):
+    # Проверяем, нет ли уже такой ссылки в нашем списке
+    if not any(item['link'] == link for item in news_db):
+        news_db.append({'title': title, 'link': link, 'source': source})
 
-# --- ПАРСИНГ ---
 def get_rss_feed(url, source_name):
     try:
         feed = feedparser.parse(url)
         for entry in feed.entries[:5]:
-            save_to_db(entry.title, entry.link, source_name)
+            save_to_memory(entry.title, entry.link, source_name)
     except Exception as e:
         print(f"Ошибка RSS {source_name}: {e}")
 
@@ -53,7 +34,7 @@ def scrape_mathus(url, source_name):
             if text and len(text) > 5 and count < 3: 
                 if href.startswith('/'):
                     href = url + href
-                save_to_db(text, href, source_name)
+                save_to_memory(text, href, source_name)
                 count += 1
     except Exception as e:
         print(f"Ошибка парсинга {source_name}: {e}")
@@ -83,8 +64,8 @@ HTML_TEMPLATE = """
         <a href="/refresh" class="btn">🔄 Обновить ленту</a>
         {% for item in news %}
         <div class="card">
-            <div class="source">{{ item[2] }}</div>
-            <a href="{{ item[1] }}" target="_blank">{{ item[0] }}</a>
+            <div class="source">{{ item.source }}</div>
+            <a href="{{ item.link }}" target="_blank">{{ item.title }}</a>
         </div>
         {% endfor %}
     </div>
@@ -92,30 +73,21 @@ HTML_TEMPLATE = """
 </html>
 """
 
-# --- ВЕБ-СЕРВЕР ---
 @app.route('/')
 def index():
-    conn = get_db_connection()
-    news_items = conn.execute("SELECT title, link, source FROM news ORDER BY id DESC LIMIT 20").fetchall()
-    conn.close()
-    
-    # Если база пустая (первый запуск), качаем данные
-    if not news_items:
+    global news_db
+    # Если список пустой, качаем данные
+    if not news_db:
         get_rss_feed("https://habr.com/ru/rss/hubs/physics/articles/all/?fl=ru", "Хабр: Физика")
         get_rss_feed("https://hackaday.com/feed/", "Hackaday")
         scrape_mathus("https://mathus.ru/phys/", "Mathus")
         
-        conn = get_db_connection()
-        news_items = conn.execute("SELECT title, link, source FROM news ORDER BY id DESC LIMIT 20").fetchall()
-        conn.close()
-        
-    return render_template_string(HTML_TEMPLATE, news=news_items)
+    return render_template_string(HTML_TEMPLATE, news=news_db)
 
 @app.route('/refresh')
 def refresh():
-    get_rss_feed("https://habr.com/ru/rss/hubs/physics/articles/all/?fl=ru", "Хабр: Физика")
-    get_rss_feed("https://hackaday.com/feed/", "Hackaday")
-    scrape_mathus("https://mathus.ru/phys/", "Mathus")
+    global news_db
+    news_db.clear() # Очищаем старые новости
     return index()
 
 if __name__ == "__main__":
