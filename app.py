@@ -339,6 +339,12 @@ def refresh_feeds_background():
 def start_scheduler():
     """Периодическое обновление каждые CACHE_TTL секунд."""
     def loop():
+        # Первый fetch сразу (через 5 секунд после старта, чтобы не блокировать)
+        time.sleep(5)
+        logger.info("Initial background feed fetch")
+        refresh_feeds_background()
+        
+        # Дальше — по расписанию
         while True:
             time.sleep(CACHE_TTL)
             logger.info("Scheduled feed refresh")
@@ -421,6 +427,12 @@ START_TIME = time.time()
 def index():
     source_filter = request.args.get('source', 'all')
     news = load_posts_from_db(source_filter=source_filter, limit=100)
+    
+    # Если база пустая — запускаем fetch прямо сейчас (но не блокируем ответ)
+    if not news:
+        logger.info("Empty database, triggering background fetch")
+        refresh_feeds_background()
+    
     return render_template_string(
         HTML_TEMPLATE,
         news=news,
@@ -975,19 +987,7 @@ signal.signal(signal.SIGINT, graceful_shutdown)
 init_db()
 logger.info("Database initialized on module load")
 
-# Первое обновление СИНХРОННО (чтобы лента не была пустой при первом запросе)
-logger.info("Initial synchronous feed fetch...")
-try:
-    items = fetch_all_news()
-    save_posts_to_db(items)
-    with cache_lock:
-        feed_cache["latest"] = items
-        feed_cache["last_update"] = time.time()
-    logger.info(f"Initial fetch done: {len(items)} posts")
-except Exception as e:
-    logger.error(f"Initial fetch failed: {e}")
-
-# Дальше — фоновый планировщик для периодических обновлений
+# Запускаем фоновый планировщик (он сам сделает первый fetch через 10 секунд)
 start_scheduler()
 
 if __name__ == "__main__":
