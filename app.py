@@ -1,23 +1,108 @@
 import feedparser
 import requests
 from bs4 import BeautifulSoup
-from flask import Flask, render_template_string, redirect, request
+from flask import Flask, render_template_string, jsonify, request
 import os
 import re
 import time
 import datetime
 import html
+import sqlite3
+import threading
+import logging
+import sys
+import hashlib
+import json
+from contextlib import contextmanager
+from concurrent.futures import ThreadPoolExecutor
+from cachetools import TTLCache
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+import signal
 
-app = Flask(__name__)
+# ==========================================
+# ЛОГИРОВАНИЕ
+# ==========================================
+logger = logging.getLogger("engfeed")
+handler = logging.StreamHandler(sys.stdout)
+handler.setFormatter(logging.Formatter(
+    "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%H:%M:%S"
+))
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
 
-news_db = []
-last_update_time = 0
+# ==========================================
+# КОНФИГУРАЦИЯ
+# ==========================================
+DB_PATH = os.environ.get("DB_PATH", "engfeed.db")
+CACHE_TTL = int(os.environ.get("CACHE_TTL", 15 * 60))  # 15 минут
+PORT = int(os.environ.get("PORT", 5000))
+DEBUG = os.environ.get("FLASK_DEBUG", "0") == "1"
 
-# Словарь цветов для источников и языков
+# Кэш в памяти
+feed_cache = TTLCache(maxsize=1, ttl=CACHE_TTL)
+cache_lock = threading.Lock()
+
+# HTTP сессия с retry
+def make_session():
+    s = requests.Session()
+    retries = Retry(
+        total=3,
+        backoff_factor=1.0,
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=["GET"],
+    )
+    adapter = HTTPAdapter(max_retries=retries)
+    s.mount("http://", adapter)
+    s.mount("https://", adapter)
+    s.headers.update({
+        "User-Agent": "EngFeed/1.0 (Engineering Feed Aggregator)",
+        "Accept": "application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.8"
+    })
+    return s
+
+session = make_session()
+
+# ==========================================
+# ИСТОЧНИКИ (RSS ФИДЫ)
+# ==========================================
+FEEDS = [
+    # Программирование
+    {"url": "https://habr.com/ru/rss/best/daily/?fl=ru", "source": "Хабр", "limit": 10, "category": "programming"},
+    {"url": "https://blog.rust-lang.org/feed.xml", "source": "Rust Blog", "limit": 3, "category": "programming"},
+    {"url": "https://blog.python.org/feeds/posts/default?alt=rss", "source": "Python Insider", "limit": 3, "category": "programming"},
+    {"url": "https://hnrss.org/frontpage", "source": "Hacker News", "limit": 8, "category": "programming"},
+    
+    # Инженерия
+    {"url": "https://hackaday.com/feed/", "source": "Hackaday", "limit": 5, "category": "engineering"},
+    {"url": "https://spectrum.ieee.org/feeds/feed.rss", "source": "IEEE Spectrum", "limit": 5, "category": "engineering"},
+    
+    # Физика (англ)
+    {"url": "https://www.quantamagazine.org/feed/", "source": "Quanta Magazine", "limit": 8, "category": "physics"},
+    {"url": "http://export.arxiv.org/rss/quant-ph", "source": "arXiv:quant-ph", "limit": 5, "category": "physics"},
+    {"url": "http://feeds.nature.com/nphys/rss/current", "source": "Nature Physics", "limit": 5, "category": "physics"},
+    {"url": "https://physicsworld.com/feed/", "source": "Physics World", "limit": 5, "category": "physics"},
+    
+    # Наука (рус)
+    {"url": "https://elementy.ru/rss/news", "source": "Элементы", "limit": 8, "category": "science"},
+    {"url": "https://nplus1.ru/rss", "source": "N+1", "limit": 6, "category": "science"},
+]
+
+# Кастомные стили для известных источников
 SOURCE_STYLES = {
     "Хабр": {"color": "#5f9df9", "letter": "Х"},
     "Hackaday": {"color": "#ef4444", "letter": "H"},
-    "Mathus": {"color": "#22c55e", "letter": "M"}
+    "Quanta Magazine": {"color": "#a855f7", "letter": "Q"},
+    "Элементы": {"color": "#22c55e", "letter": "Э"},
+    "N+1": {"color": "#3b82f6", "letter": "N"},
+    "arXiv:quant-ph": {"color": "#f59e0b", "letter": "A"},
+    "Nature Physics": {"color": "#ec4899", "letter": "NP"},
+    "Physics World": {"color": "#14b8a6", "letter": "PW"},
+    "IEEE Spectrum": {"color": "#f97316", "letter": "IEEE"},
+    "Hacker News": {"color": "#f97316", "letter": "Y"},
+    "Rust Blog": {"color": "#ff9060", "letter": "R"},
+    "Python Insider": {"color": "#7cb8ea", "letter": "P"},
 }
 
 LANG_STYLES = {
@@ -26,40 +111,252 @@ LANG_STYLES = {
 }
 
 # ==========================================
-# ОЧИСТКА ДАННЫХ (Гигиена)
+# БАЗА ДАННЫХ
 # ==========================================
-def clean_text(raw_html):
-    if not raw_html: return ""
+@contextmanager
+def get_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    try:
+        yield conn
+        conn.commit()
+    finally:
+        conn.close()
+
+def init_db():
+    with get_db() as conn:
+        conn.executescript("""
+            CREATE TABLE IF NOT EXISTS posts (
+                link TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                source TEXT NOT NULL,
+                snippet TEXT,
+                color TEXT,
+                letter TEXT,
+                pub_time REAL,
+                day TEXT,
+                fetched_at REAL DEFAULT (strftime('%s', 'now'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_posts_source ON posts(source);
+            CREATE INDEX IF NOT EXISTS idx_posts_pub_time ON posts(pub_time DESC);
+        """)
+    logger.info("Database initialized")
+
+def save_posts_to_db(posts):
+    with get_db() as conn:
+        for post in posts:
+            try:
+                conn.execute("""
+                    INSERT OR REPLACE INTO posts 
+                    (link, title, source, snippet, color, letter, pub_time, day, fetched_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    post['link'], post['title'], post['source'], post['snippet'],
+                    post['color'], post['letter'], post['pub_time'], post['day'],
+                    time.time()
+                ))
+            except Exception as e:
+                logger.error(f"Failed to save post {post.get('link')}: {e}")
+
+def load_posts_from_db(source_filter=None, limit=100):
+    with get_db() as conn:
+        if source_filter and source_filter != 'all':
+            cursor = conn.execute(
+                "SELECT * FROM posts WHERE source = ? ORDER BY pub_time DESC LIMIT ?",
+                (source_filter, limit)
+            )
+        else:
+            cursor = conn.execute(
+                "SELECT * FROM posts ORDER BY pub_time DESC LIMIT ?",
+                (limit,)
+            )
+        return [dict(row) for row in cursor.fetchall()]
+
+# ==========================================
+# УТИЛИТЫ
+# ==========================================
+def color_from_name(name: str) -> str:
+    """Генерирует детерминированный цвет из имени источника."""
+    h = int(hashlib.md5(name.encode()).hexdigest()[:8], 16) % 360
+    return f"hsl({h}, 65%, 60%)"
+
+def clean_text(raw_html: str) -> str:
+    """Очистка HTML и нормализация текста."""
+    if not raw_html:
+        return ""
     # Декодируем HTML-сущности
     text = html.unescape(raw_html)
-    # Удаляем теги
-    text = re.sub(r'<.*?>', '', text)
-    # Чиним склейки (охлаждение:—) и лишние пробелы
-    text = re.sub(r'([.!?])([А-ЯA-Z])', r'\1 \2', text)
-    text = re.sub(r'\s+', ' ', text).strip()
+    # Парсим и извлекаем текст
+    soup = BeautifulSoup(text, "html.parser")
+    text = soup.get_text(" ", strip=True)
+    # Пробел после точки перед заглавной
+    text = re.sub(r"([.!?])([А-ЯA-Z])", r"\1 \2", text)
+    # Склейки с тире
+    text = re.sub(r"([А-Яа-яA-Za-z]):—", r"\1: —", text)
+    # Множественные пробелы
+    text = re.sub(r"\s+", " ", text).strip()
     return text
 
-def pluralize_time(minutes, hours, days):
-    if days > 0:
-        if days % 10 == 1 and days % 100 != 11: return f"{days} день назад"
-        elif days % 10 in [2, 3, 4] and days % 100 not in [12, 13, 14]: return f"{days} дня назад"
-        else: return f"{days} дней назад"
-    elif hours > 0:
-        if hours % 10 == 1 and hours % 100 != 11: return f"{hours} час назад"
-        elif hours % 10 in [2, 3, 4] and hours % 100 not in [12, 13, 14]: return f"{hours} часа назад"
-        else: return f"{hours} часов назад"
-    else:
-        if minutes % 10 == 1 and minutes % 100 != 11: return f"{minutes} минуту назад"
-        elif minutes % 10 in [2, 3, 4] and minutes % 100 not in [12, 13, 14]: return f"{minutes} минуты назад"
-        else: return f"{minutes} минут назад"
+def smart_snippet(html_text: str, max_chars: int = 240) -> str:
+    """Умное извлечение сниппета из HTML."""
+    if not html_text:
+        return ""
+    soup = BeautifulSoup(html_text, "html.parser")
+    # Убираем картинки, видео, код
+    for tag in soup.find_all(["img", "iframe", "video", "code", "pre", "figure"]):
+        tag.decompose()
+    paragraphs = soup.find_all("p")
+    text = " ".join(p.get_text(" ", strip=True) for p in paragraphs) or soup.get_text(" ", strip=True)
+    text = re.sub(r"\s+", " ", text).strip()
+    if len(text) <= max_chars:
+        return text
+    return text[:max_chars].rsplit(" ", 1)[0] + "…"
 
-def get_relative_time(ts):
+def pluralize_time(minutes: int, hours: int, days: int) -> str:
+    """Правильное склонение временных единиц."""
+    if days > 0:
+        if days % 10 == 1 and days % 100 != 11:
+            return f"{days} день назад"
+        elif days % 10 in [2, 3, 4] and days % 100 not in [12, 13, 14]:
+            return f"{days} дня назад"
+        else:
+            return f"{days} дней назад"
+    elif hours > 0:
+        if hours % 10 == 1 and hours % 100 != 11:
+            return f"{hours} час назад"
+        elif hours % 10 in [2, 3, 4] and hours % 100 not in [12, 13, 14]:
+            return f"{hours} часа назад"
+        else:
+            return f"{hours} часов назад"
+    else:
+        if minutes % 10 == 1 and minutes % 100 != 11:
+            return f"{minutes} минуту назад"
+        elif minutes % 10 in [2, 3, 4] and minutes % 100 not in [12, 13, 14]:
+            return f"{minutes} минуты назад"
+        else:
+            return f"{minutes} минут назад"
+
+def get_relative_time(ts: float) -> str:
+    """Человекочитаемое время."""
     diff = time.time() - ts
-    if diff < 60: return "Только что"
-    return pluralize_time(int(diff // 60) % 60, int(diff // 3600) % 24, int(diff // 86400))
+    if diff < 60:
+        return "Только что"
+    return pluralize_time(
+        int(diff // 60) % 60,
+        int(diff // 3600) % 24,
+        int(diff // 86400)
+    )
+
+def enrich_post(item: dict) -> dict:
+    """Обогащение поста метаданными."""
+    style = SOURCE_STYLES.get(item['source'])
+    if not style:
+        color = color_from_name(item['source'])
+        letter = item['source'][0].upper()
+    else:
+        color, letter = style["color"], style["letter"]
+    
+    pub_time = item.get('pub_time') or time.time()
+    dt = datetime.datetime.fromtimestamp(pub_time)
+    today = datetime.date.today()
+    
+    if dt.date() == today:
+        day_label = "Сегодня"
+    elif dt.date() == today - datetime.timedelta(days=1):
+        day_label = "Вчера"
+    elif (today - dt.date()).days < 7:
+        day_label = dt.strftime("%A")
+    else:
+        day_label = dt.strftime("%d %B")
+    
+    return {
+        'title': clean_text(item.get('title', '')),
+        'link': item['link'],
+        'source': item['source'],
+        'snippet': smart_snippet(item.get('snippet', ''), 240),
+        'color': color,
+        'letter': letter,
+        'time': get_relative_time(pub_time),
+        'day': day_label,
+        'pub_time': pub_time,
+    }
 
 # ==========================================
-# БАЗА ЗНАНИЙ: RUST & PYTHON
+# ПАРСИНГ
+# ==========================================
+def parse_feed_safe(url: str, source_name: str, limit: int = 10) -> list:
+    """Безопасный парсинг одного фида."""
+    try:
+        resp = session.get(url, timeout=10)
+        resp.raise_for_status()
+        feed = feedparser.parse(resp.content)
+        items = []
+        for entry in feed.entries[:limit]:
+            pub_time = None
+            if hasattr(entry, 'published_parsed') and entry.published_parsed:
+                pub_time = time.mktime(entry.published_parsed)
+            items.append({
+                'title': entry.get('title', 'Без заголовка'),
+                'link': entry.get('link'),
+                'source': source_name,
+                'snippet': entry.get('summary', ''),
+                'pub_time': pub_time,
+            })
+        logger.info(f"[{source_name}] Parsed {len(items)} items")
+        return items
+    except Exception as e:
+        logger.warning(f"[{source_name}] Failed to parse {url}: {e}")
+        return []
+
+def fetch_all_news() -> list:
+    """Параллельный сбор всех лент."""
+    all_items = []
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        futures = [
+            pool.submit(parse_feed_safe, f["url"], f["source"], f["limit"])
+            for f in FEEDS
+        ]
+        for future in futures:
+            all_items.extend(future.result())
+    
+    # Дедупликация и сортировка
+    seen = set()
+    unique = []
+    for item in sorted(all_items, key=lambda x: x.get('pub_time') or 0, reverse=True):
+        if item['link'] and item['link'] not in seen:
+            seen.add(item['link'])
+            unique.append(enrich_post(item))
+    
+    logger.info(f"Fetched {len(unique)} unique posts from {len(FEEDS)} sources")
+    return unique
+
+def refresh_feeds_background():
+    """Фоновое обновление лент."""
+    def worker():
+        try:
+            items = fetch_all_news()
+            with cache_lock:
+                feed_cache["latest"] = items
+                feed_cache["last_update"] = time.time()
+            save_posts_to_db(items)
+            logger.info("Feed refresh completed")
+        except Exception as e:
+            logger.error(f"Feed refresh failed: {e}")
+    
+    threading.Thread(target=worker, daemon=True).start()
+
+def start_scheduler():
+    """Периодическое обновление каждые CACHE_TTL секунд."""
+    def loop():
+        while True:
+            time.sleep(CACHE_TTL)
+            logger.info("Scheduled feed refresh")
+            refresh_feeds_background()
+    
+    threading.Thread(target=loop, daemon=True).start()
+
+# ==========================================
+# WIKI БАЗА ЗНАНИЙ
 # ==========================================
 RUST_DB = {
     "ownership": {
@@ -79,6 +376,17 @@ RUST_DB = {
     // println!("{}", s1); // ОШИБКА
     println!("{}", s2);
 }</code></pre>
+        <h2>Заимствование</h2>
+        <p>Вместо передачи владения можно <b>заимствовать</b> значение через ссылки:</p>
+        <pre><code class="language-rust">fn calculate_length(s: &String) -> usize {
+    s.len() // s заимствуется, не владеет
+}
+
+fn main() {
+    let s1 = String::from("hello");
+    let len = calculate_length(&s1);
+    println!("Длина '{}' равна {}.", s1, len);
+}</code></pre>
         """
     }
 }
@@ -97,60 +405,100 @@ PYTHON_DB = {
         count += 1
 
 counter = count_up_to(3)
-print(next(counter)) # 1</code></pre>
+print(next(counter)) # 1
+print(next(counter)) # 2
+print(next(counter)) # 3</code></pre>
+        <h2>Генераторные выражения</h2>
+        <p>Можно создавать генераторы в одну строку:</p>
+        <pre><code class="language-python">squares = (x**2 for x in range(10))
+print(list(squares)) # [0, 1, 4, 9, 16, 25, 36, 49, 64, 81]
+
+# Память не тратится на весь список сразу
+huge_gen = (x for x in range(10**7))
+print(next(huge_gen)) # 0</code></pre>
         """
     }
 }
 
 # ==========================================
-# ПАРСИНГ И ЛЕНТА
+# FLASK ПРИЛОЖЕНИЕ
 # ==========================================
-def save_to_memory(title, link, source, snippet="", pub_time=None):
-    if not any(item['link'] == link for item in news_db):
-        if not snippet: snippet = "Нажмите, чтобы прочитать полностью..."
-        if not pub_time: pub_time = time.time()
-        
-        style = SOURCE_STYLES.get(source, {"color": "#8b8b93", "letter": source[0]})
-        
-        # Группировка по дням
-        dt = datetime.datetime.fromtimestamp(pub_time)
-        today = datetime.date.today()
-        if dt.date() == today: day_label = "Сегодня"
-        elif dt.date() == today - datetime.timedelta(days=1): day_label = "Вчера"
-        else: day_label = dt.strftime("%d %B")
+app = Flask(__name__)
+START_TIME = time.time()
 
-        news_db.append({
-            'title': clean_text(title), 
-            'link': link, 
-            'source': source, 
-            'snippet': clean_text(snippet)[:160] + "...",
-            'color': style["color"], 
-            'letter': style["letter"],
-            'time': get_relative_time(pub_time),
-            'day': day_label
-        })
+@app.route('/')
+def index():
+    source_filter = request.args.get('source', 'all')
+    news = load_posts_from_db(source_filter=source_filter, limit=100)
+    return render_template_string(
+        HTML_TEMPLATE,
+        news=news,
+        active_tab='feed',
+        LANG_STYLES=LANG_STYLES,
+        source_filter=source_filter
+    )
 
-def fetch_all_news():
-    global news_db, last_update_time
-    news_db.clear()
-    try:
-        feed = feedparser.parse("https://habr.com/ru/rss/best/daily/?fl=ru")
-        for entry in feed.entries[:10]:
-            pub_time = time.mktime(entry.published_parsed) if hasattr(entry, 'published_parsed') else None
-            save_to_memory(entry.title, entry.link, "Хабр", entry.get('summary', ''), pub_time)
-    except Exception as e: print(f"RSS Error: {e}")
-        
-    try:
-        feed = feedparser.parse("https://hackaday.com/feed/")
-        for entry in feed.entries[:5]:
-            pub_time = time.mktime(entry.published_parsed) if hasattr(entry, 'published_parsed') else None
-            save_to_memory(entry.title, entry.link, "Hackaday", entry.get('summary', ''), pub_time)
-    except Exception as e: print(f"RSS Error: {e}")
-    
-    last_update_time = time.time()
+@app.route('/wiki/rust')
+def wiki_rust():
+    topic = request.args.get('topic', list(RUST_DB.keys())[0])
+    return render_template_string(
+        HTML_TEMPLATE,
+        active_tab='rust',
+        db=RUST_DB,
+        current_topic=topic,
+        news=[],
+        LANG_STYLES=LANG_STYLES
+    )
+
+@app.route('/wiki/python')
+def wiki_python():
+    topic = request.args.get('topic', list(PYTHON_DB.keys())[0])
+    return render_template_string(
+        HTML_TEMPLATE,
+        active_tab='python',
+        db=PYTHON_DB,
+        current_topic=topic,
+        news=[],
+        LANG_STYLES=LANG_STYLES
+    )
+
+@app.route('/api/feed')
+def api_feed():
+    """JSON-API для ленты."""
+    source_filter = request.args.get('source', 'all')
+    items = load_posts_from_db(source_filter=source_filter, limit=100)
+    return jsonify({
+        "items": items,
+        "last_update": feed_cache.get("last_update", time.time()),
+        "total": len(items),
+    })
+
+@app.route('/api/refresh')
+def api_refresh():
+    """Запуск фонового обновления."""
+    refresh_feeds_background()
+    return jsonify({"status": "ok", "started_at": time.time()})
+
+@app.route('/api/stats')
+def api_stats():
+    """Статистика для бейджей."""
+    items = load_posts_from_db(limit=500)
+    by_source = {}
+    for item in items:
+        by_source[item['source']] = by_source.get(item['source'], 0) + 1
+    return jsonify({"by_source": by_source, "total": len(items)})
+
+@app.route('/health')
+def health():
+    """Health check для мониторинга."""
+    return jsonify({
+        "status": "ok",
+        "uptime": time.time() - START_TIME,
+        "feeds_count": len(FEEDS),
+    })
 
 # ==========================================
-# ШАБЛОН И ДИЗАЙН-СИСТЕМА
+# HTML ШАБЛОН
 # ==========================================
 HTML_TEMPLATE = """
 <!DOCTYPE html>
@@ -167,7 +515,6 @@ HTML_TEMPLATE = """
     <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     
     <style>
-        /* 0. ФУНДАМЕНТ: ТОКЕНЫ */
         :root[data-theme="dark"] {
             --bg: #0b0b0d; --surface: #161619; --surface-hover: #1a1a1f; --raised: #1c1c21;
             --border: rgba(255,255,255,.06); --border-strong: rgba(255,255,255,.10);
@@ -183,7 +530,6 @@ HTML_TEMPLATE = """
             --code-bg: #f6f6f8;
         }
 
-        /* 4. ГЛОБАЛЬНОЕ */
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { 
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -201,7 +547,6 @@ HTML_TEMPLATE = """
         pre { background: var(--code-bg) !important; border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; overflow-x: auto; margin: 16px 0; position: relative; }
         code:not([class*="language-"]) { background: rgba(255,255,255,.08); padding: 2px 6px; border-radius: 6px; font-size: 13px; }
 
-        /* 1. ШАПКА */
         header { 
             position: fixed; top: 0; left: 0; right: 0; height: 64px; 
             background: rgba(11,11,13,.75); backdrop-filter: blur(16px) saturate(1.4); -webkit-backdrop-filter: blur(16px) saturate(1.4);
@@ -214,7 +559,6 @@ HTML_TEMPLATE = """
         .logo svg { width: 20px; height: 20px; fill: var(--accent); }
         .badge { background: var(--accent-soft); color: #c4b5fd; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
         
-        /* Segmented Control */
         .nav-tabs { display: flex; gap: 4px; background: var(--surface); padding: 4px; border-radius: 10px; }
         .nav-tab { color: var(--text-3); padding: 8px 14px; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 500; transition: 120ms ease; border: none; background: none; cursor: pointer; }
         .nav-tab:hover { background: rgba(255,255,255,.06); color: var(--text-1); }
@@ -230,10 +574,8 @@ HTML_TEMPLATE = """
         @keyframes spin { 100% { transform: rotate(360deg); } }
         .spin { animation: spin 800ms linear infinite; }
 
-        /* 2. ЛЕНТА */
         .container { width: 100%; max-width: 740px; margin: 24px auto; padding: 0 24px; }
         
-        /* Поиск и Чипы */
         .search-wrapper { position: relative; margin-bottom: 16px; }
         .search-wrapper svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; stroke: var(--text-4); fill: none; stroke-width: 2; }
         .search-input { width: 100%; height: 44px; padding: 0 40px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); color: var(--text-1); font-size: 14px; transition: 160ms ease; }
@@ -247,7 +589,6 @@ HTML_TEMPLATE = """
         .chip.active { background: var(--accent-soft); border-color: var(--accent); color: #c4b5fd; }
         .chip-count { background: rgba(255,255,255,.08); padding: 2px 6px; border-radius: 999px; font-size: 11px; }
 
-        /* Карточки */
         .day-header { font-size: 12px; font-weight: 600; color: var(--text-3); letter-spacing: 0.4px; text-transform: uppercase; margin: 24px 0 12px; position: sticky; top: 64px; background: var(--bg); padding: 8px 0; z-index: 10; }
         
         .card { 
@@ -258,6 +599,7 @@ HTML_TEMPLATE = """
         .card:active { transform: scale(0.995); }
         .card.read { opacity: 0.6; }
         .card.read .card-title { color: var(--text-3); }
+        .card.focused { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-ring); }
         
         @keyframes slideUp { to { opacity: 1; transform: translateY(0); } }
         
@@ -273,7 +615,7 @@ HTML_TEMPLATE = """
         
         .card-title { font-size: 17px; font-weight: 600; color: var(--text-1); text-decoration: none; line-height: 1.35; display: block; margin-bottom: 6px; transition: 120ms; }
         .card-title:hover { color: var(--accent); }
-        .card-snippet { font-size: 14px; line-height: 1.55; color: var(--text-3); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+        .card-snippet { font-size: 14px; line-height: 1.55; color: var(--text-3); display: -webkit-box; -webkit-line-clamp: 3; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
         
         .card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
         .tag { font-size: 12px; font-weight: 500; padding: 2px 8px; border-radius: 6px; }
@@ -284,7 +626,10 @@ HTML_TEMPLATE = """
         .action-btn.active { color: var(--accent); }
         .action-btn.active svg { fill: var(--accent); stroke: var(--accent); }
 
-        /* 3. WIKI */
+        .skeleton { background: linear-gradient(90deg, var(--surface) 25%, var(--surface-hover) 50%, var(--surface) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; border-radius: 12px; }
+        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+        .skeleton-card { height: 140px; margin-bottom: 12px; }
+
         .wiki-layout { display: flex; gap: 32px; max-width: 1200px; margin: 40px auto; padding: 0 24px; }
         .wiki-sidebar { width: 260px; flex-shrink: 0; position: sticky; top: 84px; height: max-content; }
         .sidebar-label { font-size: 11px; font-weight: 600; color: var(--text-4); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 12px; }
@@ -313,7 +658,6 @@ HTML_TEMPLATE = """
         .cta-python { background: rgba(124,184,234,.14); border-color: rgba(124,184,234,.3); color: #7cb8ea; }
         .cta-python:hover { background: rgba(124,184,234,.2); }
 
-        /* Скроллбар для кода */
         pre::-webkit-scrollbar { height: 8px; }
         pre::-webkit-scrollbar-thumb { background: #3a3a42; }
 
@@ -356,7 +700,6 @@ HTML_TEMPLATE = """
         </div>
     </header>
 
-    <!-- ЛЕНТА -->
     {% if active_tab == 'feed' %}
     <main class="container">
         <div class="search-wrapper">
@@ -369,8 +712,13 @@ HTML_TEMPLATE = """
             <div class="chip active" data-filter="all">Все</div>
             <div class="chip" data-filter="unread">Непрочитанные</div>
             <div class="chip" data-filter="bookmarks">Закладки</div>
-            <div class="chip" data-filter="Хабр">Хабр <span class="chip-count">{{ news | selectattr('source', 'equalto', 'Хабр') | list | length }}</span></div>
-            <div class="chip" data-filter="Hackaday">Hackaday <span class="chip-count">{{ news | selectattr('source', 'equalto', 'Hackaday') | list | length }}</span></div>
+            {% set sources = {} %}
+            {% for item in news %}
+                {% set _ = sources.update({item.source: (sources.get(item.source, 0) + 1)}) %}
+            {% endfor %}
+            {% for source, count in sources.items() %}
+            <div class="chip" data-filter="{{ source }}">{{ source }} <span class="chip-count">{{ count }}</span></div>
+            {% endfor %}
         </div>
 
         <div id="feed-container">
@@ -413,7 +761,6 @@ HTML_TEMPLATE = """
     </main>
     {% endif %}
 
-    <!-- WIKI -->
     {% if active_tab in ['rust', 'python'] %}
     <div class="wiki-layout">
         <aside class="wiki-sidebar">
@@ -460,7 +807,6 @@ HTML_TEMPLATE = """
     {% endif %}
 
     <script>
-        // 4. ТЕМА
         const themeBtn = document.getElementById('theme-btn');
         let currentTheme = localStorage.getItem('theme') || 'dark';
         document.documentElement.setAttribute('data-theme', currentTheme);
@@ -471,7 +817,6 @@ HTML_TEMPLATE = """
             localStorage.setItem('theme', currentTheme);
         });
 
-        // 2. ЛЕНТА (Логика Read/Unread, Закладки)
         let readLinks = JSON.parse(localStorage.getItem('readLinks') || '[]');
         let bookmarks = JSON.parse(localStorage.getItem('bookmarks') || '[]');
         
@@ -492,13 +837,15 @@ HTML_TEMPLATE = """
                 if (readLinks.includes(link)) card.classList.add('read');
                 
                 const btn = card.querySelector('.bookmark-btn');
-                const span = btn.querySelector('span');
-                if (bookmarks.includes(link)) {
-                    btn.classList.add('active');
-                    span.innerText = "В закладках";
-                } else {
-                    btn.classList.remove('active');
-                    span.innerText = "В закладки";
+                if (btn) {
+                    const span = btn.querySelector('span');
+                    if (bookmarks.includes(link)) {
+                        btn.classList.add('active');
+                        span.innerText = "В закладках";
+                    } else {
+                        btn.classList.remove('active');
+                        span.innerText = "В закладки";
+                    }
                 }
 
                 card.onclick = (e) => {
@@ -526,7 +873,6 @@ HTML_TEMPLATE = """
             };
         });
 
-        // Копирование ссылки
         window.copyLink = function(btn, link) {
             navigator.clipboard.writeText(link).then(() => {
                 const original = btn.innerHTML;
@@ -535,7 +881,6 @@ HTML_TEMPLATE = """
             });
         };
 
-        // Фильтрация (Поиск + Чипы)
         let activeFilter = 'all';
         const chips = document.querySelectorAll('.chip');
         const searchInput = document.getElementById('search');
@@ -566,7 +911,37 @@ HTML_TEMPLATE = """
         });
         if(searchInput) searchInput.oninput = filterCards;
 
-        // Копирование кода в Wiki
+        window.filterTag = function(source) {
+            chips.forEach(c => c.classList.remove('active'));
+            const chip = document.querySelector(`.chip[data-filter="${source}"]`);
+            if (chip) {
+                chip.classList.add('active');
+                activeFilter = source;
+                filterCards();
+            }
+        };
+
+        window.refreshFeed = async function() {
+            const btn = document.getElementById('refresh-btn');
+            const svg = btn.querySelector('svg');
+            svg.classList.add('spin');
+            
+            const container = document.getElementById('feed-container');
+            container.innerHTML = '<div class="skeleton skeleton-card"></div>'.repeat(3);
+            
+            try {
+                await fetch('/api/refresh');
+                setTimeout(async () => {
+                    const resp = await fetch('/api/feed');
+                    const data = await resp.json();
+                    location.reload();
+                }, 2000);
+            } catch (e) {
+                console.error('Refresh failed:', e);
+                svg.classList.remove('spin');
+            }
+        };
+
         document.querySelectorAll('pre').forEach(pre => {
             const btn = document.createElement('button');
             btn.className = 'icon-btn';
@@ -580,35 +955,35 @@ HTML_TEMPLATE = """
             pre.appendChild(btn);
         });
 
-        // Инициализация
+        document.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'INPUT') return;
+            const cards = [...document.querySelectorAll('.card')];
+            if (!cards.length) return;
+            
+            if (e.key === '/') { e.preventDefault(); searchInput.focus(); }
+            else if (e.key === 'r') refreshFeed();
+        });
+
         if (document.querySelector('.card')) applyState();
     </script>
 </body>
 </html>
 """
 
-@app.route('/')
-def index():
-    global news_db
-    if not news_db:
-        fetch_all_news()
-    return render_template_string(HTML_TEMPLATE, news=news_db, active_tab='feed', LANG_STYLES=LANG_STYLES)
+# ==========================================
+# ЗАПУСК
+# ==========================================
+def graceful_shutdown(signum, frame):
+    logger.info("Shutting down gracefully...")
+    sys.exit(0)
 
-@app.route('/refresh')
-def refresh():
-    fetch_all_news()
-    return redirect('/')
-
-@app.route('/wiki/rust')
-def wiki_rust():
-    topic = request.args.get('topic', list(RUST_DB.keys())[0])
-    return render_template_string(HTML_TEMPLATE, active_tab='rust', db=RUST_DB, current_topic=topic, news=[], LANG_STYLES=LANG_STYLES)
-
-@app.route('/wiki/python')
-def wiki_python():
-    topic = request.args.get('topic', list(PYTHON_DB.keys())[0])
-    return render_template_string(HTML_TEMPLATE, active_tab='python', db=PYTHON_DB, current_topic=topic, news=[], LANG_STYLES=LANG_STYLES)
+signal.signal(signal.SIGTERM, graceful_shutdown)
+signal.signal(signal.SIGINT, graceful_shutdown)
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    init_db()
+    logger.info("Starting initial feed fetch...")
+    refresh_feeds_background()
+    start_scheduler()
+    logger.info(f"Server starting on port {PORT}")
+    app.run(host="0.0.0.0", port=PORT, debug=DEBUG)
