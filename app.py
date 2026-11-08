@@ -984,8 +984,19 @@ signal.signal(signal.SIGINT, graceful_shutdown)
 init_db()
 logger.info("Database initialized on module load")
 
-# Фоновое обновление и планировщик
-refresh_feeds_background()
+# Первое обновление СИНХРОННО (чтобы лента не была пустой при первом запросе)
+logger.info("Initial synchronous feed fetch...")
+try:
+    items = fetch_all_news()
+    save_posts_to_db(items)
+    with cache_lock:
+        feed_cache["latest"] = items
+        feed_cache["last_update"] = time.time()
+    logger.info(f"Initial fetch done: {len(items)} posts")
+except Exception as e:
+    logger.error(f"Initial fetch failed: {e}")
+
+# Дальше — фоновый планировщик для периодических обновлений
 start_scheduler()
 
 if __name__ == "__main__":
