@@ -56,14 +56,13 @@ def save_to_memory(title, link, source, snippet="", pub_time=None):
             'color': style["color"],
             'letter': style["letter"],
             'time_str': get_relative_time(pub_time),
-            'raw_time': pub_time # Сохраняем сырое время для сортировки
+            'raw_time': pub_time
         })
 
 def get_rss_feed(url, source_name):
     try:
         feed = feedparser.parse(url)
-        # Берем по 5 статей с источника, чтобы было из чего выбирать
-        for entry in feed.entries[:5]:
+        for entry in feed.entries[:6]: # Берем 6 статей с каждого хаба
             summary = entry.get('summary', '')
             snippet = clean_snippet(summary)
             
@@ -102,7 +101,6 @@ def fetch_all_news():
     get_rss_feed("https://hackaday.com/feed/", "Hackaday")
     scrape_mathus("https://mathus.ru/phys/", "Mathus")
     
-    # Сортируем по РЕАЛЬНОМУ времени (новые сверху)
     news_db.sort(key=lambda x: x['raw_time'], reverse=True)
     last_update_time = time.time()
 
@@ -126,14 +124,25 @@ HTML_TEMPLATE = """
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg-base); color: var(--text-main); -webkit-font-smoothing: antialiased; padding-top: 64px; transition: background 0.3s; }
+        
         header { position: fixed; top: 0; left: 0; right: 0; height: 64px; background: var(--bg-header); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: center; z-index: 100; }
         .header-content { width: 100%; max-width: 640px; display: flex; justify-content: space-between; align-items: center; padding: 0 16px; }
-        .logo { font-weight: 700; font-size: 1.2rem; display: flex; align-items: center; gap: 8px;}
+        
+        .logo-wrap { display: flex; flex-direction: column; }
+        .logo { font-weight: 700; font-size: 1.1rem; display: flex; align-items: center; gap: 8px;}
+        .last-updated { font-size: 0.7rem; color: var(--text-muted); margin-top: 2px; }
+        
         .unread-count { background: var(--accent); color: #000; font-size: 0.75rem; padding: 2px 8px; border-radius: 12px; font-weight: bold; }
         .header-actions { display: flex; gap: 12px; align-items: center; }
-        .btn-icon { background: none; border: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 8px; border-radius: 8px; transition: background 0.2s; }
+        
+        .btn-icon { background: none; border: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 8px; border-radius: 8px; transition: background 0.2s, transform 0.2s; }
         .btn-icon:hover { background: var(--border); color: var(--text-main); }
         .btn-icon svg { width: 20px; height: 20px; fill: currentColor; }
+        
+        /* Анимация вращения для кнопки обновления */
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .spin-anim svg { animation: spin 1s linear infinite; }
+
         .controls { max-width: 640px; margin: 20px auto 10px; padding: 0 16px; }
         .search-input { width: 100%; padding: 12px 16px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-main); font-size: 0.95rem; margin-bottom: 12px; outline: none; }
         .search-input:focus { border-color: var(--accent); }
@@ -141,22 +150,26 @@ HTML_TEMPLATE = """
         .chips::-webkit-scrollbar { display: none; }
         .chip { background: var(--bg-card); border: 1px solid var(--border); color: var(--text-muted); padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; cursor: pointer; white-space: nowrap; transition: all 0.2s; }
         .chip:hover, .chip.active { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 600; }
+        
         .container { max-width: 640px; margin: 0 auto; padding: 0 16px 40px; }
         .card { background-color: var(--bg-card); border-radius: 16px; padding: 16px; margin-bottom: 12px; border: 1px solid var(--border); transition: background-color 0.2s, opacity 0.2s; animation: slideUp 0.4s ease forwards; opacity: 0; transform: translateY(15px); display: flex; gap: 12px; position: relative; cursor: pointer; }
         .card:hover { background-color: var(--bg-hover); }
         .card.read { opacity: 0.5; }
         .card.read .card-title { color: var(--text-muted); }
         @keyframes slideUp { to { opacity: 1; transform: translateY(0); } }
+        
         .avatar-wrap { position: relative; flex-shrink: 0; }
         .avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #000; font-size: 1.1rem; }
         .unread-dot { position: absolute; top: -2px; right: -2px; width: 10px; height: 10px; background: var(--accent); border-radius: 50%; border: 2px solid var(--bg-card); display: none; }
         .card:not(.read) .unread-dot { display: block; }
+        
         .card-body { flex-grow: 1; }
         .meta-info { display: flex; justify-content: space-between; margin-bottom: 4px; }
         .source-name { font-weight: 600; font-size: 0.9rem; color: var(--text-main); }
         .time { font-size: 0.8rem; color: var(--text-muted); }
         .card-title { font-size: 1.05rem; font-weight: 600; line-height: 1.4; margin-bottom: 6px; display: block; }
         .card-snippet { font-size: 0.9rem; color: var(--text-muted); line-height: 1.4; margin-bottom: 12px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        
         .card-footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); padding-top: 10px; }
         .tag { font-size: 0.75rem; color: var(--accent); background: rgba(187, 134, 252, 0.1); padding: 2px 8px; border-radius: 6px; }
         .action-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 4px; font-size: 0.85rem; transition: color 0.2s; }
@@ -169,16 +182,20 @@ HTML_TEMPLATE = """
 <body>
     <header>
         <div class="header-content">
-            <div class="logo">
-                <span>⚡ EngFeed</span>
-                <span class="unread-count" id="unread-counter">0</span>
+            <div class="logo-wrap">
+                <div class="logo">
+                    <span>⚡ EngFeed</span>
+                    <span class="unread-count" id="unread-counter">0</span>
+                </div>
+                <!-- Показываем время последнего обновления -->
+                <div class="last-updated">обновлено в {{ update_time }}</div>
             </div>
             <div class="header-actions">
                 <button class="btn-icon" id="theme-toggle" title="Сменить тему">
                     <svg viewBox="0 0 24 24"><path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
                 </button>
-                <!-- КНОПКА ОБНОВЛЕНИЯ (Добавлен cache-buster) -->
-                <button class="btn-icon" onclick="window.location.href='/refresh?t=' + Date.now()" title="Обновить ленту">
+                <!-- Кнопка обновления с анимацией вращения -->
+                <button class="btn-icon" id="refresh-btn" onclick="refreshFeed()" title="Обновить ленту">
                     <svg viewBox="0 0 24 24"><path d="M21 2v6h-6M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/></svg>
                 </button>
             </div>
@@ -199,7 +216,7 @@ HTML_TEMPLATE = """
 
     <main class="container" id="feed-container">
         {% for item in news %}
-        <div class="card" data-link="{{ item.link }}" data-source="{{ item.source }}" style="animation-delay: {{ loop.index0 * 0.05 }}s;">
+        <div class="card" data-link="{{ item.link }}" data-source="{{ item.source }}" style="animation-delay: {{ loop.index0 * 0.03 }}s;">
             <div class="avatar-wrap">
                 <div class="avatar" style="background-color: {{ item.color }};">{{ item.letter }}</div>
                 <div class="unread-dot"></div>
@@ -225,6 +242,15 @@ HTML_TEMPLATE = """
     </main>
 
     <script>
+        // Логика кнопки обновления с анимацией
+        function refreshFeed() {
+            const btn = document.getElementById('refresh-btn');
+            btn.classList.add('spin-anim');
+            setTimeout(() => {
+                window.location.href = '/refresh?t=' + Date.now();
+            }, 500); // Ждем полсекунды для красоты
+        }
+
         const themeToggle = document.getElementById('theme-toggle');
         const currentTheme = localStorage.getItem('theme') || 'dark';
         document.documentElement.setAttribute('data-theme', currentTheme);
@@ -323,16 +349,16 @@ HTML_TEMPLATE = """
 
 @app.route('/')
 def index():
-    # Если база пуста, грузим. В остальных случаях отдаем кэш (чтобы не спамить сайты)
     if not news_db or (time.time() - last_update_time > 3600):
         fetch_all_news()
-    return render_template_string(HTML_TEMPLATE, news=news_db)
+    
+    # Получаем текущее время для отображения в хедере
+    update_time = datetime.datetime.now().strftime("%H:%M")
+    return render_template_string(HTML_TEMPLATE, news=news_db, update_time=update_time)
 
 @app.route('/refresh')
 def refresh():
-    # Принудительно очищаем и качаем заново
     fetch_all_news()
-    # Переадресуем на главную, чтобы убрать ?t= из адресной строки
     return redirect('/')
 
 if __name__ == "__main__":
