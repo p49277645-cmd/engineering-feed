@@ -68,41 +68,36 @@ session = make_session()
 # ИСТОЧНИКИ (RSS ФИДЫ)
 # ==========================================
 FEEDS = [
-    # Программирование
+    # Физика 9 класс и олимпиады
+    {"url": "https://mathus.ru/rss/phys.xml", "source": "Mathus: Физика 9", "limit": 10, "category": "physics"},
+    {"url": "https://elementy.ru/rss/news", "source": "Элементы", "limit": 8, "category": "physics"},
+    {"url": "https://nplus1.ru/rss", "source": "N+1", "limit": 8, "category": "science"},
+    
+    # Олимпиады Физтех
+    {"url": "https://olimpiada.ru/activity/394/rss", "source": "Олимпиада Физтех", "limit": 6, "category": "olympiad"},
+    
+    # МФТИ новости
+    {"url": "https://mipt.ru/rss/news.xml", "source": "МФТИ", "limit": 8, "category": "university"},
+    
+    # Росатом
+    {"url": "https://www.rosatom.ru/rss/news.xml", "source": "Росатом", "limit": 8, "category": "industry"},
+    
+    # ВсОШ по физике (архив заданий)
+    {"url": "https://xn--l1afu.xn--p1ai/rss", "source": "ВсОШ Физика", "limit": 6, "category": "olympiad"},
+    
+    # Программирование (оставляем Хабр)
     {"url": "https://habr.com/ru/rss/best/daily/?fl=ru", "source": "Хабр", "limit": 10, "category": "programming"},
-    {"url": "https://blog.rust-lang.org/feed.xml", "source": "Rust Blog", "limit": 3, "category": "programming"},
-    {"url": "https://blog.python.org/feeds/posts/default?alt=rss", "source": "Python Insider", "limit": 3, "category": "programming"},
-    {"url": "https://hnrss.org/frontpage", "source": "Hacker News", "limit": 8, "category": "programming"},
-    
-    # Инженерия
-    {"url": "https://hackaday.com/feed/", "source": "Hackaday", "limit": 5, "category": "engineering"},
-    {"url": "https://spectrum.ieee.org/feeds/feed.rss", "source": "IEEE Spectrum", "limit": 5, "category": "engineering"},
-    
-    # Физика (англ)
-    {"url": "https://www.quantamagazine.org/feed/", "source": "Quanta Magazine", "limit": 8, "category": "physics"},
-    {"url": "http://export.arxiv.org/rss/quant-ph", "source": "arXiv:quant-ph", "limit": 5, "category": "physics"},
-    {"url": "http://feeds.nature.com/nphys/rss/current", "source": "Nature Physics", "limit": 5, "category": "physics"},
-    {"url": "https://physicsworld.com/feed/", "source": "Physics World", "limit": 5, "category": "physics"},
-    
-    # Наука (рус)
-    {"url": "https://elementy.ru/rss/news", "source": "Элементы", "limit": 8, "category": "science"},
-    {"url": "https://nplus1.ru/rss", "source": "N+1", "limit": 6, "category": "science"},
 ]
 
-# Кастомные стили для известных источников
 SOURCE_STYLES = {
+    "Mathus: Физика 9": {"color": "#22c55e", "letter": "M"},
+    "Элементы": {"color": "#3b82f6", "letter": "Э"},
+    "N+1": {"color": "#8b5cf6", "letter": "N"},
+    "Олимпиада Физтех": {"color": "#f59e0b", "letter": "Ф"},
+    "МФТИ": {"color": "#ef4444", "letter": "М"},
+    "Росатом": {"color": "#06b6d4", "letter": "Р"},
+    "ВсОШ Физика": {"color": "#ec4899", "letter": "В"},
     "Хабр": {"color": "#5f9df9", "letter": "Х"},
-    "Hackaday": {"color": "#ef4444", "letter": "H"},
-    "Quanta Magazine": {"color": "#a855f7", "letter": "Q"},
-    "Элементы": {"color": "#22c55e", "letter": "Э"},
-    "N+1": {"color": "#3b82f6", "letter": "N"},
-    "arXiv:quant-ph": {"color": "#f59e0b", "letter": "A"},
-    "Nature Physics": {"color": "#ec4899", "letter": "NP"},
-    "Physics World": {"color": "#14b8a6", "letter": "PW"},
-    "IEEE Spectrum": {"color": "#f97316", "letter": "IEEE"},
-    "Hacker News": {"color": "#f97316", "letter": "Y"},
-    "Rust Blog": {"color": "#ff9060", "letter": "R"},
-    "Python Insider": {"color": "#7cb8ea", "letter": "P"},
 }
 
 LANG_STYLES = {
