@@ -20,89 +20,92 @@ SOURCE_STYLES = {
 }
 
 # ==========================================
-# УЧЕБНИК ФИЗИКИ 9 КЛАСС (ПО ПРОГРАММЕ ПЕРЫШКИНА)
+# ФИЗИКА 9 КЛАСС (СО ССЫЛКОЙ НА ПОЛНЫЙ УЧЕБНИК)
 # ==========================================
 PHYSICS_DB = {
-    "kinematics": {
-        "title": "1. Кинематика: Механика движения",
+    "intro": {
+        "title": "Глава 1. Законы взаимодействия и движения тел",
         "content": """
-        <p>Кинематика — это раздел механики, изучающий способы описания движения тел без учета причин, его вызывающих. В 9 классе мы переходим от простого «равномерного» движения к «равноускоренному», которое является базовой моделью для большинства инженерных расчетов.</p>
-        <h4>Равноускоренное движение</h4>
-        <p>Движение, при котором скорость тела за любые равные промежутки времени изменяется одинаково, называется равноускоренным. Ускорение (\(a\)) — это векторная величина, показывающая, насколько быстро меняется скорость.</p>
+        <div style="margin-bottom: 24px;">
+            <a href="https://kniga-figa.ru/fizika-9-klass-uchebnik-peryshkin-a-v-god-2023/" target="_blank" style="display: inline-flex; align-items: center; gap: 8px; background: rgba(187, 134, 252, 0.1); color: var(--accent); padding: 10px 16px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; border: 1px solid rgba(187, 134, 252, 0.2); transition: background 0.2s;">
+                📖 Читать полный учебник (Перышкин) онлайн
+            </a>
+        </div>
+        <p>Механическим движением называют изменение с течением времени положения тела относительно других тел. Чтобы описать движение, нам нужно выбрать систему отсчёта — тело отсчёта, связанную с ним систему координат и часы.</p>
+        <p>Часто мы можем пренебречь размерами тела по сравнению с расстоянием, которое оно проходит. Такое тело называют <b>материальной точкой</b>. Например, при расчёте движения поезда между городами его длина несущественна, а при посадке в вагон — нет.</p>
+        <h4>Основные понятия</h4>
+        <ul>
+            <li><b>Материальная точка</b> — тело, размерами которого можно пренебречь в данных условиях.</li>
+            <li><b>Поступательное движение</b> — движение, при котором все точки тела движутся одинаково.</li>
+            <li><b>Система отсчёта</b> (СО) — совокупность тела отсчёта, системы координат и прибора для измерения времени (часов).</li>
+        </ul>
+        """
+    },
+    "displacement": {
+        "title": "§2-4. Перемещение. Равномерное движение",
+        "content": """
+        <div style="margin-bottom: 24px;">
+            <a href="https://kniga-figa.ru/fizika-9-klass-uchebnik-peryshkin-a-v-god-2023/" target="_blank" style="display: inline-flex; align-items: center; gap: 8px; background: rgba(187, 134, 252, 0.1); color: var(--accent); padding: 10px 16px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; border: 1px solid rgba(187, 134, 252, 0.2); transition: background 0.2s;">
+                📖 Читать полный учебник (Перышкин) онлайн
+            </a>
+        </div>
+        <p>Путь — это длина траектории. Перемещение — это вектор, соединяющий начальное и конечное положение тела. Модуль перемещения может быть меньше пути (при криволинейном движении) или равен ему (при прямолинейном движении в одну сторону).</p>
+        <h4>Прямолинейное равномерное движение</h4>
+        <p>Это движение, при котором тело за любые равные промежутки времени совершает одинаковые перемещения. Скорость при таком движении постоянна.</p>
+        <div class="formula">\[ v = \\frac{s}{t} = \\text{const} \]</div>
+        <p>Координата тела в любой момент времени определяется по формуле:</p>
+        <div class="formula">\[ x = x_0 + v_x t \]</div>
+        """
+    },
+    "acceleration": {
+        "title": "§5-8. Равноускоренное движение",
+        "content": """
+        <div style="margin-bottom: 24px;">
+            <a href="https://kniga-figa.ru/fizika-9-klass-uchebnik-peryshkin-a-v-god-2023/" target="_blank" style="display: inline-flex; align-items: center; gap: 8px; background: rgba(187, 134, 252, 0.1); color: var(--accent); padding: 10px 16px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; border: 1px solid rgba(187, 134, 252, 0.2); transition: background 0.2s;">
+                📖 Читать полный учебник (Перышкин) онлайн
+            </a>
+        </div>
+        <p>Если скорость тела за равные промежутки времени изменяется на одну и ту же величину, движение называют <b>равноускоренным</b>. Величина, показывающая, как быстро меняется скорость, называется ускорением.</p>
+        <div class="formula">\[ a = \\frac{v - v_0}{t} \]</div>
+        <p>При равноускоренном движении скорость тела в любой момент времени:</p>
         <div class="formula">\[ v = v_0 + at \]</div>
-        <div class="formula">\[ S = v_0t + \\frac{at^2}{2} \]</div>
-        <p>Геометрический смысл: площадь под графиком скорости численно равна пройденному пути. Этот метод (графическое интегрирование) часто используется в инженерии для обработки данных с датчиков.</p>
+        <p>Перемещение при этом можно найти по формуле (площадь под графиком скорости):</p>
+        <div class="formula">\[ S = v_0 t + \\frac{at^2}{2} \]</div>
         """
     },
-    "dynamics": {
-        "title": "2. Динамика: Законы Ньютона",
+    "newton_laws": {
+        "title": "§9-12. Законы Ньютона",
         "content": """
-        <p>Динамика объясняет, <i>почему</i> тела движутся именно так. В основе лежат три закона Ньютона — фундамент классической механики.</p>
-        <h4>Первый закон (Инерция)</h4>
-        <p>Существуют системы отсчета, относительно которых тело сохраняет состояние покоя или равномерного прямолинейного движения, если на него не действуют силы (или их действие скомпенсировано).</p>
+        <div style="margin-bottom: 24px;">
+            <a href="https://kniga-figa.ru/fizika-9-klass-uchebnik-peryshkin-a-v-god-2023/" target="_blank" style="display: inline-flex; align-items: center; gap: 8px; background: rgba(187, 134, 252, 0.1); color: var(--accent); padding: 10px 16px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; border: 1px solid rgba(187, 134, 252, 0.2); transition: background 0.2s;">
+                📖 Читать полный учебник (Перышкин) онлайн
+            </a>
+        </div>
+        <p>Динамика изучает причины изменения движения. Основу составляют три закона Ньютона.</p>
+        <h4>Первый закон (Закон инерции)</h4>
+        <p>Существуют такие системы отсчёта, относительно которых тело сохраняет состояние покоя или равномерного прямолинейного движения, если на него не действуют другие тела (или их действие скомпенсировано). Такие системы называют <b>инерциальными</b> (ИСО).</p>
         <h4>Второй закон</h4>
-        <p>Ускорение тела прямо пропорционально приложенной силе и обратно пропорционально его массе. Это главное уравнение движения:</p>
-        <div class="formula">\[ \\vec{F} = m\\vec{a} \]</div>
-        <p>В инженерии этот закон позволяет рассчитывать нагрузки на конструкции, тягу двигателей и динамику полета ракет.</p>
+        <p>Ускорение тела прямо пропорционально равнодействующей приложенных к нему сил и обратно пропорционально массе тела.</p>
+        <div class="formula">\[ \\vec{a} = \\frac{\\vec{F}}{m} \\quad \\text{или} \\quad \\vec{F} = m\\vec{a} \]</div>
         <h4>Третий закон</h4>
-        <p>Силы взаимодействия двух тел равны по модулю, противоположны по направлению и приложены к разным телам. Именно поэтому при выстреле ружье отдает назад.</p>
-        """
-    },
-    "momentum": {
-        "title": "3. Импульс и закон сохранения",
-        "content": """
-        <p>Импульс тела (\(p\)) — это векторная величина, равная произведению массы на скорость: <b>\(\\vec{p} = m\\vec{v}\)</b>. Это «количество движения», которое позволяет описать взаимодействие тел.</p>
-        <h4>Закон сохранения импульса</h4>
-        <p>В замкнутой системе (где внешние силы отсутствуют или скомпенсированы) векторная сумма импульсов всех тел остается постоянной. Это фундаментальный закон природы.</p>
-        <div class="formula">\[ m_1\\vec{v}_1 + m_2\\vec{v}_2 = m_1\\vec{u}_1 + m_2\\vec{u}_2 \]</div>
-        <p>Этот закон объясняет реактивное движение (ракеты, самолеты) и используется при анализе столкновений (например, в физике элементарных частиц).</p>
-        """
-    },
-    "oscillations": {
-        "title": "4. Механические колебания и волны. Звук",
-        "content": """
-        <p>Колебания — это движения, которые точно или приблизительно повторяются через равные промежутки времени. Механические колебания лежат в основе работы огромного количества устройств: от часов до двигателей внутреннего сгорания.</p>
-        <h4>Гармонические колебания</h4>
-        <p>Простейший вид колебаний — гармонические, при которых координата тела меняется по закону синуса или косинуса. Основные характеристики: амплитуда, период, частота.</p>
-        <div class="formula">\[ x(t) = A \\sin(\\omega t + \\varphi_0) \]</div>
-        <h4>Волны и звук</h4>
-        <p>Волна — это распространение колебаний в среде с течением времени. Звук — это продольная механическая волна, распространяющаяся в упругой среде (воздух, вода, металл). В вакууме звук не распространяется.</p>
-        <p>Частота звука определяет его высоту (тон), а амплитуда — громкость.</p>
-        """
-    },
-    "electromagnetism": {
-        "title": "5. Электромагнитное поле. Индукция",
-        "content": """
-        <p>Электромагнитное поле — это особая форма материи, посредством которой осуществляется взаимодействие между заряженными частицами. Электрическое и магнитное поля неразрывно связаны.</p>
-        <h4>Магнитное поле</h4>
-        <p>Магнитное поле создается движущимися зарядами (током) и постоянными магнитами. Оно характеризуется вектором магнитной индукции (\(\\vec{B}\)).</p>
-        <h4>Явление электромагнитной индукции</h4>
-        <p>Открытое Майклом Фарадеем явление: при изменении магнитного потока, пронизывающего контур, в нем возникает электрический ток (индукционный ток).</p>
-        <div class="formula">\[ \\mathcal{E} = -\\frac{d\\Phi}{dt} \]</div>
-        <p>Этот закон (закон Фарадея) лежит в основе работы всех генераторов электроэнергии — от ГЭС до атомных станций. Именно так механическая энергия преобразуется в электрическую.</p>
-        """
-    },
-    "atom": {
-        "title": "6. Строение атома и атомного ядра",
-        "content": """
-        <p>В начале XX века опыты Резерфорда показали, что атом имеет сложное строение: в центре находится положительно заряженное ядро, вокруг которого движутся электроны (планетарная модель).</p>
-        <h4>Радиоактивность</h4>
-        <p>Это самопроизвольное превращение одних атомных ядер в другие, сопровождающееся излучением. Различают альфа-, бета- и гамма-излучение.</p>
-        <h4>Ядерные реакции</h4>
-        <p>Изменение атомных ядер при взаимодействии с элементарными частицами или друг с другом. При ядерных реакциях выполняется закон сохранения массового и зарядового чисел.</p>
-        <div class="formula">\[ ^{235}_{92}\\text{U} + ^{1}_{0}\\text{n} \\rightarrow ^{141}_{56}\\text{Ba} + ^{92}_{36}\\text{Kr} + 3^{1}_{0}\\text{n} \]</div>
-        <p>Это пример реакции деления урана, которая используется в ядерной энергетике и является основой для понимания работы ядерных реакторов.</p>
+        <p>Силы, с которыми два тела действуют друг на друга, равны по модулю и противоположны по направлению. Они приложены к разным телам и не компенсируют друг друга.</p>
+        <div class="formula">\[ \\vec{F}_{12} = -\\vec{F}_{21} \]</div>
         """
     }
 }
 
 # ==========================================
-# БАЗА ПО RUST И PYTHON (БЕЗ ИЗМЕНЕНИЙ)
+# RUST (СО ССЫЛКОЙ НА STEPIK)
 # ==========================================
 RUST_DB = {
     "ownership": {
         "title": "Rust: Владение и заимствование",
         "content": """
+        <div style="margin-bottom: 24px;">
+            <a href="https://stepik.org/course/195449/promo" target="_blank" style="display: inline-flex; align-items: center; gap: 8px; background: rgba(207, 102, 121, 0.1); color: #cf6679; padding: 10px 16px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; border: 1px solid rgba(207, 102, 121, 0.2); transition: background 0.2s;">
+                🦀 Пройти интерактивный курс на Stepik
+            </a>
+        </div>
         <p>Rust — это язык для тех, кто хочет скорости C++ и безопасности Python. Его главная фишка — <b>Ownership (Владение)</b>. В Rust нет сборщика мусора (Garbage Collector), память очищается детерминированно, когда переменная выходит из области видимости.</p>
         <h4>Правила владения:</h4>
         <ul>
@@ -117,51 +120,27 @@ RUST_DB = {
     println!("{}", s2);
 }</code></pre>
         """
-    },
-    "structs": {
-        "title": "Rust: Структуры и методы",
-        "content": """
-        <p>Структуры в Rust позволяют создавать собственные типы данных, группируя связанные значения. У полей структуры есть имена, в отличие от кортежей.</p>
-        <pre><code class="language-rust">struct Laser {
-    power: f64,
-    wavelength: u32,
-}
-
-impl Laser {
-    fn turn_on(&self) {
-        println!("Лазер с мощностью {} Вт включен", self.power);
-    }
-}</code></pre>
-        """
     }
 }
 
+# ==========================================
+# PYTHON (СО ССЫЛКОЙ НА STEPIK)
+# ==========================================
 PYTHON_DB = {
     "generators": {
         "title": "Python: Генераторы и yield",
         "content": """
+        <div style="margin-bottom: 24px;">
+            <a href="https://stepik.org/course/214271/promo" target="_blank" style="display: inline-flex; align-items: center; gap: 8px; background: rgba(244, 180, 0, 0.1); color: #f4b400; padding: 10px 16px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; border: 1px solid rgba(244, 180, 0, 0.2); transition: background 0.2s;">
+                🐍 Пройти интерактивный курс на Stepik
+            </a>
+        </div>
         <p>В Python есть мощный инструмент для работы с памятью — генераторы. Обычная функция возвращает результат и завершается. Генератор использует <code>yield</code> и «замораживает» свое состояние, возвращаясь к нему при следующем вызове.</p>
         <pre><code class="language-python">def count_up_to(max):
     count = 1
     while count <= max:
         yield count
-        count += 1
-
-counter = count_up_to(3)
-print(next(counter)) # 1</code></pre>
-        """
-    },
-    "oop": {
-        "title": "Python: Классы и ООП",
-        "content": """
-        <p>Объектно-ориентированное программирование (ООП) позволяет моделировать реальный мир в коде. Класс — это чертеж, а объект — это конкретное изделие по этому чертежу.</p>
-        <pre><code class="language-python">class Photon:
-    def __init__(self, wavelength):
-        self.wavelength = wavelength
-        self.energy = 1240 / wavelength # эВ
-
-    def info(self):
-        print(f"Фотон с длиной волны {self.wavelength} нм")</code></pre>
+        count += 1</code></pre>
         """
     }
 }
@@ -301,19 +280,19 @@ HTML_TEMPLATE = """
         .card-snippet { font-size: 14px; color: var(--text-snippet); line-height: 1.55; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
         .wiki-layout { display: flex; gap: 20px; max-width: 900px; margin: 20px auto; padding: 0 16px; }
-        .wiki-sidebar { width: 260px; flex-shrink: 0; position: sticky; top: 84px; height: max-content; }
+        .wiki-sidebar { width: 280px; flex-shrink: 0; position: sticky; top: 84px; height: max-content; }
         .wiki-menu { list-style: none; }
-        .wiki-menu li a { display: block; padding: 8px 12px; color: var(--text-muted); text-decoration: none; border-radius: 8px; font-size: 14px; margin-bottom: 2px; transition: 0.2s; }
+        .wiki-menu li a { display: block; padding: 8px 12px; color: var(--text-muted); text-decoration: none; border-radius: 8px; font-size: 13px; margin-bottom: 2px; transition: 0.2s; line-height: 1.4; }
         .wiki-menu li a:hover { background: rgba(255,255,255,0.05); color: var(--text-main); }
         .wiki-menu li a.active { background: rgba(187, 134, 252, 0.1); color: var(--accent); font-weight: 600; }
         
         .wiki-content { flex-grow: 1; background: var(--bg-card); border-radius: 16px; border: 1px solid var(--border); padding: 32px; }
-        .wiki-content h1 { font-size: 28px; margin-bottom: 24px; color: var(--text-main); }
+        .wiki-content h1 { font-size: 24px; margin-bottom: 24px; color: var(--text-main); }
         .wiki-content h4 { font-size: 18px; margin: 24px 0 12px; color: var(--text-main); }
         .wiki-content p { font-size: 15px; color: var(--text-snippet); line-height: 1.6; margin-bottom: 16px; }
         .wiki-content ul { margin-left: 20px; margin-bottom: 16px; color: var(--text-snippet); line-height: 1.6; }
         .wiki-content pre { border-radius: 12px !important; margin: 16px 0 !important; }
-        .formula { background: rgba(255,255,255,0.03); padding: 16px; border-radius: 12px; text-align: center; font-size: 22px; margin: 16px 0; color: var(--accent); border: 1px solid var(--border); overflow-x: auto; }
+        .formula { background: rgba(255,255,255,0.03); padding: 16px; border-radius: 12px; text-align: center; font-size: 20px; margin: 16px 0; color: var(--accent); border: 1px solid var(--border); overflow-x: auto; }
 
         @media (max-width: 768px) {
             .wiki-layout { flex-direction: column; }
