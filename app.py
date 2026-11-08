@@ -980,10 +980,14 @@ def graceful_shutdown(signum, frame):
 signal.signal(signal.SIGTERM, graceful_shutdown)
 signal.signal(signal.SIGINT, graceful_shutdown)
 
+# Инициализация при загрузке модуля (для gunicorn)
+init_db()
+logger.info("Database initialized on module load")
+
+# Фоновое обновление и планировщик
+refresh_feeds_background()
+start_scheduler()
+
 if __name__ == "__main__":
-    init_db()
-    logger.info("Starting initial feed fetch...")
-    refresh_feeds_background()
-    start_scheduler()
     logger.info(f"Server starting on port {PORT}")
     app.run(host="0.0.0.0", port=PORT, debug=DEBUG)
