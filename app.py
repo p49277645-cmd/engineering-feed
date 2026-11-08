@@ -256,18 +256,21 @@ def load_from_db(limit=200):
 
 app = Flask(__name__)
 
+def _background_fetch():
+    """Фоновая загрузка — не блокирует ответ."""
+    try:
+        items = fetch_all_data()
+        save_to_db(items)
+        logger.info(f"Background fetch done: {len(items)}")
+    except Exception as e:
+        logger.error(f"Background fetch error: {e}")
+
 @app.route('/')
 def index():
     news = load_from_db()
     if not news:
-        logger.info("База пустая, загружаем...")
-        try:
-            items = fetch_all_data()
-            save_to_db(items)
-            news = items
-            logger.info(f"Загружено {len(news)}")
-        except Exception as e:
-            logger.error(f"Ошибка: {e}")
+        # Запускаем загрузку в фоне, НЕ ждём
+        threading.Thread(target=_background_fetch, daemon=True).start()
     return render_template_string(HTML_TEMPLATE, news=news)
 
 @app.route('/wiki/rust')
