@@ -221,7 +221,7 @@ HTML_TEMPLATE = """
                 <button class="btn-icon" id="theme-toggle" title="Сменить тему">
                     <svg viewBox="0 0 24 24"><path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
                 </button>
-                <button class="btn-icon" onclick="window.location.reload()" title="Обновить ленту">
+                <button class="btn-icon" onclick="window.location.href='/refresh'" title="Обновить ленту">
                     <svg viewBox="0 0 24 24"><path d="M21 2v6h-6M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/></svg>
                 </button>
             </div>
