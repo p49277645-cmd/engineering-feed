@@ -31,9 +31,8 @@ SESSION.headers.update({
 
 # ВСЕ ИСТОЧНИКИ
 SOURCES = [
-    # ФИЗИКА 9 КЛАСС (БОЛЬШЕ НОВОСТЕЙ)
+    # ФИЗИКА 9 КЛАСС
     {"type": "scrape", "url": "https://mathus.ru/phys/", "source": "Mathus: Физика 9", "category": "physics", "limit": 12},
-    {"type": "rss", "url": "https://elementy.ru/rss/news", "source": "Элементы: Физика", "category": "physics", "limit": 10},
     
     # ИНТЕРЕСНЫЕ НОВОСТИ ФИЗИКИ
     {"type": "rss", "url": "https://www.quantamagazine.org/feed/", "source": "Quanta: Физика", "category": "physics_news", "limit": 8},
@@ -46,20 +45,28 @@ SOURCES = [
     {"type": "scrape", "url": "https://olimpiada.ru/activity/7288", "source": "Росатом Юниор", "category": "olympiad", "limit": 6},
     {"type": "scrape", "url": "https://olimpiada.ru/activity/395", "source": "Физтех: Математика", "category": "olympiad", "limit": 6},
     
-    # ОЛИМПИАДЫ: АРХИВ (ЧТО БЫЛО)
+    # ОЛИМПИАДЫ: АРХИВ
     {"type": "scrape", "url": "https://olimpiada.ru/archive/394", "source": "Физтех: Архив", "category": "olympiad_archive", "limit": 10},
     {"type": "scrape", "url": "https://olimpiada.ru/archive/5878", "source": "Росатом: Архив", "category": "olympiad_archive", "limit": 10},
     {"type": "scrape", "url": "https://xn--l1afu.xn--p1ai/материалы/видеоразборы-всош-физика/", "source": "ВсОШ: Архив", "category": "olympiad_archive", "limit": 8},
     
-    # ИНТЕРЕСНЫЕ НОВОСТИ МАТЕМАТИКИ
+    # МАТЕМАТИКА
     {"type": "scrape", "url": "https://mathus.ru/math/", "source": "Mathus: Математика", "category": "math", "limit": 10},
     {"type": "rss", "url": "https://www.quantamagazine.org/feed/", "source": "Quanta: Математика", "category": "math_news", "limit": 6},
     
-    # ИНТЕРЕСНЫЕ НОВОСТИ ПРОГРАММИРОВАНИЯ
+    # ПРОГРАММИРОВАНИЕ
     {"type": "rss", "url": "https://habr.com/ru/rss/hub/python/daily/?fl=ru", "source": "Хабр: Python", "category": "code", "limit": 8},
     {"type": "rss", "url": "https://habr.com/ru/rss/hub/rust/daily/?fl=ru", "source": "Хабр: Rust", "category": "code", "limit": 8},
     {"type": "rss", "url": "https://hnrss.org/frontpage", "source": "Hacker News", "category": "code_news", "limit": 10},
     {"type": "rss", "url": "https://dev.to/feed", "source": "Dev.to", "category": "code_news", "limit": 8},
+    
+    # РОБОТОТЕХНИКА И МИКРОКОНТРОЛЛЕРЫ (ESP, Arduino)
+    {"type": "rss", "url": "https://blog.arduino.cc/feed/", "source": "Arduino Blog", "category": "robotics", "limit": 8},
+    {"type": "rss", "url": "https://hackaday.com/category/arduino/feed/", "source": "Hackaday: Arduino", "category": "robotics", "limit": 6},
+    {"type": "rss", "url": "https://hackaday.com/category/esp8266/feed/", "source": "Hackaday: ESP", "category": "robotics", "limit": 6},
+    {"type": "rss", "url": "https://robohub.org/feed/", "source": "Robohub", "category": "robotics", "limit": 6},
+    {"type": "rss", "url": "https://www.instructables.com/rss/", "source": "Instructables", "category": "robotics", "limit": 8},
+    {"type": "rss", "url": "https://habr.com/ru/rss/hub/robotics/daily/?fl=ru", "source": "Хабр: Робототехника", "category": "robotics", "limit": 8},
     
     # УНИВЕРСИТЕТЫ
     {"type": "scrape", "url": "https://mipt.ru/news", "source": "МФТИ", "category": "university", "limit": 8},
@@ -67,6 +74,7 @@ SOURCES = [
     
     # ЭЛЕКТРОНИКА
     {"type": "rss", "url": "https://habr.com/ru/rss/hub/electronics/daily/?fl=ru", "source": "Хабр: Электроника", "category": "tech", "limit": 8},
+    {"type": "rss", "url": "https://habr.com/ru/rss/hub/diy_electronics/daily/?fl=ru", "source": "Хабр: DIY Electronics", "category": "tech", "limit": 8},
     {"type": "rss", "url": "https://hackaday.com/feed/", "source": "Hackaday", "category": "tech", "limit": 6},
 ]
 
@@ -80,6 +88,7 @@ STYLES = {
     "math_news": {"color": "#9333ea", "letter": "МН"},
     "code": {"color": "#f59e0b", "letter": "К"},
     "code_news": {"color": "#d97706", "letter": "КН"},
+    "robotics": {"color": "#14b8a6", "letter": "Р"},
     "tech": {"color": "#06b6d4", "letter": "Э"},
 }
 
