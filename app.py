@@ -28,25 +28,34 @@ SESSION.headers.update({
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
 })
 
-# ИСТОЧНИКИ
+# ТОЛЬКО ФИЗИКА, ОЛИМПИАДЫ, МАТЕША, КОД, ЭЛЕКТРОНИКА
 SOURCES = [
-    {"type": "rss", "url": "https://elementy.ru/rss/news", "source": "Элементы", "category": "physics", "limit": 8},
-    {"type": "rss", "url": "https://nplus1.ru/rss", "source": "N+1", "category": "science", "limit": 6},
-    {"type": "rss", "url": "https://habr.com/ru/rss/hub/python/daily/?fl=ru", "source": "Хабр: Python", "category": "code", "limit": 6},
-    {"type": "rss", "url": "https://habr.com/ru/rss/hub/rust/daily/?fl=ru", "source": "Хабр: Rust", "category": "code", "limit": 6},
-    {"type": "rss", "url": "https://habr.com/ru/rss/hub/electronics/daily/?fl=ru", "source": "Хабр: Электроника", "category": "tech", "limit": 6},
-    {"type": "rss", "url": "https://hackaday.com/feed/", "source": "Hackaday", "category": "tech", "limit": 5},
-    {"type": "scrape", "url": "https://mathus.ru/phys/", "source": "Mathus: Физика", "category": "physics", "limit": 6},
-    {"type": "scrape", "url": "https://mathus.ru/math/", "source": "Mathus: Математика", "category": "math", "limit": 6},
+    # ФИЗИКА 9 КЛАСС + ОЛИМПИАДЫ
+    {"type": "scrape", "url": "https://mathus.ru/phys/", "source": "Mathus: Физика 9", "category": "physics", "limit": 8},
+    {"type": "scrape", "url": "https://olimpiada.ru/activity/394", "source": "Олимпиада Физтех", "category": "olympiad", "limit": 6},
+    {"type": "scrape", "url": "https://olimpiada.ru/activity/5878", "source": "Росатом", "category": "olympiad", "limit": 6},
+    {"type": "scrape", "url": "https://olimpiada.ru/activity/7288", "source": "Росатом Юниор", "category": "olympiad", "limit": 5},
+    {"type": "scrape", "url": "https://xn--l1afu.xn--p1ai/материалы/видеоразборы-всош-физика/", "source": "ВсОШ Физика", "category": "olympiad", "limit": 5},
+    
+    # УНИВЕРСИТЕТЫ
     {"type": "scrape", "url": "https://mipt.ru/news", "source": "МФТИ", "category": "university", "limit": 6},
     {"type": "scrape", "url": "https://mephi.ru/press-center/news/", "source": "МИФИ", "category": "university", "limit": 6},
-    {"type": "scrape", "url": "https://olimpiada.ru/activity/394", "source": "Физтех", "category": "olympiad", "limit": 5},
-    {"type": "scrape", "url": "https://olimpiada.ru/activity/5878", "source": "Росатом", "category": "olympiad", "limit": 5},
+    
+    # МАТЕМАТИКА
+    {"type": "scrape", "url": "https://mathus.ru/math/", "source": "Mathus: Математика", "category": "math", "limit": 8},
+    {"type": "scrape", "url": "https://olimpiada.ru/activity/395", "source": "Физтех: Математика", "category": "olympiad", "limit": 5},
+    
+    # ПРОГРАММИРОВАНИЕ
+    {"type": "rss", "url": "https://habr.com/ru/rss/hub/python/daily/?fl=ru", "source": "Хабр: Python", "category": "code", "limit": 6},
+    {"type": "rss", "url": "https://habr.com/ru/rss/hub/rust/daily/?fl=ru", "source": "Хабр: Rust", "category": "code", "limit": 6},
+    
+    # ЭЛЕКТРОНИКА
+    {"type": "rss", "url": "https://habr.com/ru/rss/hub/electronics/daily/?fl=ru", "source": "Хабр: Электроника", "category": "tech", "limit": 6},
+    {"type": "rss", "url": "https://hackaday.com/feed/", "source": "Hackaday", "category": "tech", "limit": 5},
 ]
 
 STYLES = {
     "physics": {"color": "#10b981", "letter": "Ф"},
-    "science": {"color": "#8b5cf6", "letter": "Н"},
     "olympiad": {"color": "#ef4444", "letter": "О"},
     "university": {"color": "#3b82f6", "letter": "В"},
     "math": {"color": "#a855f7", "letter": "М"},
@@ -128,7 +137,7 @@ def scrape_html(item):
         soup = BeautifulSoup(resp.text, "html.parser")
         results = []
         
-        nodes = soup.select("h2 a, h3 a, h4 a, .news-item a, .news-list a")[:30]
+        nodes = soup.select("h2 a, h3 a, h4 a, .news-item a, .news-list a, .activity-news a")[:40]
         
         seen = set()
         for node in nodes:
@@ -151,7 +160,7 @@ def scrape_html(item):
                 "title": title[:100],
                 "link": href,
                 "source": item["source"],
-                "snippet": "Материалы и задания",
+                "snippet": "Материалы и задания олимпиады",
                 "pub_time": time.time(),
                 "category": item["category"]
             })
@@ -232,14 +241,14 @@ app = Flask(__name__)
 def index():
     news = load_from_db()
     if not news:
-        logger.info("База пустая, загружаем данные...")
+        logger.info("База пустая, загружаем...")
         try:
             items = fetch_all_data()
             save_to_db(items)
             news = items
-            logger.info(f"Загружено {len(news)} записей")
+            logger.info(f"Загружено {len(news)}")
         except Exception as e:
-            logger.error(f"Ошибка загрузки: {e}")
+            logger.error(f"Ошибка: {e}")
     return render_template_string(HTML_TEMPLATE, news=news)
 
 @app.route('/wiki/rust')
