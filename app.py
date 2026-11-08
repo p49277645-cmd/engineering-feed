@@ -1,7 +1,7 @@
 import feedparser
 import requests
 from bs4 import BeautifulSoup
-from flask import Flask, render_template_string, redirect, request
+from flask import Flask, render_template_string, redirect, request, send_file
 import os
 import time
 import re
@@ -167,16 +167,12 @@ def refresh():
     return redirect('/')
 
 @app.route('/book')
-@app.route('/book')
 def book():
-    # Твоя ссылка для встраивания
-    pdf_embed_url = "https://disk.yandex.ru/i/9XHe8mDf514qiQ?embed=1"
-    
-    # Создаём iframe, который растянется на весь экран
-    html_iframe = f'''
-        <iframe src="{pdf_embed_url}" width="100%" height="85vh" style="border:none; border-radius:12px; box-shadow: 0 8px 32px rgba(0,0,0,0.5);"></iframe>
-    '''
-    return render_template_string(HTML_TEMPLATE, active_tab='book', book_content=html_iframe)
+    try:
+        # Открываем твой PDF файл напрямую
+        return send_file('physics.pdf', mimetype='application/pdf')
+    except Exception as e:
+        return f"Ошибка: файл physics.pdf не найден в репозитории. {e}"
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
