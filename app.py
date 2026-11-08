@@ -3,21 +3,23 @@ import requests
 from bs4 import BeautifulSoup
 from flask import Flask, render_template_string
 import os
+import time
 
 app = Flask(__name__)
 
 # Вместо базы данных используем обычный список в памяти
 news_db = []
+last_update_time = 0
 
 def save_to_memory(title, link, source):
-    # Проверяем, нет ли уже такой ссылки в нашем списке
+    # Проверяем, нет ли уже такой ссылки (чтобы не было дублей)
     if not any(item['link'] == link for item in news_db):
         news_db.append({'title': title, 'link': link, 'source': source})
 
 def get_rss_feed(url, source_name):
     try:
         feed = feedparser.parse(url)
-        for entry in feed.entries[:5]:
+        for entry in feed.entries[:4]: # Берем по 4 статьи с каждого источника
             save_to_memory(entry.title, entry.link, source_name)
     except Exception as e:
         print(f"Ошибка RSS {source_name}: {e}")
@@ -39,7 +41,23 @@ def scrape_mathus(url, source_name):
     except Exception as e:
         print(f"Ошибка парсинга {source_name}: {e}")
 
-# --- HTML ШАБЛОН ---
+# Функция, которая собирает всё в кучу
+def fetch_all_news():
+    global news_db, last_update_time
+    print("Начинаем обновление ленты...")
+    news_db.clear() # Очищаем старые новости перед новой загрузкой
+    
+    get_rss_feed("https://habr.com/ru/rss/hubs/physics/articles/all/?fl=ru", "Хабр: Физика")
+    get_rss_feed("https://habr.com/ru/rss/hubs/easyelectronics/articles/all/?fl=ru", "Хабр: DIY Электроника")
+    get_rss_feed("https://habr.com/ru/rss/hubs/python/articles/all/?fl=ru", "Хабр: Python")
+    get_rss_feed("https://habr.com/ru/rss/hubs/cpp/articles/all/?fl=ru", "Хабр: C++")
+    get_rss_feed("https://hackaday.com/feed/", "Hackaday")
+    scrape_mathus("https://mathus.ru/phys/", "Mathus (Физика)")
+    
+    last_update_time = time.time()
+    print("Лента успешно обновлена!")
+
+# --- HTML ШАБЛОН (пока оставляем старый дизайн) ---
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="ru">
@@ -75,19 +93,15 @@ HTML_TEMPLATE = """
 
 @app.route('/')
 def index():
-    global news_db
-    # Если список пустой, качаем данные
-    if not news_db:
-        get_rss_feed("https://habr.com/ru/rss/hubs/physics/articles/all/?fl=ru", "Хабр: Физика")
-        get_rss_feed("https://hackaday.com/feed/", "Hackaday")
-        scrape_mathus("https://mathus.ru/phys/", "Mathus")
+    # Если лента пуста ИЛИ прошло больше 1 часа (3600 секунд) с последнего обновления
+    if not news_db or (time.time() - last_update_time > 3600):
+        fetch_all_news()
         
     return render_template_string(HTML_TEMPLATE, news=news_db)
 
 @app.route('/refresh')
 def refresh():
-    global news_db
-    news_db.clear() # Очищаем старые новости
+    fetch_all_news()
     return index()
 
 if __name__ == "__main__":
