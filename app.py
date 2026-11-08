@@ -68,38 +68,34 @@ session = make_session()
 # ИСТОЧНИКИ (RSS ФИДЫ)
 # ==========================================
 FEEDS = [
-    # Физика 9 класс и олимпиады
-    {"url": "https://mathus.ru/rss/phys.xml", "source": "Mathus: Физика 9", "limit": 10, "category": "physics"},
+    # Физика и олимпиады
+    {"url": "https://mathus.ru/rss/phys.xml", "source": "Mathus: Физика", "limit": 10, "category": "physics"},
     {"url": "https://elementy.ru/rss/news", "source": "Элементы", "limit": 8, "category": "physics"},
-    {"url": "https://nplus1.ru/rss", "source": "N+1", "limit": 8, "category": "science"},
     
-    # Олимпиады Физтех
+    # Олимпиады: Физтех + Росатом
     {"url": "https://olimpiada.ru/activity/394/rss", "source": "Олимпиада Физтех", "limit": 6, "category": "olympiad"},
+    {"url": "https://olimpiada.ru/activity/5878/rss", "source": "Росатом", "limit": 6, "category": "olympiad"},
     
-    # МФТИ новости
-    {"url": "https://mipt.ru/rss/news.xml", "source": "МФТИ", "limit": 8, "category": "university"},
+    # Математика
+    {"url": "https://mathus.ru/rss/math.xml", "source": "Mathus: Математика", "limit": 8, "category": "math"},
     
-    # Росатом
-    {"url": "https://www.rosatom.ru/rss/news.xml", "source": "Росатом", "limit": 8, "category": "industry"},
+    # Электроника и проекты
+    {"url": "https://habr.com/ru/rss/hub/diy/daily/?fl=ru", "source": "Хабр: DIY", "limit": 8, "category": "electronics"},
+    {"url": "https://habr.com/ru/rss/hub/electronics/daily/?fl=ru", "source": "Хабр: Электроника", "limit": 8, "category": "electronics"},
     
-    # ВсОШ по физике (архив заданий)
-    {"url": "https://xn--l1afu.xn--p1ai/rss", "source": "ВсОШ Физика", "limit": 6, "category": "olympiad"},
-    
-    # Программирование (оставляем Хабр)
-    {"url": "https://habr.com/ru/rss/best/daily/?fl=ru", "source": "Хабр", "limit": 10, "category": "programming"},
+    # Python и Rust
+    {"url": "https://habr.com/ru/rss/hub/python/daily/?fl=ru", "source": "Хабр: Python", "limit": 8, "category": "programming"},
+    {"url": "https://habr.com/ru/rss/hub/rust/daily/?fl=ru", "source": "Хабр: Rust", "limit": 6, "category": "programming"},
 ]
 
 SOURCE_STYLES = {
-    "Mathus: Физика 9": {"color": "#22c55e", "letter": "M"},
-    "Элементы": {"color": "#3b82f6", "letter": "Э"},
-    "N+1": {"color": "#8b5cf6", "letter": "N"},
-    "Олимпиада Физтех": {"color": "#f59e0b", "letter": "Ф"},
-    "МФТИ": {"color": "#ef4444", "letter": "М"},
+    "Mathus: Физика": {"color": "#22c55e", "letter": "MФ"},
+    "Mathus: Математика": {"color": "#3b82f6", "letter": "MМ"},
+    "Элементы": {"color": "#a855f7", "letter": "Э"},
+    "Олимпиада Физтех": {"color": "#f59e0b", "letter": "ФТ"},
     "Росатом": {"color": "#06b6d4", "letter": "Р"},
-    "ВсОШ Физика": {"color": "#ec4899", "letter": "В"},
-    "Хабр": {"color": "#5f9df9", "letter": "Х"},
-}
-
+    "Хабр: DIY": {"color": "#ef4444", "letter": "DIY"},
+    "Хабр:
 LANG_STYLES = {
     "Rust": {"color": "#ff9060"},
     "Python": {"color": "#7cb8ea"}
