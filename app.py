@@ -4,30 +4,70 @@ from bs4 import BeautifulSoup
 from flask import Flask, render_template_string, redirect, request
 import os
 import re
+import time
+import datetime
+import html
 
 app = Flask(__name__)
 
 news_db = []
+last_update_time = 0
+
+# Словарь цветов для источников и языков
 SOURCE_STYLES = {
-    "Хабр": {"color": "#bb86fc", "letter": "Х"},
-    "Hackaday": {"color": "#cf6679", "letter": "H"},
-    "Mathus": {"color": "#0f9d58", "letter": "M"}
+    "Хабр": {"color": "#5f9df9", "letter": "Х"},
+    "Hackaday": {"color": "#ef4444", "letter": "H"},
+    "Mathus": {"color": "#22c55e", "letter": "M"}
+}
+
+LANG_STYLES = {
+    "Rust": {"color": "#ff9060"},
+    "Python": {"color": "#7cb8ea"}
 }
 
 # ==========================================
-# БАЗА ЗНАНИЙ: RUST (СО ССЫЛКОЙ НА STEPIK)
+# ОЧИСТКА ДАННЫХ (Гигиена)
+# ==========================================
+def clean_text(raw_html):
+    if not raw_html: return ""
+    # Декодируем HTML-сущности
+    text = html.unescape(raw_html)
+    # Удаляем теги
+    text = re.sub(r'<.*?>', '', text)
+    # Чиним склейки (охлаждение:—) и лишние пробелы
+    text = re.sub(r'([.!?])([А-ЯA-Z])', r'\1 \2', text)
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
+
+def pluralize_time(minutes, hours, days):
+    if days > 0:
+        if days % 10 == 1 and days % 100 != 11: return f"{days} день назад"
+        elif days % 10 in [2, 3, 4] and days % 100 not in [12, 13, 14]: return f"{days} дня назад"
+        else: return f"{days} дней назад"
+    elif hours > 0:
+        if hours % 10 == 1 and hours % 100 != 11: return f"{hours} час назад"
+        elif hours % 10 in [2, 3, 4] and hours % 100 not in [12, 13, 14]: return f"{hours} часа назад"
+        else: return f"{hours} часов назад"
+    else:
+        if minutes % 10 == 1 and minutes % 100 != 11: return f"{minutes} минуту назад"
+        elif minutes % 10 in [2, 3, 4] and minutes % 100 not in [12, 13, 14]: return f"{minutes} минуты назад"
+        else: return f"{minutes} минут назад"
+
+def get_relative_time(ts):
+    diff = time.time() - ts
+    if diff < 60: return "Только что"
+    return pluralize_time(int(diff // 60) % 60, int(diff // 3600) % 24, int(diff // 86400))
+
+# ==========================================
+# БАЗА ЗНАНИЙ: RUST & PYTHON
 # ==========================================
 RUST_DB = {
     "ownership": {
-        "title": "Rust: Владение и заимствование",
+        "title": "Владение и заимствование",
+        "lang": "Rust",
         "content": """
-        <div style="margin-bottom: 24px;">
-            <a href="https://stepik.org/course/195449/promo" target="_blank" style="display: inline-flex; align-items: center; gap: 8px; background: rgba(187, 134, 252, 0.1); color: var(--accent); padding: 10px 16px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; border: 1px solid rgba(187, 134, 252, 0.2); transition: background 0.2s;">
-                🦀 Пройти интерактивный курс на Stepik
-            </a>
-        </div>
         <p>Rust — это язык для тех, кто хочет скорости C++ и безопасности Python. Его главная фишка — <b>Ownership (Владение)</b>. В Rust нет сборщика мусора, память очищается детерминированно.</p>
-        <h4>Правила владения:</h4>
+        <h2>Правила владения:</h2>
         <ul>
             <li>У каждого значения есть ровно один владелец.</li>
             <li>В один момент времени может быть только один владелец.</li>
@@ -43,19 +83,13 @@ RUST_DB = {
     }
 }
 
-# ==========================================
-# БАЗА ЗНАНИЙ: PYTHON (СО ССЫЛКОЙ НА STEPIK)
-# ==========================================
 PYTHON_DB = {
     "generators": {
-        "title": "Python: Генераторы и yield",
+        "title": "Генераторы и yield",
+        "lang": "Python",
         "content": """
-        <div style="margin-bottom: 24px;">
-            <a href="https://stepik.org/course/214271/promo" target="_blank" style="display: inline-flex; align-items: center; gap: 8px; background: rgba(3, 218, 198, 0.1); color: #03dac6; padding: 10px 16px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; border: 1px solid rgba(3, 218, 198, 0.2); transition: background 0.2s;">
-                🐍 Пройти интерактивный курс на Stepik
-            </a>
-        </div>
         <p>В Python есть мощный инструмент для работы с памятью — генераторы. Обычная функция возвращает результат и завершается. Генератор использует <code>yield</code> и «замораживает» свое состояние.</p>
+        <h2>Пример бесконечной последовательности</h2>
         <pre><code class="language-python">def count_up_to(max):
     count = 1
     while count <= max:
@@ -71,38 +105,52 @@ print(next(counter)) # 1</code></pre>
 # ==========================================
 # ПАРСИНГ И ЛЕНТА
 # ==========================================
-def clean_snippet(raw_html):
-    if not raw_html: return ""
-    text = re.sub(r'<.*?>', '', raw_html)
-    return text[:140] + "..." if len(text) > 140 else text
-
-def save_to_memory(title, link, source, snippet=""):
+def save_to_memory(title, link, source, snippet="", pub_time=None):
     if not any(item['link'] == link for item in news_db):
-        style = SOURCE_STYLES.get(source, {"color": "#8b8b90", "letter": source[0]})
+        if not snippet: snippet = "Нажмите, чтобы прочитать полностью..."
+        if not pub_time: pub_time = time.time()
+        
+        style = SOURCE_STYLES.get(source, {"color": "#8b8b93", "letter": source[0]})
+        
+        # Группировка по дням
+        dt = datetime.datetime.fromtimestamp(pub_time)
+        today = datetime.date.today()
+        if dt.date() == today: day_label = "Сегодня"
+        elif dt.date() == today - datetime.timedelta(days=1): day_label = "Вчера"
+        else: day_label = dt.strftime("%d %B")
+
         news_db.append({
-            'title': title, 'link': link, 'source': source, 'snippet': snippet,
-            'color': style["color"], 'letter': style["letter"]
+            'title': clean_text(title), 
+            'link': link, 
+            'source': source, 
+            'snippet': clean_text(snippet)[:160] + "...",
+            'color': style["color"], 
+            'letter': style["letter"],
+            'time': get_relative_time(pub_time),
+            'day': day_label
         })
 
 def fetch_all_news():
-    global news_db
+    global news_db, last_update_time
     news_db.clear()
     try:
         feed = feedparser.parse("https://habr.com/ru/rss/best/daily/?fl=ru")
         for entry in feed.entries[:10]:
-            save_to_memory(entry.title, entry.link, "Хабр", clean_snippet(entry.get('summary', '')))
-    except Exception as e:
-        print(f"RSS Error: {e}")
+            pub_time = time.mktime(entry.published_parsed) if hasattr(entry, 'published_parsed') else None
+            save_to_memory(entry.title, entry.link, "Хабр", entry.get('summary', ''), pub_time)
+    except Exception as e: print(f"RSS Error: {e}")
         
     try:
         feed = feedparser.parse("https://hackaday.com/feed/")
         for entry in feed.entries[:5]:
-            save_to_memory(entry.title, entry.link, "Hackaday", clean_snippet(entry.get('summary', '')))
-    except Exception as e:
-        print(f"RSS Error: {e}")
+            pub_time = time.mktime(entry.published_parsed) if hasattr(entry, 'published_parsed') else None
+            save_to_memory(entry.title, entry.link, "Hackaday", entry.get('summary', ''), pub_time)
+    except Exception as e: print(f"RSS Error: {e}")
+    
+    last_update_time = time.time()
 
 # ==========================================
-# ШАБЛОН (ДИЗАЙН)
+# ШАБЛОН И ДИЗАЙН-СИСТЕМА
 # ==========================================
 HTML_TEMPLATE = """
 <!DOCTYPE html>
@@ -110,56 +158,164 @@ HTML_TEMPLATE = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0b0b0d">
     <title>Engineering Feed</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-rust.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    
     <style>
+        /* 0. ФУНДАМЕНТ: ТОКЕНЫ */
         :root[data-theme="dark"] {
-            --bg-base: #0b0b0d; --bg-card: #161619; --border: rgba(255, 255, 255, 0.05);
-            --text-main: #f4f4f6; --text-muted: #b8b8c0; --accent: #bb86fc;
+            --bg: #0b0b0d; --surface: #161619; --surface-hover: #1a1a1f; --raised: #1c1c21;
+            --border: rgba(255,255,255,.06); --border-strong: rgba(255,255,255,.10);
+            --text-1: #f4f4f6; --text-2: #b8b8c0; --text-3: #8b8b93; --text-4: #6c6c74;
+            --accent: #8b5cf6; --accent-soft: rgba(139,92,246,.16); --accent-ring: rgba(139,92,246,.25);
+            --code-bg: #101013;
         }
         :root[data-theme="light"] {
-            --bg-base: #f0f2f5; --bg-card: #ffffff; --border: rgba(0, 0, 0, 0.06);
-            --text-main: #1c1c1e; --text-muted: #6b7280; --accent: #7c3aed;
+            --bg: #f4f4f6; --surface: #ffffff; --surface-hover: #f8f8fa; --raised: #ffffff;
+            --border: rgba(0,0,0,.08); --border-strong: rgba(0,0,0,.12);
+            --text-1: #16161a; --text-2: #4b4b52; --text-3: #7a7a82; --text-4: #9a9aa2;
+            --accent: #7c3aed; --accent-soft: rgba(124,58,237,.1); --accent-ring: rgba(124,58,237,.2);
+            --code-bg: #f6f6f8;
         }
+
+        /* 4. ГЛОБАЛЬНОЕ */
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg-base); background-image: radial-gradient(900px 420px at 50% -120px, rgba(124,92,246,.07), transparent); color: var(--text-main); padding-top: 64px; }
+        body { 
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            background: var(--bg); color: var(--text-1); padding-top: 64px; 
+            -webkit-font-smoothing: antialiased;
+        }
+        ::selection { background: var(--accent-ring); color: var(--text-1); }
+        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #2a2a30; border-radius: 8px; }
+        ::-webkit-scrollbar-thumb:hover { background: #3a3a42; }
+        :focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-ring); }
         
-        header { position: fixed; top: 0; left: 0; right: 0; height: 64px; background: rgba(11, 11, 13, 0.75); backdrop-filter: blur(16px); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: center; z-index: 100; }
-        .header-content { width: 100%; max-width: 900px; display: flex; justify-content: space-between; align-items: center; padding: 0 16px; }
-        
-        .nav-tabs { display: flex; gap: 4px; background: rgba(255,255,255,0.03); padding: 4px; border-radius: 10px; }
-        .nav-tab { color: var(--text-muted); padding: 6px 16px; border-radius: 8px; text-decoration: none; font-size: 14px; font-weight: 500; transition: 0.2s; }
-        .nav-tab:hover { color: var(--text-main); }
-        .nav-tab.active { background: var(--bg-card); color: var(--accent); box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+        code, pre { font-family: 'JetBrains Mono', monospace; font-size: 13.5px; line-height: 1.65; }
+        pre { background: var(--code-bg) !important; border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; overflow-x: auto; margin: 16px 0; position: relative; }
+        code:not([class*="language-"]) { background: rgba(255,255,255,.08); padding: 2px 6px; border-radius: 6px; font-size: 13px; }
 
-        .container { width: 100%; max-width: 740px; margin: 20px auto; padding: 0 16px; }
-        .card { background-color: var(--bg-card); border-radius: 16px; padding: 20px 22px; margin-top: 12px; border: 1px solid var(--border); transition: all 160ms; display: flex; gap: 12px; cursor: pointer; text-decoration: none; color: inherit; }
-        .card:hover { background-color: rgba(255,255,255,0.03); border-color: rgba(255,255,255,0.09); box-shadow: 0 8px 24px rgba(0,0,0,.35); transform: translateY(-1px); }
+        /* 1. ШАПКА */
+        header { 
+            position: fixed; top: 0; left: 0; right: 0; height: 64px; 
+            background: rgba(11,11,13,.75); backdrop-filter: blur(16px) saturate(1.4); -webkit-backdrop-filter: blur(16px) saturate(1.4);
+            border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: center; z-index: 100; 
+        }
+        [data-theme="light"] header { background: rgba(255,255,255,.75); }
+        .header-content { width: 100%; max-width: 1200px; display: flex; justify-content: space-between; align-items: center; padding: 0 24px; }
         
-        .avatar { width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #000; font-size: 16px; flex-shrink: 0; }
+        .logo { font-weight: 700; font-size: 17px; display: flex; align-items: center; gap: 8px; }
+        .logo svg { width: 20px; height: 20px; fill: var(--accent); }
+        .badge { background: var(--accent-soft); color: #c4b5fd; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+        
+        /* Segmented Control */
+        .nav-tabs { display: flex; gap: 4px; background: var(--surface); padding: 4px; border-radius: 10px; }
+        .nav-tab { color: var(--text-3); padding: 8px 14px; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 500; transition: 120ms ease; border: none; background: none; cursor: pointer; }
+        .nav-tab:hover { background: rgba(255,255,255,.06); color: var(--text-1); }
+        .nav-tab.active { background: var(--accent-soft); color: #c4b5fd; font-weight: 600; }
+        
+        .actions { display: flex; align-items: center; gap: 12px; }
+        .updated-time { font-size: 12px; color: var(--text-3); }
+        .icon-btn { width: 36px; height: 36px; border-radius: 10px; border: none; background: none; color: var(--text-3); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 120ms ease; }
+        .icon-btn:hover { background: rgba(255,255,255,.07); color: var(--text-1); }
+        .icon-btn:active { background: rgba(255,255,255,.12); }
+        .icon-btn svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2; }
+        
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .spin { animation: spin 800ms linear infinite; }
+
+        /* 2. ЛЕНТА */
+        .container { width: 100%; max-width: 740px; margin: 24px auto; padding: 0 24px; }
+        
+        /* Поиск и Чипы */
+        .search-wrapper { position: relative; margin-bottom: 16px; }
+        .search-wrapper svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; stroke: var(--text-4); fill: none; stroke-width: 2; }
+        .search-input { width: 100%; height: 44px; padding: 0 40px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); color: var(--text-1); font-size: 14px; transition: 160ms ease; }
+        .search-input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px var(--accent-ring); }
+        .kbd-hint { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--text-4); background: rgba(255,255,255,.08); padding: 2px 6px; border-radius: 4px; }
+        
+        .chips-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 16px; scrollbar-width: none; position: relative; mask-image: linear-gradient(to right, black 90%, transparent); }
+        .chips-row::-webkit-scrollbar { display: none; }
+        .chip { height: 32px; background: transparent; border: 1px solid var(--border); color: var(--text-2); padding: 0 12px; border-radius: 999px; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; transition: 120ms ease; display: flex; align-items: center; gap: 6px; }
+        .chip:hover { background: rgba(255,255,255,.06); }
+        .chip.active { background: var(--accent-soft); border-color: var(--accent); color: #c4b5fd; }
+        .chip-count { background: rgba(255,255,255,.08); padding: 2px 6px; border-radius: 999px; font-size: 11px; }
+
+        /* Карточки */
+        .day-header { font-size: 12px; font-weight: 600; color: var(--text-3); letter-spacing: 0.4px; text-transform: uppercase; margin: 24px 0 12px; position: sticky; top: 64px; background: var(--bg); padding: 8px 0; z-index: 10; }
+        
+        .card { 
+            background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 20px 22px; margin-bottom: 12px; 
+            display: flex; gap: 16px; cursor: pointer; transition: 160ms ease; animation: slideUp 240ms ease forwards; opacity: 0; transform: translateY(6px);
+        }
+        .card:hover { background: var(--surface-hover); border-color: var(--border-strong); box-shadow: 0 8px 24px rgba(0,0,0,.35); transform: translateY(-1px); }
+        .card:active { transform: scale(0.995); }
+        .card.read { opacity: 0.6; }
+        .card.read .card-title { color: var(--text-3); }
+        
+        @keyframes slideUp { to { opacity: 1; transform: translateY(0); } }
+        
+        .avatar-wrap { position: relative; flex-shrink: 0; }
+        .avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; color: #000; }
+        .unread-dot { position: absolute; top: -2px; right: -2px; width: 9px; height: 9px; background: var(--accent); border-radius: 50%; border: 2px solid var(--surface); display: none; }
+        .card:not(.read) .unread-dot { display: block; }
+        
         .card-body { flex-grow: 1; min-width: 0; }
-        .meta-info { display: flex; justify-content: space-between; margin-bottom: 4px; }
-        .source-name { font-weight: 600; font-size: 13px; color: var(--text-muted); }
-        .card-title { font-size: 17px; font-weight: 600; line-height: 1.35; margin-bottom: 6px; display: block; color: var(--text-main); }
-        .card-snippet { font-size: 14px; color: var(--text-muted); line-height: 1.55; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-
-        /* Стили для Wiki */
-        .wiki-layout { display: flex; gap: 20px; max-width: 900px; margin: 20px auto; padding: 0 16px; }
-        .wiki-sidebar { width: 260px; flex-shrink: 0; position: sticky; top: 84px; height: max-content; }
-        .wiki-menu { list-style: none; }
-        .wiki-menu li a { display: block; padding: 8px 12px; color: var(--text-muted); text-decoration: none; border-radius: 8px; font-size: 14px; margin-bottom: 2px; transition: 0.2s; }
-        .wiki-menu li a:hover { background: rgba(255,255,255,0.05); color: var(--text-main); }
-        .wiki-menu li a.active { background: rgba(187, 134, 252, 0.1); color: var(--accent); font-weight: 600; }
+        .meta { display: flex; justify-content: space-between; margin-bottom: 4px; }
+        .source { font-weight: 600; font-size: 13px; color: var(--text-2); }
+        .time { font-size: 12px; color: var(--text-3); font-variant-numeric: tabular-nums; }
         
-        .wiki-content { flex-grow: 1; background: var(--bg-card); border-radius: 16px; border: 1px solid var(--border); padding: 32px; }
-        .wiki-content h1 { font-size: 28px; margin-bottom: 24px; color: var(--text-main); }
-        .wiki-content h4 { font-size: 18px; margin: 24px 0 12px; color: var(--text-main); }
-        .wiki-content p { font-size: 15px; color: #a2a2a8; line-height: 1.6; margin-bottom: 16px; }
-        .wiki-content ul { margin-left: 20px; margin-bottom: 16px; color: #a2a2a8; line-height: 1.6; }
-        .wiki-content pre { border-radius: 12px !important; margin: 16px 0 !important; }
+        .card-title { font-size: 17px; font-weight: 600; color: var(--text-1); text-decoration: none; line-height: 1.35; display: block; margin-bottom: 6px; transition: 120ms; }
+        .card-title:hover { color: var(--accent); }
+        .card-snippet { font-size: 14px; line-height: 1.55; color: var(--text-3); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+        
+        .card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
+        .tag { font-size: 12px; font-weight: 500; padding: 2px 8px; border-radius: 6px; }
+        .action-group { display: flex; gap: 8px; }
+        .action-btn { background: none; border: none; color: var(--text-3); cursor: pointer; display: flex; align-items: center; gap: 4px; font-size: 12px; padding: 4px 8px; border-radius: 6px; transition: 120ms; }
+        .action-btn:hover { background: rgba(255,255,255,.06); color: var(--text-1); }
+        .action-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; }
+        .action-btn.active { color: var(--accent); }
+        .action-btn.active svg { fill: var(--accent); stroke: var(--accent); }
+
+        /* 3. WIKI */
+        .wiki-layout { display: flex; gap: 32px; max-width: 1200px; margin: 40px auto; padding: 0 24px; }
+        .wiki-sidebar { width: 260px; flex-shrink: 0; position: sticky; top: 84px; height: max-content; }
+        .sidebar-label { font-size: 11px; font-weight: 600; color: var(--text-4); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 12px; }
+        .wiki-menu { list-style: none; display: flex; flex-direction: column; gap: 2px; }
+        .wiki-menu a { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; font-size: 13px; font-weight: 500; color: var(--text-2); text-decoration: none; transition: 120ms; }
+        .wiki-menu a:hover { background: rgba(255,255,255,.06); color: var(--text-1); }
+        .wiki-menu a.active { background: var(--accent-soft); color: #c4b5fd; }
+        .lang-dot { width: 8px; height: 8px; border-radius: 50%; }
+        
+        .wiki-content { flex-grow: 1; max-width: 860px; background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 48px; }
+        .breadcrumbs { font-size: 12px; color: var(--text-3); margin-bottom: 24px; display: flex; gap: 8px; align-items: center; }
+        .breadcrumbs svg { width: 12px; height: 12px; stroke: var(--text-4); fill: none; stroke-width: 2; }
+        
+        .wiki-content h1 { font-size: 32px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 24px; }
+        .wiki-content h2 { font-size: 22px; font-weight: 650; margin: 36px 0 16px; }
+        .wiki-content p { font-size: 15px; line-height: 1.7; color: var(--text-2); margin-bottom: 16px; }
+        .wiki-content strong { color: var(--text-1); }
+        .wiki-content ul { margin-left: 24px; margin-bottom: 24px; color: var(--text-2); line-height: 1.7; font-size: 15px; }
+        .wiki-content li { margin-bottom: 6px; }
+        .wiki-content li::marker { color: var(--accent); }
+        
+        .cta-btn { display: inline-flex; align-items: center; gap: 10px; height: 44px; padding: 0 20px; border-radius: 12px; text-decoration: none; font-size: 14px; font-weight: 600; margin: 24px 0; border: 1px solid; transition: 160ms; }
+        .cta-btn svg { width: 18px; height: 18px; fill: currentColor; }
+        .cta-rust { background: rgba(255,144,96,.14); border-color: rgba(255,144,96,.3); color: #ff9060; }
+        .cta-rust:hover { background: rgba(255,144,96,.2); }
+        .cta-python { background: rgba(124,184,234,.14); border-color: rgba(124,184,234,.3); color: #7cb8ea; }
+        .cta-python:hover { background: rgba(124,184,234,.2); }
+
+        /* Скроллбар для кода */
+        pre::-webkit-scrollbar { height: 8px; }
+        pre::-webkit-scrollbar-thumb { background: #3a3a42; }
 
         @media (max-width: 768px) {
             .wiki-layout { flex-direction: column; }
@@ -167,76 +323,265 @@ HTML_TEMPLATE = """
             .header-content { flex-direction: column; height: auto; padding: 12px; gap: 12px;}
             body { padding-top: 110px; }
             header { height: auto; }
+            .wiki-content { padding: 24px; }
         }
     </style>
 </head>
 <body>
     <header>
         <div class="header-content">
-            <div class="logo" style="font-weight: 700; font-size: 18px; display: flex; align-items: center; gap: 8px;">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="var(--accent)" stroke="none"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+            <div class="logo">
+                <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
                 EngFeed
+                <span class="badge" id="unread-badge" style="display:none;">0</span>
             </div>
+            
             <div class="nav-tabs">
-                <a href="/" class="nav-tab {{ 'active' if active_tab == 'feed' else '' }}">Лента</a>
-                <a href="/wiki/rust" class="nav-tab {{ 'active' if active_tab == 'rust' else '' }}">Rust</a>
-                <a href="/wiki/python" class="nav-tab {{ 'active' if active_tab == 'python' else '' }}">Python</a>
+                <button onclick="window.location.href='/'" class="nav-tab {{ 'active' if active_tab == 'feed' else '' }}">Лента</button>
+                <button onclick="window.location.href='/wiki/rust'" class="nav-tab {{ 'active' if active_tab == 'rust' else '' }}">Rust</button>
+                <button onclick="window.location.href='/wiki/python'" class="nav-tab {{ 'active' if active_tab == 'python' else '' }}">Python</button>
             </div>
-            <div style="display: flex; gap: 8px;">
-                <button class="nav-tab" id="theme-toggle" style="background:none; border:none; cursor:pointer; padding: 6px;">🌓</button>
+            
+            <div class="actions">
+                <span class="updated-time" id="update-time">обновлено сейчас</span>
+                <button class="icon-btn" id="theme-btn" aria-label="Сменить тему">
+                    <svg viewBox="0 0 24 24"><path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                </button>
                 {% if active_tab == 'feed' %}
-                <button class="nav-tab" onclick="window.location.href='/refresh'" style="background:none; border:none; cursor:pointer; padding: 6px;">🔄</button>
+                <button class="icon-btn" id="refresh-btn" onclick="refreshFeed()" aria-label="Обновить">
+                    <svg viewBox="0 0 24 24"><path d="M21 2v6h-6M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/></svg>
+                </button>
                 {% endif %}
             </div>
         </div>
     </header>
 
+    <!-- ЛЕНТА -->
     {% if active_tab == 'feed' %}
     <main class="container">
-        {% for item in news %}
-            <a href="{{ item.link }}" target="_blank" class="card">
-                <div class="avatar" style="background-color: {{ item.color }};">{{ item.letter }}</div>
-                <div class="card-body">
-                    <div class="meta-info">
-                        <span class="source-name">{{ item.source }}</span>
+        <div class="search-wrapper">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>
+            <input type="text" id="search" class="search-input" placeholder="Поиск по заголовкам…">
+            <span class="kbd-hint">/</span>
+        </div>
+        
+        <div class="chips-row" id="filters">
+            <div class="chip active" data-filter="all">Все</div>
+            <div class="chip" data-filter="unread">Непрочитанные</div>
+            <div class="chip" data-filter="bookmarks">Закладки</div>
+            <div class="chip" data-filter="Хабр">Хабр <span class="chip-count">{{ news | selectattr('source', 'equalto', 'Хабр') | list | length }}</span></div>
+            <div class="chip" data-filter="Hackaday">Hackaday <span class="chip-count">{{ news | selectattr('source', 'equalto', 'Hackaday') | list | length }}</span></div>
+        </div>
+
+        <div id="feed-container">
+            {% set ns = namespace(current_day="") %}
+            {% for item in news %}
+                {% if item.day != ns.current_day %}
+                    {% set ns.current_day = item.day %}
+                    <div class="day-header">{{ ns.current_day }}</div>
+                {% endif %}
+                
+                <div class="card" data-link="{{ item.link }}" data-source="{{ item.source }}">
+                    <div class="avatar-wrap">
+                        <div class="avatar" style="background: {{ item.color }}; box-shadow: 0 0 0 1px {{ item.color }}40;">{{ item.letter }}</div>
+                        <div class="unread-dot"></div>
                     </div>
-                    <div class="card-title">{{ item.title }}</div>
-                    <div class="card-snippet">{{ item.snippet }}</div>
+                    <div class="card-body">
+                        <div class="meta">
+                            <span class="source">{{ item.source }}</span>
+                            <span class="time">{{ item.time }}</span>
+                        </div>
+                        <a href="{{ item.link }}" target="_blank" rel="noopener" class="card-title">{{ item.title }}</a>
+                        <div class="card-snippet">{{ item.snippet }}</div>
+                        
+                        <div class="card-footer">
+                            <span class="tag" style="color: {{ item.color }}; background: {{ item.color }}20;" onclick="filterTag('{{ item.source }}')">#{{ item.source }}</span>
+                            <div class="action-group">
+                                <button class="action-btn copy-btn" data-link="{{ item.link }}" onclick="copyLink(this, '{{ item.link }}')">
+                                    <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                                </button>
+                                <button class="action-btn bookmark-btn" data-link="{{ item.link }}">
+                                    <svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+                                    <span>В закладки</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </a>
-        {% endfor %}
+            {% endfor %}
+        </div>
     </main>
     {% endif %}
 
+    <!-- WIKI -->
     {% if active_tab in ['rust', 'python'] %}
     <div class="wiki-layout">
         <aside class="wiki-sidebar">
+            <div class="sidebar-label">{{ 'Rust' if active_tab == 'rust' else 'Python' }}</div>
             <ul class="wiki-menu">
                 {% for key, item in db.items() %}
-                <li><a href="?topic={{ key }}" class="{{ 'active' if current_topic == key else '' }}">{{ item.title }}</a></li>
+                <li>
+                    <a href="?topic={{ key }}" class="{{ 'active' if current_topic == key else '' }}">
+                        <div class="lang-dot" style="background: {{ LANG_STYLES[item.lang].color }}"></div>
+                        {{ item.title }}
+                    </a>
+                </li>
                 {% endfor %}
             </ul>
+            <div style="margin-top: 24px;">
+                <a href="/" style="font-size: 13px; color: var(--text-3); text-decoration: none; display: flex; align-items: center; gap: 6px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                    К ленте
+                </a>
+            </div>
         </aside>
+        
         <main class="wiki-content">
-            {% if db[current_topic] %}
-                <h1>{{ db[current_topic].title }}</h1>
-                {{ db[current_topic].content | safe }}
+            <div class="breadcrumbs">
+                Wiki <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg> {{ db[current_topic].lang }}
+            </div>
+            <h1>{{ db[current_topic].title }}</h1>
+            
+            {% if active_tab == 'rust' %}
+            <a href="https://stepik.org/course/195449/promo" target="_blank" class="cta-btn cta-rust">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
+                Пройти интерактивный курс на Stepik
+            </a>
             {% else %}
-                <h1>Выберите тему</h1>
+            <a href="https://stepik.org/course/214271/promo" target="_blank" class="cta-btn cta-python">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
+                Пройти интерактивный курс на Stepik
+            </a>
             {% endif %}
+            
+            {{ db[current_topic].content | safe }}
         </main>
     </div>
     {% endif %}
 
     <script>
-        const themeToggle = document.getElementById('theme-toggle');
-        const currentTheme = localStorage.getItem('theme') || 'dark';
+        // 4. ТЕМА
+        const themeBtn = document.getElementById('theme-btn');
+        let currentTheme = localStorage.getItem('theme') || 'dark';
         document.documentElement.setAttribute('data-theme', currentTheme);
-        themeToggle.addEventListener('click', () => {
-            const newTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-            document.documentElement.setAttribute('data-theme', newTheme);
-            localStorage.setItem('theme', newTheme);
+        
+        themeBtn.addEventListener('click', () => {
+            currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', currentTheme);
+            localStorage.setItem('theme', currentTheme);
         });
+
+        // 2. ЛЕНТА (Логика Read/Unread, Закладки)
+        let readLinks = JSON.parse(localStorage.getItem('readLinks') || '[]');
+        let bookmarks = JSON.parse(localStorage.getItem('bookmarks') || '[]');
+        
+        function updateBadge() {
+            const cards = document.querySelectorAll('.card');
+            let unread = 0;
+            cards.forEach(c => { if (!readLinks.includes(c.dataset.link)) unread++; });
+            const badge = document.getElementById('unread-badge');
+            if (badge) {
+                badge.innerText = unread;
+                badge.style.display = unread > 0 ? 'inline-block' : 'none';
+            }
+        }
+
+        function applyState() {
+            document.querySelectorAll('.card').forEach(card => {
+                const link = card.dataset.link;
+                if (readLinks.includes(link)) card.classList.add('read');
+                
+                const btn = card.querySelector('.bookmark-btn');
+                const span = btn.querySelector('span');
+                if (bookmarks.includes(link)) {
+                    btn.classList.add('active');
+                    span.innerText = "В закладках";
+                } else {
+                    btn.classList.remove('active');
+                    span.innerText = "В закладки";
+                }
+
+                card.onclick = (e) => {
+                    if (e.target.closest('.bookmark-btn') || e.target.closest('.copy-btn') || e.target.closest('.tag')) return;
+                    if (!readLinks.includes(link)) {
+                        readLinks.push(link);
+                        localStorage.setItem('readLinks', JSON.stringify(readLinks));
+                        applyState();
+                        updateBadge();
+                    }
+                    window.open(link, '_blank');
+                };
+            });
+            updateBadge();
+        }
+
+        document.querySelectorAll('.bookmark-btn').forEach(btn => {
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                const link = btn.closest('.card').dataset.link;
+                if (bookmarks.includes(link)) bookmarks = bookmarks.filter(l => l !== link);
+                else bookmarks.push(link);
+                localStorage.setItem('bookmarks', JSON.stringify(bookmarks));
+                applyState();
+            };
+        });
+
+        // Копирование ссылки
+        window.copyLink = function(btn, link) {
+            navigator.clipboard.writeText(link).then(() => {
+                const original = btn.innerHTML;
+                btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" stroke="var(--accent)"/></svg>';
+                setTimeout(() => btn.innerHTML = original, 1200);
+            });
+        };
+
+        // Фильтрация (Поиск + Чипы)
+        let activeFilter = 'all';
+        const chips = document.querySelectorAll('.chip');
+        const searchInput = document.getElementById('search');
+
+        function filterCards() {
+            const query = searchInput.value.toLowerCase();
+            document.querySelectorAll('.card').forEach(card => {
+                const title = card.querySelector('.card-title').innerText.toLowerCase();
+                const source = card.dataset.source;
+                const link = card.dataset.link;
+                
+                let matchFilter = (activeFilter === 'all') || 
+                                  (activeFilter === 'unread' && !readLinks.includes(link)) ||
+                                  (activeFilter === 'bookmarks' && bookmarks.includes(link)) ||
+                                  (source === activeFilter);
+                                  
+                card.style.display = (matchFilter && title.includes(query)) ? 'flex' : 'none';
+            });
+        }
+
+        chips.forEach(chip => {
+            chip.onclick = () => {
+                chips.forEach(c => c.classList.remove('active'));
+                chip.classList.add('active');
+                activeFilter = chip.dataset.filter;
+                filterCards();
+            };
+        });
+        if(searchInput) searchInput.oninput = filterCards;
+
+        // Копирование кода в Wiki
+        document.querySelectorAll('pre').forEach(pre => {
+            const btn = document.createElement('button');
+            btn.className = 'icon-btn';
+            btn.style.cssText = 'position:absolute; right:8px; top:8px; background:rgba(255,255,255,0.1); width:28px; height:28px; border-radius:6px; color:var(--text-2);';
+            btn.innerHTML = '<svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
+            btn.onclick = () => {
+                navigator.clipboard.writeText(pre.innerText);
+                btn.innerHTML = '<svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:var(--accent);fill:none;stroke-width:2;"><path d="M20 6L9 17l-5-5"/></svg>';
+                setTimeout(() => btn.innerHTML = '<svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>', 1500);
+            };
+            pre.appendChild(btn);
+        });
+
+        // Инициализация
+        if (document.querySelector('.card')) applyState();
     </script>
 </body>
 </html>
@@ -247,7 +592,7 @@ def index():
     global news_db
     if not news_db:
         fetch_all_news()
-    return render_template_string(HTML_TEMPLATE, news=news_db, active_tab='feed')
+    return render_template_string(HTML_TEMPLATE, news=news_db, active_tab='feed', LANG_STYLES=LANG_STYLES)
 
 @app.route('/refresh')
 def refresh():
@@ -257,12 +602,12 @@ def refresh():
 @app.route('/wiki/rust')
 def wiki_rust():
     topic = request.args.get('topic', list(RUST_DB.keys())[0])
-    return render_template_string(HTML_TEMPLATE, active_tab='rust', db=RUST_DB, current_topic=topic, news=[])
+    return render_template_string(HTML_TEMPLATE, active_tab='rust', db=RUST_DB, current_topic=topic, news=[], LANG_STYLES=LANG_STYLES)
 
 @app.route('/wiki/python')
 def wiki_python():
     topic = request.args.get('topic', list(PYTHON_DB.keys())[0])
-    return render_template_string(HTML_TEMPLATE, active_tab='python', db=PYTHON_DB, current_topic=topic, news=[])
+    return render_template_string(HTML_TEMPLATE, active_tab='python', db=PYTHON_DB, current_topic=topic, news=[], LANG_STYLES=LANG_STYLES)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
