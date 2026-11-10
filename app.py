@@ -9,7 +9,7 @@ import sys
 import hashlib
 import threading
 from contextlib import contextmanager
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 
 import feedparser
 import requests
@@ -234,19 +234,29 @@ def scrape_html(item):
 
 def fetch_all_data():
     all_items = []
+    pairs = []
     with ThreadPoolExecutor(max_workers=12) as executor:
-        futures = [executor.submit(parse_rss if s["type"] == "rss" else scrape_html, s) for s in SOURCES]
-        for f in futures:
+        for s in SOURCES:
+            fn = parse_rss if s["type"] == "rss" else scrape_html
+            pairs.append((executor.submit(fn, s), s["source"]))
+        for fut, name in pairs:
             try:
-                r = f.result(timeout=15)
-                if r: all_items.extend(r)
+                r = fut.result(timeout=30)
+                if r:
+                    all_items.extend(r)
+                else:
+                    logger.warning(f"[EMPTY] {name}: 0 записей")
+            except FuturesTimeoutError:
+                logger.warning(f"[SKIP] {name}: таймаут >30с")
             except Exception as e:
-                logger.warning(f"Задача прервана: {e}")
+                logger.warning(f"[SKIP] {name}: {e}")
 
     enriched = []
     for it in all_items:
         g = CAT_GROUP.get(it["category"], "physics")
-        meta = GROUP_META[g]
+        meta = GROUP_META.get(g)
+        if not meta:
+            continue
         ts = it.get("pub_time") or time.time()
         enriched.append({
             "title": it["title"], "link": it["link"], "source": it["source"],
@@ -305,7 +315,11 @@ def load_from_db(limit=200):
 def normalize(rows):
     for r in rows:
         g = r.get("group") or CAT_GROUP.get(r.get("category"), "physics")
-        meta = GROUP_META[g]
+        # Безопасное получение метаданных группы
+        meta = GROUP_META.get(g) 
+        if not meta:
+            continue  # Пропускаем битые записи
+        
         r["group"] = g
         r["group_name"] = meta["name"]
         if not r.get("color"): r["color"] = meta["color"]
