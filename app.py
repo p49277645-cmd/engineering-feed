@@ -358,6 +358,15 @@ def wiki_python():
     return render_template_string(HTML_TEMPLATE, active_tab='python', db=PYTHON_DB, current_topic=topic, news=[], groups=GROUP_META)
 
 @app.route('/api/refresh')
+def api_refresh():
+    try:
+        items = fetch_all_data()
+        save_to_db(items)
+        logger.info(f"REFRESH OK: {len(items)} записей сохранено")
+        return jsonify({"status": "ok", "count": len(items)})
+    except Exception as e:
+        logger.error(f"Refresh error: {e}")
+        return jsonify({"status": "error", "count": 0, "error": str(e)}), 500
 
 @app.route('/health')
 def health():
