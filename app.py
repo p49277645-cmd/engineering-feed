@@ -165,7 +165,7 @@ def read_minutes(title):
 
 def parse_rss(item):
     try:
-        resp = SESSION.get(item["url"], timeout=10)
+        resp = SESSION.get(item["url"], timeout=6)
         resp.raise_for_status()
         feed = feedparser.parse(resp.content)
         results = []
@@ -191,7 +191,7 @@ def parse_rss(item):
 
 def scrape_html(item):
     try:
-        resp = SESSION.get(item["url"], timeout=10)
+        resp = SESSION.get(item["url"], timeout=6)
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
         base_url = "/".join(item["url"].split("/")[:3])
@@ -241,7 +241,7 @@ def fetch_all_data():
             pairs.append((executor.submit(fn, s), s["source"]))
         for fut, name in pairs:
             try:
-                r = fut.result(timeout=10)
+                r = fut.result(timeout=6)
                 if r:
                     all_items.extend(r)
                 else:
