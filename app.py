@@ -604,7 +604,7 @@ body::before{content:'';position:fixed;top:-200px;right:-100px;width:700px;heigh
 
         
     {% endif %}
-    # ... предыдущая часть шаблона до </main> остается без изменений ...
+
 
     </main>
 </div>
