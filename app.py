@@ -604,11 +604,17 @@ body::before{content:'';position:fixed;top:-200px;right:-100px;width:700px;heigh
 
         
     {% endif %}
+    # ... предыдущая часть шаблона до </main> остается без изменений ...
+
     </main>
 </div>
 
+<script>
+// ==========================================
+// JAVASCRIPT ФУНКЦИОНАЛ
+// ==========================================
 var refreshAttempts = 0;
-var maxRefreshAttempts = 10; // Максимум 10 попыток (примерно 40 секунд ожидания)
+var maxRefreshAttempts = 10;
 
 function resetRefreshState() {
     var svg = document.querySelector('#refreshBtn svg');
@@ -626,7 +632,6 @@ function doRefresh() {
     var btn = document.querySelector('#refreshBtn');
     var ebtn = document.querySelector('.empty-state button');
     
-    // Запускаем крутилку и блокируем кнопку
     if (svg) svg.classList.add('spin');
     if (btn) btn.disabled = true;
     if (ebtn) {
@@ -675,9 +680,6 @@ if (document.querySelector('.empty-state')) {
     doRefresh();
 }
 
-// ==========================================
-// ОСТАЛЬНОЙ СТАРЫЙ КОД (фильтры, закладки и т.д.) ОСТАЕТСЯ БЕЗ ИЗМЕНЕНИЙ:
-// ==========================================
 var readLinks = JSON.parse(localStorage.getItem('readLinks') || '[]');
 var bookmarks = JSON.parse(localStorage.getItem('bookmarks') || '[]');
 var subs = JSON.parse(localStorage.getItem('subs') || '[]');
