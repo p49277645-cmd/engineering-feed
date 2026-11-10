@@ -235,19 +235,19 @@ def scrape_html(item):
 def fetch_all_data():
     all_items = []
     pairs = []
-    with ThreadPoolExecutor(max_workers=12) as executor:
+    with ThreadPoolExecutor(max_workers=24) as executor:
         for s in SOURCES:
             fn = parse_rss if s["type"] == "rss" else scrape_html
             pairs.append((executor.submit(fn, s), s["source"]))
         for fut, name in pairs:
             try:
-                r = fut.result(timeout=30)
+                r = fut.result(timeout=10)
                 if r:
                     all_items.extend(r)
                 else:
                     logger.warning(f"[EMPTY] {name}: 0 записей")
             except FuturesTimeoutError:
-                logger.warning(f"[SKIP] {name}: таймаут >30с")
+                logger.warning(f"[SKIP] {name}: таймаут >10с")
             except Exception as e:
                 logger.warning(f"[SKIP] {name}: {e}")
 
@@ -359,14 +359,6 @@ def wiki_python():
     return render_template_string(HTML_TEMPLATE, active_tab='python', db=PYTHON_DB, current_topic=topic, news=[], groups=GROUP_META)
 
 @app.route('/api/refresh')
-def api_refresh():
-    try:
-        items = fetch_all_data()
-        save_to_db(items)
-        return jsonify({"status": "ok", "count": len(items)})
-    except Exception as e:
-        logger.error(f"Refresh error: {e}")
-        return jsonify({"status": "error", "count": 0}), 500
 
 @app.route('/health')
 def health():
