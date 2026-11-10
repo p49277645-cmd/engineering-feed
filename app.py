@@ -302,6 +302,18 @@ def load_from_db(limit=200):
     with get_db() as conn:
         cur = conn.execute("SELECT * FROM posts ORDER BY fetched_at DESC LIMIT ?", (limit,))
         return [dict(r) for r in cur.fetchall()]
+def normalize(rows):
+    for r in rows:
+        g = r.get("group") or CAT_GROUP.get(r.get("category"), "physics")
+        meta = GROUP_META[g]
+        r["group"] = g
+        r["group_name"] = meta["name"]
+        if not r.get("color"): r["color"] = meta["color"]
+        if not r.get("letter"): r["letter"] = meta["letter"]
+        if r.get("read_min") is None: r["read_min"] = 5
+        if r.get("image") is None: r["image"] = ""
+        if not r.get("time_str"): r["time_str"] = rel_time(r.get("fetched_at") or time.time())
+    return rows
 
 # ==========================================
 # FLASK
@@ -319,9 +331,7 @@ def _background_fetch():
 
 @app.route('/')
 def index():
-    news = load_from_db()
-    if not news:
-        threading.Thread(target=_background_fetch, daemon=True).start()
+    news = normalize(load_from_db())
     return render_template_string(HTML_TEMPLATE, news=news, groups=GROUP_META, active_tab='feed')
 
 @app.route('/wiki/rust')
@@ -341,7 +351,8 @@ def api_refresh():
         save_to_db(items)
         return jsonify({"status": "ok", "count": len(items)})
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        logger.error(f"Refresh error: {e}")
+        return jsonify({"status": "error", "count": 0}), 500
 
 @app.route('/health')
 def health():
@@ -570,15 +581,7 @@ body::before{content:'';position:fixed;top:-200px;right:-100px;width:700px;heigh
         {% endfor %}
         </div>
 
-        <div class="reco">
-            <div class="reco-label">РЕКОМЕНДУЕМЫЕ ИСТОЧНИКИ</div>
-            <div class="reco-row">
-                <div class="reco-card"><img src="https://www.google.com/s2/favicons?domain=arxiv.org&sz=64" alt=""><div><div class="reco-name">ArXiv.org</div><div class="reco-sub">1.2k подписчиков</div></div><button class="subbtn" data-name="arxiv">Подписаться</button></div>
-                <div class="reco-card"><img src="https://www.google.com/s2/favicons?domain=news.ycombinator.com&sz=64" alt=""><div><div class="reco-name">Hacker News</div><div class="reco-sub">850 подписчиков</div></div><button class="subbtn" data-name="hn">Подписаться</button></div>
-                <div class="reco-card"><img src="https://www.google.com/s2/favicons?domain=habr.com&sz=64" alt=""><div><div class="reco-name">Хабр</div><div class="reco-sub">2.1k подписчиков</div></div><button class="subbtn" data-name="habr">Подписаться</button></div>
-                <div class="reco-card"><img src="https://www.google.com/s2/favicons?domain=quantamagazine.org&sz=64" alt=""><div><div class="reco-name">Quanta</div><div class="reco-sub">940 подписчиков</div></div><button class="subbtn" data-name="quanta">Подписаться</button></div>
-            </div>
-        </div>
+        
     {% endif %}
     </main>
 </div>
@@ -689,7 +692,7 @@ document.addEventListener('keydown', function (e) {
 function doRefresh() {
     var svg = document.querySelector('#refreshBtn svg');
     if (svg) svg.classList.add('spin');
-    fetch('/api/refresh').then(function () { setTimeout(function () { location.reload(); }, 2500); });
+    fetch('/api/refresh').then(function () { location.reload(); });
 }
 document.getElementById('refreshBtn').addEventListener('click', doRefresh);
 
