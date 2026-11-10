@@ -288,10 +288,10 @@ def init_db():
             CREATE TABLE IF NOT EXISTS posts (
                 link TEXT PRIMARY KEY, title TEXT, source TEXT, snippet TEXT,
                 color TEXT, letter TEXT, day TEXT, time_str TEXT,
-                category TEXT, fetched_at REAL
+                category TEXT, fetched_at REAL, image TEXT, read_min INTEGER, "group" TEXT
             );
         """)
-        for col, typ in [("image", "TEXT"), ("read_min", "INTEGER"), ("group", "TEXT")]:
+        for col, typ in [("image", "TEXT"), ("read_min", "INTEGER"), ('"group"', "TEXT")]:
             try:
                 conn.execute("ALTER TABLE posts ADD COLUMN " + col + " " + typ)
             except Exception:
@@ -302,12 +302,11 @@ def save_to_db(items):
         for it in items:
             conn.execute("""
                 INSERT OR REPLACE INTO posts
-                (link, title, source, snippet, color, letter, day, time_str, category, fetched_at, image, read_min, group)
+                (link, title, source, snippet, color, letter, day, time_str, category, fetched_at, image, read_min, "group")
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (it["link"], it["title"], it["source"], it["snippet"], it["color"], it["letter"],
                   it["day"], it["time_str"], it["category"], time.time(),
                   it.get("image", ""), it.get("read_min", 5), it.get("group", "physics")))
-
 def load_from_db(limit=200):
     with get_db() as conn:
         cur = conn.execute("SELECT * FROM posts ORDER BY fetched_at DESC LIMIT ?", (limit,))
