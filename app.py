@@ -191,25 +191,29 @@ def parse_rss(item):
 
 def scrape_html(item):
     try:
-        resp = SESSION.get(item["url"], timeout=6)
+        resp = SESSION.get(item["url"], timeout=8) # Чуть больше времени на ответ сайта
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
         base_url = "/".join(item["url"].split("/")[:3])
         results = []
-        nodes = soup.select("h2 a, h3 a, h4 a, .news-item a, .news-list a, .activity-news a, .archive-item a, article a")[:40]
+        # ДОБАВЛЕНЫ li a и table a для захвата ссылок внутри списков и таблиц mathus.ru
+        nodes = soup.select("h2 a, h3 a, h4 a, .news-item a, .news-list a, .activity-news a, .archive-item a, article a, li a, table a")[:50]
         seen = set()
         for node in nodes:
             href = node.get("href", "")
             title = clean_text(node.get_text())
             if not title or len(title) < 10: continue
             if any(x in href.lower() for x in ["login", "register", "tag", "category", "javascript"]): continue
+            
+            # Корректное формирование абсолютных ссылок
             if href.startswith("/"): href = base_url + href
             elif not href.startswith("http"): href = base_url + "/" + href.lstrip("/")
+            
             if href in seen: continue
             seen.add(href)
 
             img = ""
-            parent = node.find_parent(["li", "div", "article", "section"])
+            parent = node.find_parent(["li", "div", "article", "section", "td", "tr"])
             if parent:
                 im = parent.find("img")
                 if im:
@@ -235,19 +239,22 @@ def scrape_html(item):
 def fetch_all_data():
     all_items = []
     pairs = []
+    # Запускаем все источники параллельно
     with ThreadPoolExecutor(max_workers=24) as executor:
         for s in SOURCES:
             fn = parse_rss if s["type"] == "rss" else scrape_html
             pairs.append((executor.submit(fn, s), s["source"]))
+        
+        # Ждём результаты, но не дольше 15 секунд на каждый источник
         for fut, name in pairs:
             try:
-                r = fut.result(timeout=6)
+                r = fut.result(timeout=15) 
                 if r:
                     all_items.extend(r)
                 else:
                     logger.warning(f"[EMPTY] {name}: 0 записей")
             except FuturesTimeoutError:
-                logger.warning(f"[SKIP] {name}: таймаут >10с")
+                logger.warning(f"[SKIP] {name}: таймаут потока >15с")
             except Exception as e:
                 logger.warning(f"[SKIP] {name}: {e}")
 
@@ -255,8 +262,8 @@ def fetch_all_data():
     for it in all_items:
         g = CAT_GROUP.get(it["category"], "physics")
         meta = GROUP_META.get(g)
-        if not meta:
-            continue
+        if not meta: continue
+        
         ts = it.get("pub_time") or time.time()
         enriched.append({
             "title": it["title"], "link": it["link"], "source": it["source"],
