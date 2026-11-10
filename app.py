@@ -607,7 +607,77 @@ body::before{content:'';position:fixed;top:-200px;right:-100px;width:700px;heigh
     </main>
 </div>
 
-<script>
+var refreshAttempts = 0;
+var maxRefreshAttempts = 10; // Максимум 10 попыток (примерно 40 секунд ожидания)
+
+function resetRefreshState() {
+    var svg = document.querySelector('#refreshBtn svg');
+    var btn = document.querySelector('#refreshBtn');
+    var ebtn = document.querySelector('.empty-state button');
+    
+    if (svg) svg.classList.remove('spin');
+    if (btn) btn.disabled = false;
+    if (ebtn) ebtn.disabled = false;
+    refreshAttempts = 0;
+}
+
+function doRefresh() {
+    var svg = document.querySelector('#refreshBtn svg');
+    var btn = document.querySelector('#refreshBtn');
+    var ebtn = document.querySelector('.empty-state button');
+    
+    // Запускаем крутилку и блокируем кнопку
+    if (svg) svg.classList.add('spin');
+    if (btn) btn.disabled = true;
+    if (ebtn) {
+        ebtn.innerText = 'Загружаем источники... (подождите, это может занять до 30 секунд)';
+        ebtn.disabled = true;
+    }
+
+    fetch('/api/refresh')
+        .then(function(response) {
+            if (!response.ok) throw new Error('Network response was not ok');
+            return response.json();
+        })
+        .then(function(data) {
+            if (data.count > 0) {
+                location.reload();
+            } else {
+                refreshAttempts++;
+                if (refreshAttempts < maxRefreshAttempts) {
+                    if (ebtn) ebtn.innerText = 'Повторная попытка... (' + refreshAttempts + '/' + maxRefreshAttempts + ')';
+                    setTimeout(doRefresh, 4000); 
+                } else {
+                    resetRefreshState();
+                    if (ebtn) ebtn.innerText = 'Не удалось загрузить. Нажмите, чтобы попробовать снова';
+                }
+            }
+        })
+        .catch(function(error) {
+            console.error('Refresh error:', error);
+            refreshAttempts++;
+            if (refreshAttempts < maxRefreshAttempts) {
+                if (ebtn) ebtn.innerText = 'Ошибка сети. Повторная попытка...';
+                setTimeout(doRefresh, 4000);
+            } else {
+                resetRefreshState();
+                if (ebtn) ebtn.innerText = 'Ошибка соединения. Нажмите, чтобы попробовать снова';
+            }
+        });
+}
+
+document.getElementById('refreshBtn').addEventListener('click', function() {
+    refreshAttempts = 0;
+    doRefresh();
+});
+
+if (document.querySelector('.empty-state')) {
+    doRefresh();
+}
+
+// ==========================================
+// ОСТАЛЬНОЙ СТАРЫЙ КОД (фильтры, закладки и т.д.) ОСТАЕТСЯ БЕЗ ИЗМЕНЕНИЙ:
+// ==========================================
 var readLinks = JSON.parse(localStorage.getItem('readLinks') || '[]');
 var bookmarks = JSON.parse(localStorage.getItem('bookmarks') || '[]');
 var subs = JSON.parse(localStorage.getItem('subs') || '[]');
@@ -709,13 +779,6 @@ searchInput.addEventListener('input', function () { query = searchInput.value.to
 document.addEventListener('keydown', function (e) {
     if (e.key === '/' || (e.metaKey && e.key.toLowerCase() === 'k')) { e.preventDefault(); searchInput.focus(); }
 });
-
-function doRefresh() {
-    var svg = document.querySelector('#refreshBtn svg');
-    if (svg) svg.classList.add('spin');
-    fetch('/api/refresh').then(function () { location.reload(); });
-}
-document.getElementById('refreshBtn').addEventListener('click', doRefresh);
 
 document.querySelectorAll('.subbtn').forEach(function (btn) {
     var name = btn.getAttribute('data-name');
