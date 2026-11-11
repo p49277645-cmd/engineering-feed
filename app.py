@@ -775,11 +775,7 @@ document.querySelectorAll('[data-group]').forEach(function (btn) {
 
 
 
-document.getElementById('bellBtn').addEventListener('click', function () {
-    mode = (mode === 'unread') ? 'all' : 'unread';
-    setActive(mode === 'unread' ? null : document.querySelector('[data-mode="all"]'), document.querySelectorAll('[data-mode]'));
-    apply();
-});
+
 
 var searchInput = document.getElementById('search');
 searchInput.addEventListener('input', function () { query = searchInput.value.toLowerCase(); apply(); });
@@ -792,10 +788,7 @@ document.querySelectorAll('.subbtn').forEach(function (btn) {
     if (subs.indexOf(name) !== -1) { btn.classList.add('on'); btn.innerText = 'Вы подписаны'; }
     btn.addEventListener('click', function () {
         if (subs.indexOf(name) === -1) { subs.push(name); btn.classList.add('on'); btn.innerText = 'Вы подписаны'; }
-        else { subs = subs.filter(function (s) { return s !== name; }); btn.classList.remove('on'); btn.innerText = 'Подписаться'; }
-        localStorage.setItem('subs', JSON.stringify(subs));
-    });
-});
+        else
 
 updateBadge();
 </script>
