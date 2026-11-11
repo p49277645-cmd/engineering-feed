@@ -744,58 +744,57 @@ document.querySelectorAll('.card').forEach(function (card) {
     });
 });
 // ==========================================
-// ОБРАБОТЧИКИ ФИЛЬТРОВ И КНОПОК
+// ОБРАБОТЧИКИ ФИЛЬТРОВ И КНОПОК (единая подсветка)
 // ==========================================
-function setActive(el, family) {
-    family.forEach(function (x) { x.classList.remove('active'); });
-    if (el) el.classList.add('active');
+function syncUI() {
+    // шапка: ровно одна pill активна по текущим mode+group
+    document.querySelectorAll('.pills .pill').forEach(function (p) {
+        var pg = p.getAttribute('data-group');
+        var pm = p.getAttribute('data-mode');
+        var on = false;
+        if (pm === 'unread') on = (mode === 'unread');          // Непрочитанные
+        else if (pg) on = (group === pg && mode === 'all');     // Все / Физика / ...
+        p.classList.toggle('active', on);
+    });
+    // сайдбар: режим (Вся лента / Избранное / Прочитанное)
+    document.querySelectorAll('.side-item[data-mode]').forEach(function (b) {
+        b.classList.toggle('active', b.getAttribute('data-mode') === mode);
+    });
+    // сайдбар: категория
+    document.querySelectorAll('.cat-card').forEach(function (c) {
+        c.classList.toggle('active', c.getAttribute('data-group') === group);
+    });
 }
 
-// 1. Обработка кнопок категорий (Все, Физика, Олимпиады...)
-document.querySelectorAll('[data-group]').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-        group = btn.getAttribute('data-group');
-        document.querySelectorAll('.pill[data-group]').forEach(function (p) { p.classList.remove('active'); });
-        document.querySelectorAll('.cat-card').forEach(function (p) { p.classList.remove('active'); });
-        btn.classList.add('active');
-        
-        // Если нажата кнопка "Все" — сбрасываем фильтр непрочитанных
-        if (group === 'all') {
-            mode = 'all';
-            setActive(document.querySelector('[data-mode="all"]'), document.querySelectorAll('[data-mode]'));
-        }
-        
-        // Если нажата категория в сайдбаре — тоже сбрасываем
-        if (btn.classList.contains('cat-card')) {
-            mode = 'all';
-            setActive(document.querySelector('[data-mode="all"]'), document.querySelectorAll('[data-mode]'));
-        }
-        
-        apply();
-    });
+function handleFilter(btn) {
+    var pg = btn.getAttribute('data-group');
+    var pm = btn.getAttribute('data-mode');
+    if (btn.classList.contains('pill')) {
+        if (pm === 'unread') { mode = 'unread'; group = 'all'; }   // непрочитанные во всех категориях
+        else if (pg)         { group = pg;       mode = 'all'; }   // категория -> сброс непрочитанных
+    } else if (btn.classList.contains('cat-card')) {
+        group = pg; mode = 'all';
+    } else if (btn.classList.contains('side-item')) {
+        mode = pm; group = 'all';
+    }
+    syncUI();
+    apply();
+}
+
+// вешаем один общий обработчик на все кнопки фильтров
+document.querySelectorAll('.pills .pill, .cat-card, .side-item[data-mode]').forEach(function (btn) {
+    btn.addEventListener('click', function () { handleFilter(btn); });
 });
 
-// 2. Обработка бокового меню (Вся лента, Избранное, Прочитанное)
-document.querySelectorAll('[data-mode]').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-        mode = btn.getAttribute('data-mode');
-        setActive(btn, document.querySelectorAll('[data-mode]'));
-        // При переключении режима убираем активную категорию, если она мешает
-        if (mode === 'all') { 
-            group = 'all'; 
-            var all = document.querySelector('.pill[data-group="all"]'); 
-            if (all) all.classList.add('active'); 
-        }
-        apply();
-    });
-});
-
-// 3. Кнопка колокольчика (Быстрый доступ к непрочитанным)
+// колокольчик = быстрый переключатель непрочитанные <-> всё
 document.getElementById('bellBtn').addEventListener('click', function () {
     mode = (mode === 'unread') ? 'all' : 'unread';
-    setActive(mode === 'unread' ? null : document.querySelector('[data-mode="all"]'), document.querySelectorAll('[data-mode]'));
+    if (mode === 'all') group = 'all';
+    syncUI();
     apply();
 });
+
+syncUI(); // привести подсветку к состоянию при старте
 
 // 4. Поиск
 var searchInput = document.getElementById('search');
