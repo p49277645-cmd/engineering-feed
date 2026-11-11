@@ -394,6 +394,124 @@ HTML_TEMPLATE = """
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-rust.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+/* ===== МОБИЛЬНОЕ МЕНЮ КАТЕГОРИЙ ===== */
+.mobile-cats{
+    display:none;  /* Скрыто на десктопе */
+    overflow-x:auto;
+    gap:8px;
+    padding:12px 0;
+    margin-bottom:8px;
+    border-bottom:1px solid var(--border);
+    scrollbar-width:none;  /* Firefox */
+}
+.mobile-cats::-webkit-scrollbar{display:none;}  /* Chrome/Safari */
+
+.mobile-cat{
+    flex-shrink:0;
+    height:36px;
+    padding:0 14px;
+    border:1px solid var(--border);
+    background:var(--card);
+    color:var(--t2);
+    font-size:12px;
+    font-weight:600;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-family:'JetBrains Mono', monospace;
+    transition:.2s;
+    clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+}
+.mobile-cat:active{
+    background:var(--card2);
+    transform:scale(0.96);
+}
+.mobile-cat.active{
+    background:var(--accent-sand);
+    border-color:var(--accent-sand);
+    color:var(--bg);
+}
+.mobile-cat .cat-dot{
+    width:8px;
+    height:8px;
+    border-radius:50%;
+    background:var(--c);
+}
+
+/* Кнопка-бургер */
+.burger{
+    display:none;  /* Скрыто на десктопе */
+    width:40px;
+    height:40px;
+    border:1px solid var(--border);
+    background:var(--card);
+    color:var(--t1);
+    cursor:pointer;
+    align-items:center;
+    justify-content:center;
+    margin-right:8px;
+}
+.burger svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;}
+
+/* Overlay сайдбара на мобилке */
+.sidebar-overlay{
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,0.7);
+    backdrop-filter:blur(4px);
+    z-index:99;
+}
+.sidebar-overlay.open{display:block;}
+
+.sidebar-mobile{
+    position:fixed;
+    top:0;
+    left:0;
+    bottom:0;
+    width:85%;
+    max-width:320px;
+    background:var(--panel);
+    border-right:1px solid var(--border);
+    z-index:100;
+    overflow-y:auto;
+    padding:24px;
+    transform:translateX(-100%);
+    transition:transform .3s ease;
+}
+.sidebar-overlay.open .sidebar-mobile{
+    transform:translateX(0);
+}
+.sidebar-mobile .close-btn{
+    position:absolute;
+    top:16px;
+    right:16px;
+    width:32px;
+    height:32px;
+    border:1px solid var(--border);
+    background:var(--card);
+    color:var(--t1);
+    cursor:pointer;
+    display:grid;
+    place-items:center;
+    font-size:18px;
+}
+
+/* ===== АКТИВАЦИЯ НА МОБИЛКЕ ===== */
+@media(max-width:1024px){
+    .mobile-cats{display:flex;}
+    .burger{display:flex;}
+    .sidebar{display:none !important;}  /* Десктопный сайдбар скрыт */
+}
+@media(max-width:640px){
+    .grid{grid-template-columns:1fr;}
+    .thumb{display:none;}
+    .topbar{padding:0 12px;gap:8px;}
+    .searchwrap{max-width:none;}
+    .shell{padding:16px;}
+    .wiki-content{padding:24px;}
+}
 <style>
 :root{
     /* УНИКАЛЬНАЯ ПАЛИТРА - не типичная для AI */
@@ -1167,6 +1285,9 @@ body::after{
         <span class="kbd">K</span>
     </div>
     <div class="top-actions">
+        <button class="burger" id="burgerBtn" title="Меню">
+    <svg viewBox="0 0 24 24"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+</button>
         <button class="iconbtn" id="bellBtn" title="Непрочитанные">
             <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/></svg>
             <span class="badge" id="unreadBadge">0</span>
@@ -1182,6 +1303,42 @@ body::after{
 </header>
 
 <div class="shell">
+<div class="sidebar-overlay" id="sidebarOverlay">
+    <div class="sidebar-mobile">
+        <button class="close-btn" id="closeSidebar">✕</button>
+        <div class="side-label">Библиотека</div>
+        <button class="side-item" data-mode="all">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            Вся лента
+        </button>
+        <button class="side-item" data-mode="fav">
+            <svg viewBox="0 0 24 24"><path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg>
+            Избранное
+        </button>
+        <button class="side-item" data-mode="archived">
+            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></svg>
+            Прочитанное
+        </button>
+        
+        <div class="side-label">Wiki</div>
+        <a class="side-item" href="/wiki/rust">
+            <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 19.5A2.5 2.5 0 0 0 6.5 22H20V2H6.5A2.5 2.5 0 0 0 4 4.5z"/></svg>
+            Rust
+        </a>
+        <a class="side-item" href="/wiki/python">
+            <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 19.5A2.5 2.5 0 0 0 6.5 22H20V2H6.5A2.5 2.5 0 0 0 4 4.5z"/></svg>
+            Python
+        </a>
+        
+        <div class="side-label">Категории</div>
+        {% for gid, g in groups.items() %}
+        <button class="side-item cat-mobile-item" data-group="{{ gid }}" style="--c:{{ g.color }}">
+            <span style="width:24px;height:24px;display:grid;place-items:center;background:var(--card2);border:1px solid var(--border);font-weight:700;color:var(--c);font-family:'JetBrains Mono',monospace;font-size:12px;">{{ g.letter }}</span>
+            {{ g.name }}
+        </button>
+        {% endfor %}
+    </div>
+</div>
     <aside class="sidebar">
         <div class="side-label">Библиотека</div>
         <button class="side-item active" data-mode="all">
@@ -1233,6 +1390,14 @@ body::after{
             </div>
         </div>
     {% else %}
+    <div class="mobile-cats" id="mobileCats">
+    <button class="mobile-cat active" data-group="all">Все</button>
+    {% for gid, g in groups.items() %}
+    <button class="mobile-cat" data-group="{{ gid }}" style="--c:{{ g.color }}">
+        <span class="cat-dot"></span>{{ g.name }}
+    </button>
+    {% endfor %}
+</div>
         <div class="main-head">
             <h1>Лента на сегодня</h1>
             <div class="pills">
@@ -1446,6 +1611,43 @@ document.addEventListener('keydown', function(e) {
 });
 
 updateBadge();
+// ===== МОБИЛЬНОЕ МЕНЮ =====
+var burgerBtn = document.getElementById('burgerBtn');
+var overlay = document.getElementById('sidebarOverlay');
+var closeBtn = document.getElementById('closeSidebar');
+
+if (burgerBtn && overlay) {
+    burgerBtn.addEventListener('click', function() { overlay.classList.add('open'); });
+    closeBtn.addEventListener('click', function() { overlay.classList.remove('open'); });
+    overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) overlay.classList.remove('open');
+    });
+    
+    // Обработчики для мобильного сайдбара
+    overlay.querySelectorAll('.side-item[data-mode]').forEach(function(b) {
+        b.addEventListener('click', function() {
+            handleFilter(b);
+            overlay.classList.remove('open');
+        });
+    });
+    overlay.querySelectorAll('.cat-mobile-item').forEach(function(b) {
+        b.addEventListener('click', function() {
+            handleFilter(b);
+            overlay.classList.remove('open');
+        });
+    });
+}
+
+// Обработчики для горизонтального скролла категорий
+document.querySelectorAll('.mobile-cat').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        var pg = btn.getAttribute('data-group');
+        group = pg;
+        mode = 'all';
+        syncUI();
+        apply();
+    });
+});
 </script>
 </body>
 </html>
