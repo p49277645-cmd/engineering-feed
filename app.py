@@ -61,7 +61,6 @@ SOURCES = [
     {"type": "rss", "url": "https://hackaday.com/feed/", "source": "Hackaday", "category": "tech", "limit": 6},
 ]
 
-# Категории -> группы (как на макете)
 CAT_GROUP = {
     "physics": "physics", "physics_news": "physics",
     "olympiad": "olympiads", "olympiad_archive": "olympiads",
@@ -80,9 +79,6 @@ GROUP_META = {
     "electronics": {"letter": "Э", "color": "#f97316", "name": "Электроника"},
 }
 
-# ==========================================
-# WIKI (STEPik)
-# ==========================================
 RUST_DB = {
     "ownership": {
         "title": "Владение и заимствование",
@@ -123,9 +119,6 @@ print(next(counter)) # 1</code></pre>
     }
 }
 
-# ==========================================
-# ПАРСИНГ + РЕАЛЬНЫЕ КАРТИНКИ
-# ==========================================
 def clean_text(text):
     if not text: return ""
     text = html.unescape(text)
@@ -191,12 +184,11 @@ def parse_rss(item):
 
 def scrape_html(item):
     try:
-        resp = SESSION.get(item["url"], timeout=8) # Чуть больше времени на ответ сайта
+        resp = SESSION.get(item["url"], timeout=8)
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
         base_url = "/".join(item["url"].split("/")[:3])
         results = []
-        # ДОБАВЛЕНЫ li a и table a для захвата ссылок внутри списков и таблиц mathus.ru
         nodes = soup.select("h2 a, h3 a, h4 a, .news-item a, .news-list a, .activity-news a, .archive-item a, article a, li a, table a")[:50]
         seen = set()
         for node in nodes:
@@ -204,14 +196,10 @@ def scrape_html(item):
             title = clean_text(node.get_text())
             if not title or len(title) < 10: continue
             if any(x in href.lower() for x in ["login", "register", "tag", "category", "javascript"]): continue
-            
-            # Корректное формирование абсолютных ссылок
             if href.startswith("/"): href = base_url + href
             elif not href.startswith("http"): href = base_url + "/" + href.lstrip("/")
-            
             if href in seen: continue
             seen.add(href)
-
             img = ""
             parent = node.find_parent(["li", "div", "article", "section", "td", "tr"])
             if parent:
@@ -219,7 +207,6 @@ def scrape_html(item):
                 if im:
                     img = im.get("src") or im.get("data-src") or ""
                     if img.startswith("/"): img = base_url + img
-
             results.append({
                 "title": title[:120],
                 "link": href,
@@ -239,16 +226,13 @@ def scrape_html(item):
 def fetch_all_data():
     all_items = []
     pairs = []
-    # Запускаем все источники параллельно
     with ThreadPoolExecutor(max_workers=24) as executor:
         for s in SOURCES:
             fn = parse_rss if s["type"] == "rss" else scrape_html
             pairs.append((executor.submit(fn, s), s["source"]))
-        
-        # Ждём результаты, но не дольше 15 секунд на каждый источник
         for fut, name in pairs:
             try:
-                r = fut.result(timeout=15) 
+                r = fut.result(timeout=15)
                 if r:
                     all_items.extend(r)
                 else:
@@ -257,13 +241,11 @@ def fetch_all_data():
                 logger.warning(f"[SKIP] {name}: таймаут потока >15с")
             except Exception as e:
                 logger.warning(f"[SKIP] {name}: {e}")
-
     enriched = []
     for it in all_items:
         g = CAT_GROUP.get(it["category"], "physics")
         meta = GROUP_META.get(g)
         if not meta: continue
-        
         ts = it.get("pub_time") or time.time()
         enriched.append({
             "title": it["title"], "link": it["link"], "source": it["source"],
@@ -276,9 +258,6 @@ def fetch_all_data():
     logger.info(f"Итого: {len(enriched)} записей")
     return enriched
 
-# ==========================================
-# БАЗА ДАННЫХ
-# ==========================================
 @contextmanager
 def get_db():
     conn = sqlite3.connect(DB_PATH)
@@ -314,18 +293,18 @@ def save_to_db(items):
             """, (it["link"], it["title"], it["source"], it["snippet"], it["color"], it["letter"],
                   it["day"], it["time_str"], it["category"], time.time(),
                   it.get("image", ""), it.get("read_min", 5), it.get("group", "physics")))
+
 def load_from_db(limit=200):
     with get_db() as conn:
         cur = conn.execute("SELECT * FROM posts ORDER BY fetched_at DESC LIMIT ?", (limit,))
         return [dict(r) for r in cur.fetchall()]
+
 def normalize(rows):
     for r in rows:
         g = r.get("group") or CAT_GROUP.get(r.get("category"), "physics")
-        # Безопасное получение метаданных группы
-        meta = GROUP_META.get(g) 
+        meta = GROUP_META.get(g)
         if not meta:
-            continue  # Пропускаем битые записи
-        
+            continue
         r["group"] = g
         r["group_name"] = meta["name"]
         if not r.get("color"): r["color"] = meta["color"]
@@ -335,19 +314,7 @@ def normalize(rows):
         if not r.get("time_str"): r["time_str"] = rel_time(r.get("fetched_at") or time.time())
     return rows
 
-# ==========================================
-# FLASK
-# ==========================================
 app = Flask(__name__)
-
-def _background_fetch():
-    try:
-        items = fetch_all_data()
-        if items:
-            save_to_db(items)
-            logger.info(f"Фон завершён: {len(items)}")
-    except Exception as e:
-        logger.error(f"Ошибка фона: {e}")
 
 @app.route('/')
 def index():
@@ -394,143 +361,20 @@ HTML_TEMPLATE = """
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-rust.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
-/* ===== МОБИЛЬНОЕ МЕНЮ КАТЕГОРИЙ ===== */
-.mobile-cats{
-    display:none;  /* Скрыто на десктопе */
-    overflow-x:auto;
-    gap:8px;
-    padding:12px 0;
-    margin-bottom:8px;
-    border-bottom:1px solid var(--border);
-    scrollbar-width:none;  /* Firefox */
-}
-.mobile-cats::-webkit-scrollbar{display:none;}  /* Chrome/Safari */
-
-.mobile-cat{
-    flex-shrink:0;
-    height:36px;
-    padding:0 14px;
-    border:1px solid var(--border);
-    background:var(--card);
-    color:var(--t2);
-    font-size:12px;
-    font-weight:600;
-    cursor:pointer;
-    display:flex;
-    align-items:center;
-    gap:8px;
-    font-family:'JetBrains Mono', monospace;
-    transition:.2s;
-    clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
-}
-.mobile-cat:active{
-    background:var(--card2);
-    transform:scale(0.96);
-}
-.mobile-cat.active{
-    background:var(--accent-sand);
-    border-color:var(--accent-sand);
-    color:var(--bg);
-}
-.mobile-cat .cat-dot{
-    width:8px;
-    height:8px;
-    border-radius:50%;
-    background:var(--c);
-}
-
-/* Кнопка-бургер */
-.burger{
-    display:none;  /* Скрыто на десктопе */
-    width:40px;
-    height:40px;
-    border:1px solid var(--border);
-    background:var(--card);
-    color:var(--t1);
-    cursor:pointer;
-    align-items:center;
-    justify-content:center;
-    margin-right:8px;
-}
-.burger svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;}
-
-/* Overlay сайдбара на мобилке */
-.sidebar-overlay{
-    display:none;
-    position:fixed;
-    inset:0;
-    background:rgba(0,0,0,0.7);
-    backdrop-filter:blur(4px);
-    z-index:99;
-}
-.sidebar-overlay.open{display:block;}
-
-.sidebar-mobile{
-    position:fixed;
-    top:0;
-    left:0;
-    bottom:0;
-    width:85%;
-    max-width:320px;
-    background:var(--panel);
-    border-right:1px solid var(--border);
-    z-index:100;
-    overflow-y:auto;
-    padding:24px;
-    transform:translateX(-100%);
-    transition:transform .3s ease;
-}
-.sidebar-overlay.open .sidebar-mobile{
-    transform:translateX(0);
-}
-.sidebar-mobile .close-btn{
-    position:absolute;
-    top:16px;
-    right:16px;
-    width:32px;
-    height:32px;
-    border:1px solid var(--border);
-    background:var(--card);
-    color:var(--t1);
-    cursor:pointer;
-    display:grid;
-    place-items:center;
-    font-size:18px;
-}
-
-/* ===== АКТИВАЦИЯ НА МОБИЛКЕ ===== */
-@media(max-width:1024px){
-    .mobile-cats{display:flex;}
-    .burger{display:flex;}
-    .sidebar{display:none !important;}  /* Десктопный сайдбар скрыт */
-}
-@media(max-width:640px){
-    .grid{grid-template-columns:1fr;}
-    .thumb{display:none;}
-    .topbar{padding:0 12px;gap:8px;}
-    .searchwrap{max-width:none;}
-    .shell{padding:16px;}
-    .wiki-content{padding:24px;}
-}
 <style>
 :root{
-    /* УНИКАЛЬНАЯ ПАЛИТРА - не типичная для AI */
-    --bg: #0d0e0f;           /* Тёмный графит */
-    --panel: #151719;        /* Тёплый тёмно-серый */
-    --card: #1a1d1f;         /* Чуть светлее */
-    --card2: #222629;        /* Ещё светлее */
-    --border: #2a2f33;       /* Тёплая граница */
-    --t1: #e8e6e3;           /* Тёплый белый */
-    --t2: #9a9895;           /* Тёплый серый */
-    --t3: #6b6966;           /* Тёмный серый */
-    
-    /* Акценты - нестандартные */
-    --accent-sand: #d4b896;      /* Песочный/охра */
-    --accent-coral: #e07a5f;     /* Терракотовый/коралл */
-    --accent-emerald: #81b29a;   /* Приглушённый изумруд */
-    --accent-rust: #bc6c25;      /* Ржавый оранжевый */
-    
-    /* ИЗЮМИНКА - инженерная сетка */
+    --bg: #0d0e0f;
+    --panel: #151719;
+    --card: #1a1d1f;
+    --card2: #222629;
+    --border: #2a2f33;
+    --t1: #e8e6e3;
+    --t2: #9a9895;
+    --t3: #6b6966;
+    --accent-sand: #d4b896;
+    --accent-coral: #e07a5f;
+    --accent-emerald: #81b29a;
+    --accent-rust: #bc6c25;
     --grid-color: rgba(212, 184, 150, 0.03);
 }
 
@@ -541,7 +385,6 @@ body{
     background:var(--bg);
     color:var(--t1);
     min-height:100vh;
-    /* ИЗЮМИНКА - сетка как на миллиметровке */
     background-image: 
         linear-gradient(var(--grid-color) 1px, transparent 1px),
         linear-gradient(90deg, var(--grid-color) 1px, transparent 1px),
@@ -551,7 +394,6 @@ body{
     background-attachment: fixed;
 }
 
-/* ИЗЮМИНКА - технические маркеры по углам */
 body::before, body::after{
     content:'';
     position:fixed;
@@ -561,716 +403,240 @@ body::before, body::after{
     pointer-events:none;
     z-index:0;
 }
-body::before{
-    top:20px;
-    left:20px;
-    border-right:none;
-    border-bottom:none;
-}
-body::after{
-    bottom:20px;
-    right:20px;
-    border-left:none;
-    border-top:none;
-}
+body::before{top:20px;left:20px;border-right:none;border-bottom:none;}
+body::after{bottom:20px;right:20px;border-left:none;border-top:none;}
 
 ::-webkit-scrollbar{width:8px;}
 ::-webkit-scrollbar-track{background:var(--panel);}
 ::-webkit-scrollbar-thumb{background:var(--accent-sand);border-radius:4px;}
 ::-webkit-scrollbar-thumb:hover{background:var(--accent-rust);}
 
-/* ШАПКА с инженерным стилем */
 .topbar{
-    position:sticky;
-    top:0;
-    z-index:50;
-    height:68px;
-    display:flex;
-    align-items:center;
-    gap:24px;
-    padding:0 32px;
-    background:rgba(21, 23, 25, 0.95);
-    backdrop-filter:blur(12px);
+    position:sticky;top:0;z-index:50;height:68px;
+    display:flex;align-items:center;gap:24px;padding:0 32px;
+    background:rgba(21, 23, 25, 0.95);backdrop-filter:blur(12px);
     border-bottom:2px solid var(--border);
-    /* ИЗЮМИНКА - диагональная линия */
     box-shadow: 0 4px 0 var(--accent-sand);
 }
 
 .logo{
-    font-size:24px;
-    font-weight:800;
-    letter-spacing:-0.5px;
-    color:var(--t1);
-    white-space:nowrap;
-    font-family:'JetBrains Mono', monospace;
-    position:relative;
+    font-size:24px;font-weight:800;letter-spacing:-0.5px;
+    color:var(--t1);white-space:nowrap;
+    font-family:'JetBrains Mono', monospace;position:relative;
 }
-.logo::after{
-    content:'_';
-    animation: blink 1s infinite;
-    color:var(--accent-coral);
-}
-@keyframes blink{
-    0%, 50% { opacity: 1; }
-    51%, 100% { opacity: 0; }
-}
+.logo::after{content:'_';animation: blink 1s infinite;color:var(--accent-coral);}
+@keyframes blink{0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; }}
 
 .searchwrap{flex:1;max-width:640px;margin:0 auto;position:relative;}
-.searchwrap svg{
-    position:absolute;
-    left:16px;
-    top:50%;
-    transform:translateY(-50%);
-    width:18px;
-    height:18px;
-    stroke:var(--t3);
-    fill:none;
-    stroke-width:2;
-}
+.searchwrap svg{position:absolute;left:16px;top:50%;transform:translateY(-50%);width:18px;height:18px;stroke:var(--t3);fill:none;stroke-width:2;}
 .searchwrap input{
-    width:100%;
-    height:44px;
-    background:var(--card);
-    border:1px solid var(--border);
-    border-radius:0;  /* ИЗЮМИНКА - острые углы */
-    color:var(--t1);
-    font-size:14px;
-    padding:0 64px 0 44px;
-    outline:none;
-    transition:.2s;
-    font-family:'JetBrains Mono', monospace;
+    width:100%;height:44px;background:var(--card);border:1px solid var(--border);
+    border-radius:0;color:var(--t1);font-size:14px;padding:0 64px 0 44px;
+    outline:none;transition:.2s;font-family:'JetBrains Mono', monospace;
 }
-.searchwrap input:focus{
-    border-color:var(--accent-sand);
-    box-shadow:0 0 0 3px rgba(212, 184, 150, 0.15);
-    background:var(--card2);
-}
-.kbd{
-    position:absolute;
-    right:14px;
-    top:50%;
-    transform:translateY(-50%);
-    font-size:11px;
-    color:var(--t3);
-    background:var(--card2);
-    border:1px solid var(--border);
-    padding:3px 8px;
-    font-family:'JetBrains Mono', monospace;
-}
+.searchwrap input:focus{border-color:var(--accent-sand);box-shadow:0 0 0 3px rgba(212, 184, 150, 0.15);background:var(--card2);}
+.kbd{position:absolute;right:14px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--t3);background:var(--card2);border:1px solid var(--border);padding:3px 8px;font-family:'JetBrains Mono', monospace;}
 
 .top-actions{display:flex;align-items:center;gap:12px;}
+
+.burger{
+    display:none;width:40px;height:40px;border:1px solid var(--border);
+    background:var(--card);color:var(--t1);cursor:pointer;
+    align-items:center;justify-content:center;margin-right:8px;
+}
+.burger svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;}
+
 .iconbtn{
-    position:relative;
-    width:40px;
-    height:40px;
-    border-radius:0;  /* Острые углы */
-    border:1px solid var(--border);
-    background:var(--card);
-    color:var(--t2);
-    cursor:pointer;
-    display:grid;
-    place-items:center;
-    transition:.2s;
+    position:relative;width:40px;height:40px;border-radius:0;
+    border:1px solid var(--border);background:var(--card);color:var(--t2);
+    cursor:pointer;display:grid;place-items:center;transition:.2s;
 }
-.iconbtn:hover{
-    background:var(--card2);
-    border-color:var(--accent-sand);
-    color:var(--t1);
-    transform:translateY(-2px);
-}
-.iconbtn:active{
-    transform:translateY(0);
-}
+.iconbtn:hover{background:var(--card2);border-color:var(--accent-sand);color:var(--t1);transform:translateY(-2px);}
+.iconbtn:active{transform:translateY(0);}
 .iconbtn svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;}
 
 .badge{
-    position:absolute;
-    top:-4px;
-    right:-4px;
-    min-width:20px;
-    height:20px;
-    background:var(--accent-coral);
-    color:var(--bg);
-    font-size:10px;
-    font-weight:700;
-    display:none;
-    align-items:center;
-    justify-content:center;
-    padding:0 5px;
-    font-family:'JetBrains Mono', monospace;
-    border:2px solid var(--bg);
+    position:absolute;top:-4px;right:-4px;min-width:20px;height:20px;
+    background:var(--accent-coral);color:var(--bg);font-size:10px;font-weight:700;
+    display:none;align-items:center;justify-content:center;padding:0 5px;
+    font-family:'JetBrains Mono', monospace;border:2px solid var(--bg);
 }
 
-.avatar{
-    position:relative;
-    width:38px;
-    height:38px;
-    border:2px solid var(--accent-sand);
-    background:var(--card);
-    display:grid;
-    place-items:center;
-}
+.avatar{position:relative;width:38px;height:38px;border:2px solid var(--accent-sand);background:var(--card);display:grid;place-items:center;}
 .avatar svg{width:20px;height:20px;stroke:var(--t2);fill:none;stroke-width:2;}
-.online{
-    position:absolute;
-    right:-2px;
-    bottom:-2px;
-    width:12px;
-    height:12px;
-    background:var(--accent-emerald);
-    border:2px solid var(--bg);
-}
+.online{position:absolute;right:-2px;bottom:-2px;width:12px;height:12px;background:var(--accent-emerald);border:2px solid var(--bg);}
 
-/* КАРКАС */
-.shell{
-    display:grid;
-    grid-template-columns: 280px 1fr;
-    gap:32px;
-    max-width:1440px;
-    margin:0 auto;
-    padding:32px;
-    position:relative;
-    z-index:1;
-}
+.shell{display:grid;grid-template-columns: 280px 1fr;gap:32px;max-width:1440px;margin:0 auto;padding:32px;position:relative;z-index:1;}
 
 .sidebar{
-    position:sticky;
-    top:100px;
-    height:fit-content;
-    /* ИЗЮМИНКА - ограничение высоты + скролл */
-    max-height: calc(100vh - 140px);
-    overflow-y: auto;
-    overflow-x: hidden;
-    
-    background:var(--panel);
-    border:1px solid var(--border);
-    padding:24px;
-    /* Убрали clip-path — он мешал скроллу */
-    border-radius: 4px;
-    
-    /* Плавное затухание сверху/снизу — индикатор скролла */
-    mask-image: linear-gradient(
-        to bottom,
-        transparent 0px,
-        black 20px,
-        black calc(100% - 20px),
-        transparent 100%
-    );
-    -webkit-mask-image: linear-gradient(
-        to bottom,
-        transparent 0px,
-        black 20px,
-        black calc(100% - 20px),
-        transparent 100%
-    );
+    position:sticky;top:100px;height:fit-content;
+    max-height: calc(100vh - 140px);overflow-y: auto;overflow-x: hidden;
+    background:var(--panel);border:1px solid var(--border);padding:24px;border-radius: 4px;
+    mask-image: linear-gradient(to bottom, transparent 0px, black 20px, black calc(100% - 20px), transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0px, black 20px, black calc(100% - 20px), transparent 100%);
 }
 
-/* ===== КРАСИВЫЙ ИНЖЕНЕРНЫЙ ПОЛЗУНОК ===== */
-.sidebar::-webkit-scrollbar{
-    width: 6px;
-}
+.sidebar::-webkit-scrollbar{width: 6px;}
+.sidebar::-webkit-scrollbar-track{background: transparent;margin: 10px 0;}
+.sidebar::-webkit-scrollbar-thumb{background: var(--accent-sand);border-radius: 0;border: 1px solid var(--panel);min-height: 40px;}
+.sidebar::-webkit-scrollbar-thumb:hover{background: var(--accent-coral);border-color: var(--accent-coral);}
+.sidebar::-webkit-scrollbar-thumb:active{background: var(--accent-rust);}
+.sidebar{scrollbar-width: thin;scrollbar-color: var(--accent-sand) transparent;}
 
-.sidebar::-webkit-scrollbar-track{
-    background: transparent;
-    margin: 10px 0;
-}
-
-.sidebar::-webkit-scrollbar-thumb{
-    background: var(--accent-sand);
-    border-radius: 0;  /* Острые углы в стиле сайта */
-    border: 1px solid var(--panel);
-    min-height: 40px;  /* Минимальная длина ползунка */
-}
-
-.sidebar::-webkit-scrollbar-thumb:hover{
-    background: var(--accent-coral);
-    border-color: var(--accent-coral);
-}
-
-.sidebar::-webkit-scrollbar-thumb:active{
-    background: var(--accent-rust);
-}
-
-/* Для Firefox */
-.sidebar{
-    scrollbar-width: thin;
-    scrollbar-color: var(--accent-sand) transparent;
-}
-
-.side-label{
-    font-size:10px;
-    font-weight:700;
-    text-transform:uppercase;
-    letter-spacing:0.15em;
-    color:var(--t3);
-    margin:20px 0 12px 0;
-    font-family:'JetBrains Mono', monospace;
-    padding-left:4px;
-}
+.side-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:var(--t3);margin:20px 0 12px 0;font-family:'JetBrains Mono', monospace;padding-left:4px;}
 .side-label:first-child{margin-top:0;}
 
 .side-item{
-    display:flex;
-    align-items:center;
-    gap:12px;
-    width:100%;
-    padding:12px;
-    border:none;
-    background:none;
-    color:var(--t2);
-    font-size:14px;
-    font-weight:500;
-    cursor:pointer;
-    text-decoration:none;
-    transition:.2s;
-    text-align:left;
-    position:relative;
-    /* ИЗЮМИНКА - линия слева */
-    border-left:3px solid transparent;
+    display:flex;align-items:center;gap:12px;width:100%;padding:12px;border:none;
+    background:none;color:var(--t2);font-size:14px;font-weight:500;cursor:pointer;
+    text-decoration:none;transition:.2s;text-align:left;position:relative;border-left:3px solid transparent;
 }
-.side-item:hover{
-    background:rgba(212, 184, 150, 0.05);
-    color:var(--t1);
-}
-.side-item.active{
-    background:rgba(212, 184, 150, 0.1);
-    color:var(--accent-sand);
-    border-left-color:var(--accent-sand);
-}
-.side-item svg{
-    width:20px;
-    height:20px;
-    stroke:currentColor;
-    fill:none;
-    stroke-width:2;
-    flex-shrink:0;
-}
+.side-item:hover{background:rgba(212, 184, 150, 0.05);color:var(--t1);}
+.side-item.active{background:rgba(212, 184, 150, 0.1);color:var(--accent-sand);border-left-color:var(--accent-sand);}
+.side-item svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;flex-shrink:0;}
 
-/* Категории - инженерные карточки */
 .cat-card{
-    display:flex;
-    align-items:center;
-    gap:12px;
-    width:100%;
-    padding:14px;
-    margin-bottom:8px;
-    border:1px solid var(--border);
-    background:var(--card);
-    cursor:pointer;
-    transition:.3s;
-    position:relative;
-    overflow:hidden;
+    display:flex;align-items:center;gap:12px;width:100%;padding:14px;margin-bottom:8px;
+    border:1px solid var(--border);background:var(--card);cursor:pointer;transition:.3s;position:relative;overflow:hidden;
 }
-/* ИЗЮМИНКА - цветная полоса сверху */
-.cat-card::before{
-    content:'';
-    position:absolute;
-    top:0;
-    left:0;
-    right:0;
-    height:3px;
-    background:var(--c);
-    transform:scaleX(0);
-    transform-origin:left;
-    transition:transform .3s;
-}
-.cat-card:hover::before{
-    transform:scaleX(1);
-}
-.cat-card:hover{
-    border-color:var(--c);
-    transform:translateX(4px);
-    background:var(--card2);
-}
-.cat-card.active{
-    border-color:var(--c);
-    background:rgba(255,255,255,0.02);
-}
-.cat-card.active::before{
-    transform:scaleX(1);
-}
+.cat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--c);transform:scaleX(0);transform-origin:left;transition:transform .3s;}
+.cat-card:hover::before{transform:scaleX(1);}
+.cat-card:hover{border-color:var(--c);transform:translateX(4px);background:var(--card2);}
+.cat-card.active{border-color:var(--c);background:rgba(255,255,255,0.02);}
+.cat-card.active::before{transform:scaleX(1);}
 
-.cat-letter{
-    width:36px;
-    height:36px;
-    display:grid;
-    place-items:center;
-    background:var(--card2);
-    border:1px solid var(--border);
-    font-size:16px;
-    font-weight:700;
-    color:var(--c);
-    font-family:'JetBrains Mono', monospace;
-}
+.cat-letter{width:36px;height:36px;display:grid;place-items:center;background:var(--card2);border:1px solid var(--border);font-size:16px;font-weight:700;color:var(--c);font-family:'JetBrains Mono', monospace;}
+.cat-name{font-size:13px;font-weight:600;color:var(--t1);}
 
-.cat-name{
-    font-size:13px;
-    font-weight:600;
-    color:var(--t1);
-}
+.manage{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--t3);margin-top:20px;padding:10px;cursor:pointer;border-top:1px solid var(--border);font-family:'JetBrains Mono', monospace;}
+.manage:hover{color:var(--accent-sand);}
 
-.manage{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    font-size:11px;
-    color:var(--t3);
-    margin-top:20px;
-    padding:10px;
-    cursor:pointer;
-    border-top:1px solid var(--border);
-    font-family:'JetBrains Mono', monospace;
-}
-.manage:hover{
-    color:var(--accent-sand);
-}
-
-/* ОСНОВНАЯ ЧАСТЬ */
 .main{min-width:0;}
-.main-head{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    margin-bottom:28px;
-    flex-wrap:wrap;
-    gap:16px;
-    /* ИЗЮМИНКА - линия под заголовком */
-    padding-bottom:16px;
-    border-bottom:1px solid var(--border);
-}
-.main-head h1{
-    font-size:28px;
-    font-weight:800;
-    letter-spacing:-0.5px;
-    font-family:'JetBrains Mono', monospace;
-}
-.main-head h1::before{
-    content:'// ';
-    color:var(--accent-coral);
-}
+.main-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:28px;flex-wrap:wrap;gap:16px;padding-bottom:16px;border-bottom:1px solid var(--border);}
+.main-head h1{font-size:28px;font-weight:800;letter-spacing:-0.5px;font-family:'JetBrains Mono', monospace;}
+.main-head h1::before{content:'// ';color:var(--accent-coral);}
 
 .pills{display:flex;gap:8px;flex-wrap:wrap;}
 .pill{
-    height:38px;
-    padding:0 18px;
-    border:1px solid var(--border);
-    background:var(--card);
-    color:var(--t2);
-    font-size:13px;
-    font-weight:600;
-    cursor:pointer;
-    transition:.2s;
+    height:38px;padding:0 18px;border:1px solid var(--border);background:var(--card);
+    color:var(--t2);font-size:13px;font-weight:600;cursor:pointer;transition:.2s;
     font-family:'JetBrains Mono', monospace;
-    /* ИЗЮМИНКА - скошенный угол */
     clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
 }
-.pill:hover{
-    background:var(--card2);
-    color:var(--t1);
-    border-color:var(--t3);
-}
-.pill.active{
-    background:var(--accent-sand);
-    border-color:var(--accent-sand);
-    color:var(--bg);
-}
+.pill:hover{background:var(--card2);color:var(--t1);border-color:var(--t3);}
+.pill.active{background:var(--accent-sand);border-color:var(--accent-sand);color:var(--bg);}
 
-/* СЕТКА КАРТОЧЕК */
-.grid{
-    display:grid;
-    grid-template-columns:repeat(auto-fill, minmax(420px, 1fr));
-    gap:24px;
+.mobile-cats{
+    display:none;overflow-x:auto;gap:8px;padding:12px 0;margin-bottom:8px;
+    border-bottom:1px solid var(--border);scrollbar-width:none;
 }
+.mobile-cats::-webkit-scrollbar{display:none;}
+
+.mobile-cat{
+    flex-shrink:0;height:36px;padding:0 14px;border:1px solid var(--border);
+    background:var(--card);color:var(--t2);font-size:12px;font-weight:600;cursor:pointer;
+    display:flex;align-items:center;gap:8px;font-family:'JetBrains Mono', monospace;
+    transition:.2s;clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+}
+.mobile-cat:active{background:var(--card2);transform:scale(0.96);}
+.mobile-cat.active{background:var(--accent-sand);border-color:var(--accent-sand);color:var(--bg);}
+.mobile-cat .cat-dot{width:8px;height:8px;border-radius:50%;background:var(--c);}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(420px, 1fr));gap:24px;}
 
 .card{
-    display:flex;
-    gap:20px;
-    background:var(--card);
-    border:1px solid var(--border);
-    padding:24px;
-    cursor:pointer;
-    transition:.3s;
-    animation:slideIn .4s ease forwards;
-    opacity:0;
-    position:relative;
-    /* ИЗЮМИНКА - асимметричная форма */
-    clip-path: polygon(
-        0 0, 
-        100% 0, 
-        100% calc(100% - 30px), 
-        calc(100% - 30px) 100%, 
-        0 100%
-    );
+    display:flex;gap:20px;background:var(--card);border:1px solid var(--border);
+    padding:24px;cursor:pointer;transition:.3s;animation:slideIn .4s ease forwards;
+    opacity:0;position:relative;
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 30px), calc(100% - 30px) 100%, 0 100%);
 }
-@keyframes slideIn{
-    to{opacity:1;transform:translateY(0);}
-    from{opacity:0;transform:translateY(20px);}
-}
+@keyframes slideIn{to{opacity:1;transform:translateY(0);}from{opacity:0;transform:translateY(20px);}}
 
-/* ИЗЮМИНКА - цветной маркер в углу */
 .card::after{
-    content:'';
-    position:absolute;
-    top:0;
-    right:0;
-    width:0;
-    height:0;
-    border-style:solid;
-    border-width:0 40px 40px 0;
-    border-color:transparent var(--c) transparent transparent;
-    opacity:0.6;
+    content:'';position:absolute;top:0;right:0;width:0;height:0;
+    border-style:solid;border-width:0 40px 40px 0;
+    border-color:transparent var(--c) transparent transparent;opacity:0.6;
 }
 
-.card:hover{
-    border-color:var(--c);
-    transform:translateY(-4px);
-    box-shadow:0 20px 40px -10px rgba(0,0,0,0.5);
-    background:var(--card2);
-}
+.card:hover{border-color:var(--c);transform:translateY(-4px);box-shadow:0 20px 40px -10px rgba(0,0,0,0.5);background:var(--card2);}
 .card.read{opacity:0.5;}
 .card.read:hover{opacity:0.65;}
 
 .card-left{flex:1;min-width:0;display:flex;flex-direction:column;}
-.card-meta{
-    display:flex;
-    align-items:center;
-    gap:10px;
-    margin-bottom:12px;
-    font-size:11px;
-    font-family:'JetBrains Mono', monospace;
-    color:var(--t3);
-    text-transform:uppercase;
-    letter-spacing:0.05em;
-}
+.card-meta{display:flex;align-items:center;gap:10px;margin-bottom:12px;font-size:11px;font-family:'JetBrains Mono', monospace;color:var(--t3);text-transform:uppercase;letter-spacing:0.05em;}
 
-.dot{
-    width:6px;
-    height:6px;
-    border-radius:50%;
-    background:var(--c);
-    box-shadow:0 0 8px var(--c);
-}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--c);box-shadow:0 0 8px var(--c);}
 .cat{color:var(--c);font-weight:700;}
 .time{margin-left:auto;}
 
-.card-title{
-    font-size:17px;
-    font-weight:700;
-    line-height:1.4;
-    margin-bottom:8px;
-    color:var(--t1);
-}
-.card-title a{
-    color:inherit;
-    text-decoration:none;
-    position:relative;
-}
-.card-title a::after{
-    content:'';
-    position:absolute;
-    bottom:-2px;
-    left:0;
-    width:0;
-    height:2px;
-    background:var(--accent-coral);
-    transition:width .3s;
-}
-.card:hover .card-title a::after{
-    width:100%;
-}
+.card-title{font-size:17px;font-weight:700;line-height:1.4;margin-bottom:8px;color:var(--t1);}
+.card-title a{color:inherit;text-decoration:none;position:relative;}
+.card-title a::after{content:'';position:absolute;bottom:-2px;left:0;width:0;height:2px;background:var(--accent-coral);transition:width .3s;}
+.card:hover .card-title a::after{width:100%;}
 
-.src{
-    font-size:12px;
-    color:var(--t3);
-    margin-bottom:10px;
-    font-family:'JetBrains Mono', monospace;
-}
-.snippet{
-    font-size:14px;
-    line-height:1.6;
-    color:var(--t2);
-    display:-webkit-box;
-    -webkit-line-clamp:3;
-    -webkit-box-orient:vertical;
-    overflow:hidden;
-}
+.src{font-size:12px;color:var(--t3);margin-bottom:10px;font-family:'JetBrains Mono', monospace;}
+.snippet{font-size:14px;line-height:1.6;color:var(--t2);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
 
-.card-foot{
-    display:flex;
-    align-items:center;
-    gap:8px;
-    margin-top:auto;
-    padding-top:16px;
-    border-top:1px solid var(--border);
-}
-.act{
-    width:36px;
-    height:36px;
-    border:1px solid var(--border);
-    background:var(--card2);
-    color:var(--t3);
-    cursor:pointer;
-    display:grid;
-    place-items:center;
-    transition:.2s;
-}
-.act:hover{
-    border-color:var(--accent-sand);
-    color:var(--t1);
-}
-.act.on{
-    background:var(--accent-coral);
-    border-color:var(--accent-coral);
-    color:var(--bg);
-}
+.card-foot{display:flex;align-items:center;gap:8px;margin-top:auto;padding-top:16px;border-top:1px solid var(--border);}
+.act{width:36px;height:36px;border:1px solid var(--border);background:var(--card2);color:var(--t3);cursor:pointer;display:grid;place-items:center;transition:.2s;}
+.act:hover{border-color:var(--accent-sand);color:var(--t1);}
+.act.on{background:var(--accent-coral);border-color:var(--accent-coral);color:var(--bg);}
 .act svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;}
 
-.readtime{
-    margin-left:auto;
-    font-size:11px;
-    font-family:'JetBrains Mono', monospace;
-    color:var(--t3);
-    background:var(--card2);
-    border:1px solid var(--border);
-    padding:5px 12px;
-}
+.readtime{margin-left:auto;font-size:11px;font-family:'JetBrains Mono', monospace;color:var(--t3);background:var(--card2);border:1px solid var(--border);padding:5px 12px;}
 
-/* Миниатюра */
-.thumb{
-    width:200px;
-    height:140px;
-    flex-shrink:0;
-    background:var(--card2);
-    border:1px solid var(--border);
-    position:relative;
-    overflow:hidden;
-}
-.thumb img{
-    width:100%;
-    height:100%;
-    object-fit:cover;
-    position:absolute;
-    inset:0;
-    filter:grayscale(20%) contrast(1.1);
-    transition:.3s;
-}
-.card:hover .thumb img{
-    filter:grayscale(0%) contrast(1.2);
-    transform:scale(1.05);
-}
-.thumb-letter{
-    position:absolute;
-    inset:0;
-    display:grid;
-    place-items:center;
-    font-size:56px;
-    font-weight:800;
-    color:var(--c);
-    opacity:0.3;
-    font-family:'JetBrains Mono', monospace;
-}
+.thumb{width:200px;height:140px;flex-shrink:0;background:var(--card2);border:1px solid var(--border);position:relative;overflow:hidden;}
+.thumb img{width:100%;height:100%;object-fit:cover;position:absolute;inset:0;filter:grayscale(20%) contrast(1.1);transition:.3s;}
+.card:hover .thumb img{filter:grayscale(0%) contrast(1.2);transform:scale(1.05);}
+.thumb-letter{position:absolute;inset:0;display:grid;place-items:center;font-size:56px;font-weight:800;color:var(--c);opacity:0.3;font-family:'JetBrains Mono', monospace;}
 
-/* WIKI */
 .wiki-wrap{max-width:900px;}
-.wiki-top{
-    display:flex;
-    gap:8px;
-    margin-bottom:24px;
-    flex-wrap:wrap;
-    padding-bottom:16px;
-    border-bottom:1px solid var(--border);
-}
-.wiki-content{
-    background:var(--card);
-    border:1px solid var(--border);
-    padding:48px;
-    /* ИЗЮМИНКА - скошенный угол */
-    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 40px), calc(100% - 40px) 100%, 0 100%);
-}
-.wiki-content h1{
-    font-size:32px;
-    margin-bottom:24px;
-    font-family:'JetBrains Mono', monospace;
-    color:var(--accent-sand);
-}
-.wiki-content h2{
-    font-size:22px;
-    margin:32px 0 16px;
-    color:var(--accent-coral);
-}
-.wiki-content p{
-    font-size:15px;
-    line-height:1.8;
-    color:var(--t2);
-    margin-bottom:16px;
-}
-.wiki-content ul{
-    margin:0 0 20px 24px;
-    color:var(--t2);
-    line-height:1.8;
-    font-size:15px;
-}
-.wiki-content pre{
-    background:var(--bg);
-    border:1px solid var(--border);
-    padding:20px;
-    margin:20px 0;
-    overflow-x:auto;
-}
-.wiki-content code{
-    font-family:'JetBrains Mono', monospace;
-    font-size:13px;
-}
+.wiki-top{display:flex;gap:8px;margin-bottom:24px;flex-wrap:wrap;padding-bottom:16px;border-bottom:1px solid var(--border);}
+.wiki-content{background:var(--card);border:1px solid var(--border);padding:48px;clip-path: polygon(0 0, 100% 0, 100% calc(100% - 40px), calc(100% - 40px) 100%, 0 100%);}
+.wiki-content h1{font-size:32px;margin-bottom:24px;font-family:'JetBrains Mono', monospace;color:var(--accent-sand);}
+.wiki-content h2{font-size:22px;margin:32px 0 16px;color:var(--accent-coral);}
+.wiki-content p{font-size:15px;line-height:1.8;color:var(--t2);margin-bottom:16px;}
+.wiki-content ul{margin:0 0 20px 24px;color:var(--t2);line-height:1.8;font-size:15px;}
+.wiki-content pre{background:var(--bg);border:1px solid var(--border);padding:20px;margin:20px 0;overflow-x:auto;}
+.wiki-content code{font-family:'JetBrains Mono', monospace;font-size:13px;}
 
-.stepik-btn{
-    display:inline-block;
-    margin-top:16px;
-    padding:12px 24px;
-    background:var(--accent-sand);
-    color:var(--bg);
-    text-decoration:none;
-    font-weight:700;
-    font-size:13px;
-    font-family:'JetBrains Mono', monospace;
-    border:1px solid var(--accent-sand);
-    transition:.2s;
-}
-.stepik-btn:hover{
-    background:transparent;
-    color:var(--accent-sand);
-}
+.stepik-btn{display:inline-block;margin-top:16px;padding:12px 24px;background:var(--accent-sand);color:var(--bg);text-decoration:none;font-weight:700;font-size:13px;font-family:'JetBrains Mono', monospace;border:1px solid var(--accent-sand);transition:.2s;}
+.stepik-btn:hover{background:transparent;color:var(--accent-sand);}
 
-.empty-state{
-    text-align:center;
-    padding:80px 20px;
-    color:var(--t3);
-}
+.empty-state{text-align:center;padding:80px 20px;color:var(--t3);}
 .empty-state p{font-size:16px;margin-bottom:8px;}
-.empty-state button{
-    margin-top:20px;
-    padding:14px 28px;
-    background:var(--accent-sand);
-    color:var(--bg);
-    border:none;
-    font-weight:700;
-    cursor:pointer;
-    font-family:'JetBrains Mono', monospace;
-    transition:.2s;
+.empty-state button{margin-top:20px;padding:14px 28px;background:var(--accent-sand);color:var(--bg);border:none;font-weight:700;cursor:pointer;font-family:'JetBrains Mono', monospace;transition:.2s;}
+.empty-state button:hover{background:var(--accent-coral);transform:translateY(-2px);}
+
+/* Overlay сайдбара на мобилке */
+.sidebar-overlay{
+    display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);
+    backdrop-filter:blur(4px);z-index:99;
 }
-.empty-state button:hover{
-    background:var(--accent-coral);
-    transform:translateY(-2px);
+.sidebar-overlay.open{display:block;}
+
+.sidebar-mobile{
+    position:fixed;top:0;left:0;bottom:0;width:85%;max-width:320px;
+    background:var(--panel);border-right:1px solid var(--border);z-index:100;
+    overflow-y:auto;padding:24px;transform:translateX(-100%);transition:transform .3s ease;
+}
+.sidebar-overlay.open .sidebar-mobile{transform:translateX(0);}
+.sidebar-mobile .close-btn{
+    position:absolute;top:16px;right:16px;width:32px;height:32px;
+    border:1px solid var(--border);background:var(--card);color:var(--t1);
+    cursor:pointer;display:grid;place-items:center;font-size:18px;
 }
 
-/* Адаптивность */
 @media(max-width:1024px){
-    .sidebar{display:none;}
-    .shell{grid-template-columns:1fr;}
+    .mobile-cats{display:flex;}
+    .burger{display:flex;}
+    .sidebar{display:none !important;}
 }
 @media(max-width:640px){
     .grid{grid-template-columns:1fr;}
     .thumb{display:none;}
-    .topbar{padding:0 16px;}
+    .topbar{padding:0 12px;gap:8px;}
+    .searchwrap{max-width:none;}
     .shell{padding:16px;}
     .wiki-content{padding:24px;}
 }
@@ -1286,8 +652,8 @@ body::after{
     </div>
     <div class="top-actions">
         <button class="burger" id="burgerBtn" title="Меню">
-    <svg viewBox="0 0 24 24"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
-</button>
+            <svg viewBox="0 0 24 24"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+        </button>
         <button class="iconbtn" id="bellBtn" title="Непрочитанные">
             <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/></svg>
             <span class="badge" id="unreadBadge">0</span>
@@ -1319,7 +685,6 @@ body::after{
             <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></svg>
             Прочитанное
         </button>
-        
         <div class="side-label">Wiki</div>
         <a class="side-item" href="/wiki/rust">
             <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 19.5A2.5 2.5 0 0 0 6.5 22H20V2H6.5A2.5 2.5 0 0 0 4 4.5z"/></svg>
@@ -1329,7 +694,6 @@ body::after{
             <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 19.5A2.5 2.5 0 0 0 6.5 22H20V2H6.5A2.5 2.5 0 0 0 4 4.5z"/></svg>
             Python
         </a>
-        
         <div class="side-label">Категории</div>
         {% for gid, g in groups.items() %}
         <button class="side-item cat-mobile-item" data-group="{{ gid }}" style="--c:{{ g.color }}">
@@ -1353,7 +717,6 @@ body::after{
             <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></svg>
             Прочитанное
         </button>
-        
         <div class="side-label">Wiki</div>
         <a class="side-item" href="/wiki/rust">
             <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 19.5A2.5 2.5 0 0 0 6.5 22H20V2H6.5A2.5 2.5 0 0 0 4 4.5z"/></svg>
@@ -1363,7 +726,6 @@ body::after{
             <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 19.5A2.5 2.5 0 0 0 6.5 22H20V2H6.5A2.5 2.5 0 0 0 4 4.5z"/></svg>
             Python
         </a>
-        
         <div class="side-label">Категории</div>
         {% for gid, g in groups.items() %}
         <button class="cat-card" data-group="{{ gid }}" style="--c:{{ g.color }}">
@@ -1371,7 +733,6 @@ body::after{
             <span class="cat-name">{{ g.name }}</span>
         </button>
         {% endfor %}
-        
         <div class="manage">Управление →</div>
     </aside>
 
@@ -1391,13 +752,13 @@ body::after{
         </div>
     {% else %}
     <div class="mobile-cats" id="mobileCats">
-    <button class="mobile-cat active" data-group="all">Все</button>
-    {% for gid, g in groups.items() %}
-    <button class="mobile-cat" data-group="{{ gid }}" style="--c:{{ g.color }}">
-        <span class="cat-dot"></span>{{ g.name }}
-    </button>
-    {% endfor %}
-</div>
+        <button class="mobile-cat active" data-group="all">Все</button>
+        {% for gid, g in groups.items() %}
+        <button class="mobile-cat" data-group="{{ gid }}" style="--c:{{ g.color }}">
+            <span class="cat-dot"></span>{{ g.name }}
+        </button>
+        {% endfor %}
+    </div>
         <div class="main-head">
             <h1>Лента на сегодня</h1>
             <div class="pills">
@@ -1453,7 +814,6 @@ body::after{
 </div>
 
 <script>
-// JavaScript остаётся без изменений (тот же что был)
 var refreshAttempts = 0;
 var maxRefreshAttempts = 10;
 
@@ -1611,6 +971,7 @@ document.addEventListener('keydown', function(e) {
 });
 
 updateBadge();
+
 // ===== МОБИЛЬНОЕ МЕНЮ =====
 var burgerBtn = document.getElementById('burgerBtn');
 var overlay = document.getElementById('sidebarOverlay');
@@ -1623,7 +984,6 @@ if (burgerBtn && overlay) {
         if (e.target === overlay) overlay.classList.remove('open');
     });
     
-    // Обработчики для мобильного сайдбара
     overlay.querySelectorAll('.side-item[data-mode]').forEach(function(b) {
         b.addEventListener('click', function() {
             handleFilter(b);
@@ -1638,7 +998,6 @@ if (burgerBtn && overlay) {
     });
 }
 
-// Обработчики для горизонтального скролла категорий
 document.querySelectorAll('.mobile-cat').forEach(function(btn) {
     btn.addEventListener('click', function() {
         var pg = btn.getAttribute('data-group');
@@ -1653,9 +1012,7 @@ document.querySelectorAll('.mobile-cat').forEach(function(btn) {
 </html>
 """
 
-
-
 init_db()
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=PORT, debug=False) 
+    app.run(host="0.0.0.0", port=PORT, debug=False)
