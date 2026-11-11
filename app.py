@@ -743,12 +743,15 @@ document.querySelectorAll('.card').forEach(function (card) {
         setTimeout(function () { sh.classList.remove('on'); }, 1200);
     });
 });
-
+// ==========================================
+// ОБРАБОТЧИКИ ФИЛЬТРОВ И КНОПОК
+// ==========================================
 function setActive(el, family) {
     family.forEach(function (x) { x.classList.remove('active'); });
     if (el) el.classList.add('active');
 }
 
+// 1. Обработка кнопок категорий (Все, Физика, Олимпиады...)
 document.querySelectorAll('[data-group]').forEach(function (btn) {
     btn.addEventListener('click', function () {
         group = btn.getAttribute('data-group');
@@ -772,29 +775,53 @@ document.querySelectorAll('[data-group]').forEach(function (btn) {
     });
 });
 
+// 2. Обработка бокового меню (Вся лента, Избранное, Прочитанное)
+document.querySelectorAll('[data-mode]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+        mode = btn.getAttribute('data-mode');
+        setActive(btn, document.querySelectorAll('[data-mode]'));
+        // При переключении режима убираем активную категорию, если она мешает
+        if (mode === 'all') { 
+            group = 'all'; 
+            var all = document.querySelector('.pill[data-group="all"]'); 
+            if (all) all.classList.add('active'); 
+        }
+        apply();
+    });
+});
 
+// 3. Кнопка колокольчика (Быстрый доступ к непрочитанным)
+document.getElementById('bellBtn').addEventListener('click', function () {
+    mode = (mode === 'unread') ? 'all' : 'unread';
+    setActive(mode === 'unread' ? null : document.querySelector('[data-mode="all"]'), document.querySelectorAll('[data-mode]'));
+    apply();
+});
 
-
-
-
+// 4. Поиск
 var searchInput = document.getElementById('search');
 searchInput.addEventListener('input', function () { query = searchInput.value.toLowerCase(); apply(); });
 document.addEventListener('keydown', function (e) {
     if (e.key === '/' || (e.metaKey && e.key.toLowerCase() === 'k')) { e.preventDefault(); searchInput.focus(); }
 });
 
+// 5. Подписки (если будут использоваться позже)
 document.querySelectorAll('.subbtn').forEach(function (btn) {
     var name = btn.getAttribute('data-name');
     if (subs.indexOf(name) !== -1) { btn.classList.add('on'); btn.innerText = 'Вы подписаны'; }
     btn.addEventListener('click', function () {
         if (subs.indexOf(name) === -1) { subs.push(name); btn.classList.add('on'); btn.innerText = 'Вы подписаны'; }
-        else
+        else { subs = subs.filter(function (s) { return s !== name; }); btn.classList.remove('on'); btn.innerText = 'Подписаться'; }
+        localStorage.setItem('subs', JSON.stringify(subs));
+    });
+});
 
 updateBadge();
 </script>
 </body>
 </html>
 """
+
+
 
 init_db()
 
