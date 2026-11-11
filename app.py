@@ -773,16 +773,7 @@ document.querySelectorAll('[data-group]').forEach(function (btn) {
 });
 
 
-document.querySelectorAll('[data-group]').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-        group = btn.getAttribute('data-group');
-        document.querySelectorAll('.pill[data-group]').forEach(function (p) { p.classList.remove('active'); });
-        document.querySelectorAll('.cat-card').forEach(function (p) { p.classList.remove('active'); });
-        btn.classList.add('active');
-        if (btn.classList.contains('cat-card')) mode = 'all', setActive(document.querySelector('[data-mode="all"]'), document.querySelectorAll('[data-mode]'));
-        apply();
-    });
-});
+
 
 document.getElementById('bellBtn').addEventListener('click', function () {
     mode = (mode === 'unread') ? 'all' : 'unread';
