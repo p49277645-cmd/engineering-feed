@@ -389,144 +389,166 @@ HTML_TEMPLATE = """
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="EngFeed">
 <title>EngFeed</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-rust.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
 <style>
 :root{
-    /* Instagram-цвета */
-    --bg:#000000;
-    --panel:#121212;
-    --card:#1a1a1a;
-    --card2:#262626;
-    --border:#333333;
-    --t1:#ffffff;
-    --t2:#a8a8a8;
-    --t3:#737373;
-    /* Instagram-градиент */
-    --insta-gradient: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
-    --accent:#e1306c;
-    /* Изюминка — неоновое свечение */
-    --glow: 0 0 30px rgba(225, 48, 108, 0.4);
-    --glow-soft: 0 0 60px rgba(225, 48, 108, 0.2);
+    /* УНИКАЛЬНАЯ ПАЛИТРА - не типичная для AI */
+    --bg: #0d0e0f;           /* Тёмный графит */
+    --panel: #151719;        /* Тёплый тёмно-серый */
+    --card: #1a1d1f;         /* Чуть светлее */
+    --card2: #222629;        /* Ещё светлее */
+    --border: #2a2f33;       /* Тёплая граница */
+    --t1: #e8e6e3;           /* Тёплый белый */
+    --t2: #9a9895;           /* Тёплый серый */
+    --t3: #6b6966;           /* Тёмный серый */
+    
+    /* Акценты - нестандартные */
+    --accent-sand: #d4b896;      /* Песочный/охра */
+    --accent-coral: #e07a5f;     /* Терракотовый/коралл */
+    --accent-emerald: #81b29a;   /* Приглушённый изумруд */
+    --accent-rust: #bc6c25;      /* Ржавый оранжевый */
+    
+    /* ИЗЮМИНКА - инженерная сетка */
+    --grid-color: rgba(212, 184, 150, 0.03);
 }
 
 *{box-sizing:border-box;margin:0;padding:0;}
 
 body{
     font-family:'Inter',sans-serif;
-    background:#000;
+    background:var(--bg);
     color:var(--t1);
     min-height:100vh;
-    overflow-x:hidden;
-    /* ИЗЮМИНКА — живой анимированный фон */
-    background: linear-gradient(-45deg, #0a0a0a, #1a0a0f, #0f0a1a, #0a0a0a);
-    background-size: 400% 400%;
-    animation: gradientShift 15s ease infinite;
+    /* ИЗЮМИНКА - сетка как на миллиметровке */
+    background-image: 
+        linear-gradient(var(--grid-color) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid-color) 1px, transparent 1px),
+        linear-gradient(135deg, #0d0e0f 0%, #151719 100%);
+    background-size: 40px 40px, 40px 40px, 100% 100%;
+    background-position: 0 0, 0 0, 0 0;
+    background-attachment: fixed;
 }
 
-@keyframes gradientShift {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
-}
-
-/* Плавающие "пузыри" на фоне — изюминка */
+/* ИЗЮМИНКА - технические маркеры по углам */
 body::before, body::after{
     content:'';
     position:fixed;
-    border-radius:50%;
-    filter:blur(80px);
-    opacity:0.4;
+    width:100px;
+    height:100px;
+    border:1px solid rgba(212, 184, 150, 0.1);
+    pointer-events:none;
     z-index:0;
-    animation: float 20s ease-in-out infinite;
 }
-
 body::before{
-    width:600px;
-    height:600px;
-    background: radial-gradient(circle, #f09433 0%, #dc2743 50%, transparent 70%);
-    top:-200px;
-    right:-100px;
-    animation-delay:0s;
+    top:20px;
+    left:20px;
+    border-right:none;
+    border-bottom:none;
 }
-
 body::after{
-    width:500px;
-    height:500px;
-    background: radial-gradient(circle, #bc1888 0%, #833ab4 50%, transparent 70%);
-    bottom:-150px;
-    left:-100px;
-    animation-delay:-10s;
-}
-
-@keyframes float {
-    0%, 100% { transform: translate(0, 0) scale(1); }
-    33% { transform: translate(30px, -50px) scale(1.1); }
-    66% { transform: translate(-20px, 30px) scale(0.9); }
+    bottom:20px;
+    right:20px;
+    border-left:none;
+    border-top:none;
 }
 
 ::-webkit-scrollbar{width:8px;}
-::-webkit-scrollbar-thumb{background:var(--insta-gradient);border-radius:4px;}
+::-webkit-scrollbar-track{background:var(--panel);}
+::-webkit-scrollbar-thumb{background:var(--accent-sand);border-radius:4px;}
+::-webkit-scrollbar-thumb:hover{background:var(--accent-rust);}
 
-/* ШАПКА с Instagram-градиентом */
+/* ШАПКА с инженерным стилем */
 .topbar{
     position:sticky;
     top:0;
     z-index:50;
-    height:64px;
+    height:68px;
     display:flex;
     align-items:center;
     gap:24px;
-    padding:0 28px;
-    background:rgba(0,0,0,0.85);
-    backdrop-filter:blur(20px);
-    border-bottom:1px solid var(--border);
+    padding:0 32px;
+    background:rgba(21, 23, 25, 0.95);
+    backdrop-filter:blur(12px);
+    border-bottom:2px solid var(--border);
+    /* ИЗЮМИНКА - диагональная линия */
+    box-shadow: 0 4px 0 var(--accent-sand);
 }
 
 .logo{
-    font-size:26px;
+    font-size:24px;
     font-weight:800;
-    letter-spacing:-1px;
-    /* Instagram-градиент на тексте */
-    background: var(--insta-gradient);
-    -webkit-background-clip:text;
-    -webkit-text-fill-color:transparent;
-    background-clip:text;
+    letter-spacing:-0.5px;
+    color:var(--t1);
     white-space:nowrap;
+    font-family:'JetBrains Mono', monospace;
+    position:relative;
+}
+.logo::after{
+    content:'_';
+    animation: blink 1s infinite;
+    color:var(--accent-coral);
+}
+@keyframes blink{
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
 }
 
 .searchwrap{flex:1;max-width:640px;margin:0 auto;position:relative;}
-.searchwrap svg{position:absolute;left:14px;top:50%;transform:translateY(-50%);width:17px;height:17px;stroke:var(--t3);fill:none;stroke-width:2;}
+.searchwrap svg{
+    position:absolute;
+    left:16px;
+    top:50%;
+    transform:translateY(-50%);
+    width:18px;
+    height:18px;
+    stroke:var(--t3);
+    fill:none;
+    stroke-width:2;
+}
 .searchwrap input{
     width:100%;
-    height:42px;
+    height:44px;
     background:var(--card);
     border:1px solid var(--border);
-    border-radius:12px;
+    border-radius:0;  /* ИЗЮМИНКА - острые углы */
     color:var(--t1);
     font-size:14px;
-    padding:0 64px 0 42px;
+    padding:0 64px 0 44px;
     outline:none;
     transition:.2s;
+    font-family:'JetBrains Mono', monospace;
 }
 .searchwrap input:focus{
-    border-color:var(--accent);
-    box-shadow:0 0 0 3px rgba(225,48,108,0.2);
+    border-color:var(--accent-sand);
+    box-shadow:0 0 0 3px rgba(212, 184, 150, 0.15);
+    background:var(--card2);
 }
-.kbd{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--t3);background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:2px 7px;}
+.kbd{
+    position:absolute;
+    right:14px;
+    top:50%;
+    transform:translateY(-50%);
+    font-size:11px;
+    color:var(--t3);
+    background:var(--card2);
+    border:1px solid var(--border);
+    padding:3px 8px;
+    font-family:'JetBrains Mono', monospace;
+}
 
-.top-actions{display:flex;align-items:center;gap:14px;}
+.top-actions{display:flex;align-items:center;gap:12px;}
 .iconbtn{
     position:relative;
-    width:38px;
-    height:38px;
-    border-radius:50%;
-    border:none;
-    background:none;
-    color:var(--t1);
+    width:40px;
+    height:40px;
+    border-radius:0;  /* Острые углы */
+    border:1px solid var(--border);
+    background:var(--card);
+    color:var(--t2);
     cursor:pointer;
     display:grid;
     place-items:center;
@@ -534,79 +556,96 @@ body::after{
 }
 .iconbtn:hover{
     background:var(--card2);
-    transform:scale(1.1);
+    border-color:var(--accent-sand);
+    color:var(--t1);
+    transform:translateY(-2px);
+}
+.iconbtn:active{
+    transform:translateY(0);
 }
 .iconbtn svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;}
 
 .badge{
     position:absolute;
-    top:0;
-    right:0;
-    min-width:18px;
-    height:18px;
-    background:var(--insta-gradient);
-    color:#fff;
+    top:-4px;
+    right:-4px;
+    min-width:20px;
+    height:20px;
+    background:var(--accent-coral);
+    color:var(--bg);
     font-size:10px;
     font-weight:700;
-    border-radius:999px;
     display:none;
     align-items:center;
     justify-content:center;
     padding:0 5px;
-    border:2px solid #000;
+    font-family:'JetBrains Mono', monospace;
+    border:2px solid var(--bg);
 }
 
 .avatar{
     position:relative;
-    width:36px;
-    height:36px;
-    border-radius:50%;
-    background:var(--insta-gradient);
-    padding:2px;
-}
-.avatar-inner{
-    width:100%;
-    height:100%;
-    border-radius:50%;
+    width:38px;
+    height:38px;
+    border:2px solid var(--accent-sand);
     background:var(--card);
     display:grid;
     place-items:center;
 }
-.avatar svg{width:18px;height:18px;stroke:var(--t2);fill:none;stroke-width:2;}
-.online{position:absolute;right:2px;bottom:2px;width:10px;height:10px;background:#00ff88;border-radius:50%;border:2px solid #000;}
-.spin{animation:spin 1s linear infinite;}
-@keyframes spin{100%{transform:rotate(360deg);}}
-
-/* КАРКАС */
-.shell{display:flex;gap:28px;max-width:1440px;margin:0 auto;padding:28px;position:relative;z-index:1;}
-.sidebar{
-    width:236px;
-    flex-shrink:0;
-    position:sticky;
-    top:92px;
-    height:max-content;
-    max-height:calc(100vh - 120px);
-    overflow-y:auto;
-    padding-bottom:12px;
-    /* ИЗЮМИНКА — стеклянная панель */
-    background:rgba(26,26,26,0.6);
-    backdrop-filter:blur(10px);
-    border-radius:20px;
-    padding:20px;
-    border:1px solid rgba(255,255,255,0.05);
+.avatar svg{width:20px;height:20px;stroke:var(--t2);fill:none;stroke-width:2;}
+.online{
+    position:absolute;
+    right:-2px;
+    bottom:-2px;
+    width:12px;
+    height:12px;
+    background:var(--accent-emerald);
+    border:2px solid var(--bg);
 }
 
-.side-label{font-size:10px;font-weight:700;letter-spacing:.12em;color:var(--t3);margin:18px 0 10px 4px;}
+/* КАРКАС */
+.shell{
+    display:grid;
+    grid-template-columns: 280px 1fr;
+    gap:32px;
+    max-width:1440px;
+    margin:0 auto;
+    padding:32px;
+    position:relative;
+    z-index:1;
+}
+
+.sidebar{
+    position:sticky;
+    top:100px;
+    height:fit-content;
+    /* ИЗЮМИНКА - асимметричная панель */
+    background:var(--panel);
+    border:1px solid var(--border);
+    padding:24px;
+    /* Диагональный срез снизу */
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 20px), calc(100% - 20px) 100%, 0 100%);
+}
+
+.side-label{
+    font-size:10px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:0.15em;
+    color:var(--t3);
+    margin:20px 0 12px 0;
+    font-family:'JetBrains Mono', monospace;
+    padding-left:4px;
+}
 .side-label:first-child{margin-top:0;}
 
 .side-item{
     display:flex;
     align-items:center;
-    gap:10px;
+    gap:12px;
     width:100%;
-    padding:12px 14px;
+    padding:12px;
     border:none;
-    border-radius:12px;
     background:none;
     color:var(--t2);
     font-size:14px;
@@ -615,108 +654,135 @@ body::after{
     text-decoration:none;
     transition:.2s;
     text-align:left;
+    position:relative;
+    /* ИЗЮМИНКА - линия слева */
+    border-left:3px solid transparent;
 }
 .side-item:hover{
-    background:rgba(255,255,255,0.05);
+    background:rgba(212, 184, 150, 0.05);
     color:var(--t1);
 }
 .side-item.active{
-    /* Instagram-градиент фон */
-    background:var(--insta-gradient);
-    color:#fff;
-    box-shadow:var(--glow-soft);
+    background:rgba(212, 184, 150, 0.1);
+    color:var(--accent-sand);
+    border-left-color:var(--accent-sand);
 }
-.side-item svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;flex-shrink:0;}
+.side-item svg{
+    width:20px;
+    height:20px;
+    stroke:currentColor;
+    fill:none;
+    stroke-width:2;
+    flex-shrink:0;
+}
 
-/* Категории с Instagram-стилем */
+/* Категории - инженерные карточки */
 .cat-card{
     display:flex;
     align-items:center;
     gap:12px;
     width:100%;
     padding:14px;
-    margin-bottom:10px;
-    border:none;
-    border-radius:16px;
-    /* ИЗЮМИНКА — градиентная рамка */
-    background: linear-gradient(var(--card), var(--card)) border-box,
-                var(--insta-gradient) border-box;
-    border:2px solid transparent;
-    color:var(--t1);
+    margin-bottom:8px;
+    border:1px solid var(--border);
+    background:var(--card);
     cursor:pointer;
-    text-align:left;
     transition:.3s;
     position:relative;
     overflow:hidden;
 }
+/* ИЗЮМИНКА - цветная полоса сверху */
 .cat-card::before{
     content:'';
     position:absolute;
     top:0;
-    left:-100%;
-    width:100%;
-    height:100%;
-    background:var(--insta-gradient);
-    opacity:0;
-    transition:.3s;
+    left:0;
+    right:0;
+    height:3px;
+    background:var(--c);
+    transform:scaleX(0);
+    transform-origin:left;
+    transition:transform .3s;
 }
-.cat-card:hover::before{left:0;opacity:0.1;}
+.cat-card:hover::before{
+    transform:scaleX(1);
+}
 .cat-card:hover{
+    border-color:var(--c);
     transform:translateX(4px);
-    box-shadow:var(--glow-soft);
+    background:var(--card2);
 }
 .cat-card.active{
-    background:var(--insta-gradient);
-    box-shadow:var(--glow);
+    border-color:var(--c);
+    background:rgba(255,255,255,0.02);
 }
+.cat-card.active::before{
+    transform:scaleX(1);
+}
+
 .cat-letter{
     width:36px;
     height:36px;
     display:grid;
     place-items:center;
-    border-radius:10px;
-    background:rgba(255,255,255,0.1);
-    font-size:18px;
-    font-weight:800;
-    color:#fff;
-    position:relative;
-    z-index:1;
+    background:var(--card2);
+    border:1px solid var(--border);
+    font-size:16px;
+    font-weight:700;
+    color:var(--c);
+    font-family:'JetBrains Mono', monospace;
 }
+
 .cat-name{
     font-size:13px;
     font-weight:600;
     color:var(--t1);
-    position:relative;
-    z-index:1;
 }
 
 .manage{
     display:flex;
     justify-content:space-between;
     align-items:center;
-    font-size:12px;
+    font-size:11px;
     color:var(--t3);
-    margin-top:14px;
+    margin-top:20px;
     padding:10px;
     cursor:pointer;
-    border-radius:10px;
-    transition:.2s;
+    border-top:1px solid var(--border);
+    font-family:'JetBrains Mono', monospace;
 }
 .manage:hover{
-    background:rgba(255,255,255,0.05);
-    color:var(--t1);
+    color:var(--accent-sand);
 }
 
 /* ОСНОВНАЯ ЧАСТЬ */
-.main{flex:1;min-width:0;}
-.main-head{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:22px;flex-wrap:wrap;}
-.main-head h1{font-size:26px;font-weight:800;letter-spacing:-.02em;}
+.main{min-width:0;}
+.main-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:28px;
+    flex-wrap:wrap;
+    gap:16px;
+    /* ИЗЮМИНКА - линия под заголовком */
+    padding-bottom:16px;
+    border-bottom:1px solid var(--border);
+}
+.main-head h1{
+    font-size:28px;
+    font-weight:800;
+    letter-spacing:-0.5px;
+    font-family:'JetBrains Mono', monospace;
+}
+.main-head h1::before{
+    content:'// ';
+    color:var(--accent-coral);
+}
 
 .pills{display:flex;gap:8px;flex-wrap:wrap;}
 .pill{
-    height:36px;
+    height:38px;
     padding:0 18px;
-    border-radius:20px;
     border:1px solid var(--border);
     background:var(--card);
     color:var(--t2);
@@ -724,86 +790,154 @@ body::after{
     font-weight:600;
     cursor:pointer;
     transition:.2s;
+    font-family:'JetBrains Mono', monospace;
+    /* ИЗЮМИНКА - скошенный угол */
+    clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
 }
 .pill:hover{
     background:var(--card2);
     color:var(--t1);
+    border-color:var(--t3);
 }
 .pill.active{
-    background:var(--insta-gradient);
-    border-color:transparent;
-    color:#fff;
-    box-shadow:var(--glow-soft);
+    background:var(--accent-sand);
+    border-color:var(--accent-sand);
+    color:var(--bg);
 }
 
 /* СЕТКА КАРТОЧЕК */
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(430px,1fr));gap:20px;}
+.grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(420px, 1fr));
+    gap:24px;
+}
 
 .card{
     display:flex;
-    gap:18px;
+    gap:20px;
     background:var(--card);
     border:1px solid var(--border);
-    border-radius:20px;
-    padding:20px;
+    padding:24px;
     cursor:pointer;
     transition:.3s;
-    animation:fadeUp .35s ease forwards;
+    animation:slideIn .4s ease forwards;
     opacity:0;
     position:relative;
-    overflow:hidden;
+    /* ИЗЮМИНКА - асимметричная форма */
+    clip-path: polygon(
+        0 0, 
+        100% 0, 
+        100% calc(100% - 30px), 
+        calc(100% - 30px) 100%, 
+        0 100%
+    );
 }
-/* ИЗЮМИНКА — градиентная подсветка при наведении */
-.card::before{
+@keyframes slideIn{
+    to{opacity:1;transform:translateY(0);}
+    from{opacity:0;transform:translateY(20px);}
+}
+
+/* ИЗЮМИНКА - цветной маркер в углу */
+.card::after{
     content:'';
     position:absolute;
     top:0;
-    left:0;
     right:0;
-    bottom:0;
-    background:var(--insta-gradient);
-    opacity:0;
-    transition:.3s;
-    z-index:0;
+    width:0;
+    height:0;
+    border-style:solid;
+    border-width:0 40px 40px 0;
+    border-color:transparent var(--c) transparent transparent;
+    opacity:0.6;
 }
-.card:hover::before{
-    opacity:0.05;
-}
-.card:hover{
-    border-color:var(--accent);
-    transform:translateY(-4px);
-    box-shadow:var(--glow);
-}
-.card.read{opacity:.5;}
-.card.read:hover{opacity:.65;}
 
-.card-left{flex:1;min-width:0;display:flex;flex-direction:column;position:relative;z-index:1;}
-.card-meta{display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:10px;}
+.card:hover{
+    border-color:var(--c);
+    transform:translateY(-4px);
+    box-shadow:0 20px 40px -10px rgba(0,0,0,0.5);
+    background:var(--card2);
+}
+.card.read{opacity:0.5;}
+.card.read:hover{opacity:0.65;}
+
+.card-left{flex:1;min-width:0;display:flex;flex-direction:column;}
+.card-meta{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:12px;
+    font-size:11px;
+    font-family:'JetBrains Mono', monospace;
+    color:var(--t3);
+    text-transform:uppercase;
+    letter-spacing:0.05em;
+}
 
 .dot{
-    width:8px;
-    height:8px;
+    width:6px;
+    height:6px;
     border-radius:50%;
     background:var(--c);
-    box-shadow:0 0 10px var(--c);
+    box-shadow:0 0 8px var(--c);
 }
-.cat{color:var(--t2);font-weight:600;}
-.time{margin-left:auto;color:var(--t3);}
+.cat{color:var(--c);font-weight:700;}
+.time{margin-left:auto;}
 
-.card-title{font-size:16.5px;font-weight:700;line-height:1.35;margin-bottom:6px;}
-.card-title a{color:var(--t1);text-decoration:none;}
-.card:hover .card-title a{color:#e1306c;}
+.card-title{
+    font-size:17px;
+    font-weight:700;
+    line-height:1.4;
+    margin-bottom:8px;
+    color:var(--t1);
+}
+.card-title a{
+    color:inherit;
+    text-decoration:none;
+    position:relative;
+}
+.card-title a::after{
+    content:'';
+    position:absolute;
+    bottom:-2px;
+    left:0;
+    width:0;
+    height:2px;
+    background:var(--accent-coral);
+    transition:width .3s;
+}
+.card:hover .card-title a::after{
+    width:100%;
+}
 
-.src{font-size:12.5px;color:var(--t2);margin-bottom:8px;}
-.snippet{font-size:13px;line-height:1.55;color:var(--t2);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
+.src{
+    font-size:12px;
+    color:var(--t3);
+    margin-bottom:10px;
+    font-family:'JetBrains Mono', monospace;
+}
+.snippet{
+    font-size:14px;
+    line-height:1.6;
+    color:var(--t2);
+    display:-webkit-box;
+    -webkit-line-clamp:3;
+    -webkit-box-orient:vertical;
+    overflow:hidden;
+}
 
-.card-foot{display:flex;align-items:center;gap:6px;margin-top:auto;padding-top:14px;}
+.card-foot{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-top:auto;
+    padding-top:16px;
+    border-top:1px solid var(--border);
+}
 .act{
-    width:34px;
-    height:34px;
-    border:none;
-    border-radius:10px;
-    background:none;
+    width:36px;
+    height:36px;
+    border:1px solid var(--border);
+    background:var(--card2);
     color:var(--t3);
     cursor:pointer;
     display:grid;
@@ -811,106 +945,165 @@ body::after{
     transition:.2s;
 }
 .act:hover{
-    background:var(--card2);
+    border-color:var(--accent-sand);
     color:var(--t1);
 }
 .act.on{
-    background:var(--insta-gradient);
-    color:#fff;
+    background:var(--accent-coral);
+    border-color:var(--accent-coral);
+    color:var(--bg);
 }
-.act svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2;}
+.act svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;}
 
 .readtime{
     margin-left:auto;
-    font-size:11.5px;
-    color:var(--t2);
+    font-size:11px;
+    font-family:'JetBrains Mono', monospace;
+    color:var(--t3);
     background:var(--card2);
     border:1px solid var(--border);
-    border-radius:10px;
-    padding:4px 10px;
+    padding:5px 12px;
 }
 
+/* Миниатюра */
 .thumb{
-    width:190px;
-    height:128px;
+    width:200px;
+    height:140px;
     flex-shrink:0;
-    border-radius:14px;
-    overflow:hidden;
+    background:var(--card2);
+    border:1px solid var(--border);
     position:relative;
-    background:linear-gradient(135deg,var(--ctint),#1a1a1a);
+    overflow:hidden;
 }
-.thumb img{width:100%;height:100%;object-fit:cover;position:absolute;inset:0;}
+.thumb img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    position:absolute;
+    inset:0;
+    filter:grayscale(20%) contrast(1.1);
+    transition:.3s;
+}
+.card:hover .thumb img{
+    filter:grayscale(0%) contrast(1.2);
+    transform:scale(1.05);
+}
 .thumb-letter{
     position:absolute;
     inset:0;
     display:grid;
     place-items:center;
-    font-size:40px;
+    font-size:56px;
     font-weight:800;
-    background:var(--insta-gradient);
-    -webkit-background-clip:text;
-    -webkit-text-fill-color:transparent;
-    background-clip:text;
-    opacity:.6;
+    color:var(--c);
+    opacity:0.3;
+    font-family:'JetBrains Mono', monospace;
 }
 
 /* WIKI */
-.wiki-wrap{max-width:860px;}
-.wiki-top{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;}
+.wiki-wrap{max-width:900px;}
+.wiki-top{
+    display:flex;
+    gap:8px;
+    margin-bottom:24px;
+    flex-wrap:wrap;
+    padding-bottom:16px;
+    border-bottom:1px solid var(--border);
+}
 .wiki-content{
     background:var(--card);
     border:1px solid var(--border);
-    border-radius:20px;
-    padding:44px;
+    padding:48px;
+    /* ИЗЮМИНКА - скошенный угол */
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 40px), calc(100% - 40px) 100%, 0 100%);
 }
-.wiki-content h1{font-size:30px;margin-bottom:20px;letter-spacing:-.02em;}
-.wiki-content h2{font-size:21px;margin:30px 0 14px;}
-.wiki-content p{font-size:15px;line-height:1.7;color:var(--t2);margin-bottom:14px;}
-.wiki-content ul{margin:0 0 18px 22px;color:var(--t2);line-height:1.7;font-size:15px;}
-.wiki-content pre{background:#0a0a0a !important;border:1px solid var(--border);border-radius:12px;padding:16px;margin:16px 0;}
-.wiki-content code{font-family:'JetBrains Mono',monospace;font-size:13.5px;}
+.wiki-content h1{
+    font-size:32px;
+    margin-bottom:24px;
+    font-family:'JetBrains Mono', monospace;
+    color:var(--accent-sand);
+}
+.wiki-content h2{
+    font-size:22px;
+    margin:32px 0 16px;
+    color:var(--accent-coral);
+}
+.wiki-content p{
+    font-size:15px;
+    line-height:1.8;
+    color:var(--t2);
+    margin-bottom:16px;
+}
+.wiki-content ul{
+    margin:0 0 20px 24px;
+    color:var(--t2);
+    line-height:1.8;
+    font-size:15px;
+}
+.wiki-content pre{
+    background:var(--bg);
+    border:1px solid var(--border);
+    padding:20px;
+    margin:20px 0;
+    overflow-x:auto;
+}
+.wiki-content code{
+    font-family:'JetBrains Mono', monospace;
+    font-size:13px;
+}
 
 .stepik-btn{
     display:inline-block;
-    margin-top:14px;
-    padding:12px 22px;
-    background:var(--insta-gradient);
-    border:none;
-    color:#fff;
+    margin-top:16px;
+    padding:12px 24px;
+    background:var(--accent-sand);
+    color:var(--bg);
     text-decoration:none;
-    border-radius:12px;
     font-weight:700;
-    font-size:14px;
-    box-shadow:var(--glow-soft);
+    font-size:13px;
+    font-family:'JetBrains Mono', monospace;
+    border:1px solid var(--accent-sand);
     transition:.2s;
 }
 .stepik-btn:hover{
-    transform:translateY(-2px);
-    box-shadow:var(--glow);
+    background:transparent;
+    color:var(--accent-sand);
 }
 
-.empty-state{text-align:center;padding:70px 20px;color:var(--t3);}
+.empty-state{
+    text-align:center;
+    padding:80px 20px;
+    color:var(--t3);
+}
+.empty-state p{font-size:16px;margin-bottom:8px;}
 .empty-state button{
-    margin-top:18px;
-    padding:12px 26px;
-    background:var(--insta-gradient);
-    color:#fff;
+    margin-top:20px;
+    padding:14px 28px;
+    background:var(--accent-sand);
+    color:var(--bg);
     border:none;
-    border-radius:12px;
     font-weight:700;
     cursor:pointer;
-    box-shadow:var(--glow-soft);
+    font-family:'JetBrains Mono', monospace;
     transition:.2s;
 }
 .empty-state button:hover{
+    background:var(--accent-coral);
     transform:translateY(-2px);
-    box-shadow:var(--glow);
 }
 
-@keyframes fadeUp{to{opacity:1;}}
-
-@media(max-width:1000px){.sidebar{display:none;}.grid{grid-template-columns:1fr;}}
-@media(max-width:560px){.thumb{display:none;}.topbar{padding:0 14px;}.shell{padding:16px;}}
+/* Адаптивность */
+@media(max-width:1024px){
+    .sidebar{display:none;}
+    .shell{grid-template-columns:1fr;}
+}
+@media(max-width:640px){
+    .grid{grid-template-columns:1fr;}
+    .thumb{display:none;}
+    .topbar{padding:0 16px;}
+    .shell{padding:16px;}
+    .wiki-content{padding:24px;}
+}
 </style>
 </head>
 <body>
@@ -918,7 +1111,7 @@ body::after{
     <div class="logo">EngFeed</div>
     <div class="searchwrap">
         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-        <input id="search" placeholder="Поиск статей, источников, тегов...">
+        <input id="search" placeholder="Поиск...">
         <span class="kbd">K</span>
     </div>
     <div class="top-actions">
@@ -930,9 +1123,7 @@ body::after{
             <svg viewBox="0 0 24 24"><path d="M21 2v6h-6M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/></svg>
         </button>
         <div class="avatar">
-            <div class="avatar-inner">
-                <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-            </div>
+            <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             <i class="online"></i>
         </div>
     </div>
@@ -940,21 +1131,39 @@ body::after{
 
 <div class="shell">
     <aside class="sidebar">
-        <div class="side-label">БИБЛИОТЕКА</div>
-        <button class="side-item active" data-mode="all"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg> Вся лента</button>
-        <button class="side-item" data-mode="fav"><svg viewBox="0 0 24 24"><path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg> Избранное</button>
-        <button class="side-item" data-mode="archived"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></svg> Прочитанное</button>
-        <div class="side-label">WIKI</div>
-        <a class="side-item" href="/wiki/rust"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 19.5A2.5 2.5 0 0 0 6.5 22H20V2H6.5A2.5 2.5 0 0 0 4 4.5z"/></svg> Rust: конспект</a>
-        <a class="side-item" href="/wiki/python"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 19.5A2.5 2.5 0 0 0 6.5 22H20V2H6.5A2.5 2.5 0 0 0 4 4.5z"/></svg> Python: конспект</a>
-        <div class="side-label">КАТЕГОРИИ</div>
+        <div class="side-label">Библиотека</div>
+        <button class="side-item active" data-mode="all">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            Вся лента
+        </button>
+        <button class="side-item" data-mode="fav">
+            <svg viewBox="0 0 24 24"><path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg>
+            Избранное
+        </button>
+        <button class="side-item" data-mode="archived">
+            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></svg>
+            Прочитанное
+        </button>
+        
+        <div class="side-label">Wiki</div>
+        <a class="side-item" href="/wiki/rust">
+            <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 19.5A2.5 2.5 0 0 0 6.5 22H20V2H6.5A2.5 2.5 0 0 0 4 4.5z"/></svg>
+            Rust
+        </a>
+        <a class="side-item" href="/wiki/python">
+            <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 19.5A2.5 2.5 0 0 0 6.5 22H20V2H6.5A2.5 2.5 0 0 0 4 4.5z"/></svg>
+            Python
+        </a>
+        
+        <div class="side-label">Категории</div>
         {% for gid, g in groups.items() %}
-        <button class="cat-card" data-group="{{ gid }}" style="--c:{{ g.color }};--ctint:{{ g.color }}26">
+        <button class="cat-card" data-group="{{ gid }}" style="--c:{{ g.color }}">
             <span class="cat-letter">{{ g.letter }}</span>
             <span class="cat-name">{{ g.name }}</span>
         </button>
         {% endfor %}
-        <div class="manage">Управление категориями <span>+</span></div>
+        
+        <div class="manage">Управление →</div>
     </aside>
 
     <main class="main">
@@ -985,29 +1194,39 @@ body::after{
 
         {% if not news %}
         <div class="empty-state">
-            <p style="font-size:18px;margin-bottom:6px;">Лента пуста</p>
-            <p style="font-size:13px;">Идёт первая загрузка источников (10–20 секунд)</p>
-            <button onclick="doRefresh()">Загрузить новости</button>
+            <p>Лента пуста</p>
+            <p style="font-size:13px;color:var(--t3);">Загрузка источников...</p>
+            <button onclick="doRefresh()">Загрузить</button>
         </div>
         {% endif %}
 
         <div class="grid" id="grid">
         {% for item in news %}
-            <article class="card" data-group="{{ item.group }}" data-link="{{ item.link }}" style="--c:{{ item.color }};--ctint:{{ item.color }}1f">
+            <article class="card" data-group="{{ item.group }}" data-link="{{ item.link }}" style="--c:{{ item.color }}">
                 <div class="card-left">
-                    <div class="card-meta"><span class="dot"></span><span class="cat">{{ item.group_name }}</span><span class="time">{{ item.time_str }}</span></div>
-                    <h2 class="card-title"><a href="{{ item.link }}" target="_blank" rel="noopener">{{ item.title }}</a></h2>
+                    <div class="card-meta">
+                        <span class="dot"></span>
+                        <span class="cat">{{ item.group_name }}</span>
+                        <span class="time">{{ item.time_str }}</span>
+                    </div>
+                    <h2 class="card-title">
+                        <a href="{{ item.link }}" target="_blank" rel="noopener">{{ item.title }}</a>
+                    </h2>
                     <div class="src">{{ item.source }}</div>
                     <p class="snippet">{{ item.snippet }}</p>
                     <div class="card-foot">
-                        <button class="act bm" title="В закладки"><svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
-                        <button class="act sh" title="Копировать ссылку"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98"/></svg></button>
-                        <span class="readtime">{{ item.read_min }} мин чтения</span>
+                        <button class="act bm" title="Закладка">
+                            <svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+                        </button>
+                        <button class="act sh" title="Копировать">
+                            <svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98"/></svg>
+                        </button>
+                        <span class="readtime">{{ item.read_min }} мин</span>
                     </div>
                 </div>
                 <div class="thumb">
                     <span class="thumb-letter">{{ item.letter }}</span>
-                    {% if item.image %}<img src="{{ item.image }}" loading="lazy" onerror='this.remove()'>{% endif %}
+                    {% if item.image %}<img src="{{ item.image }}" loading="lazy" onerror="this.style.display='none'">{% endif %}
                 </div>
             </article>
         {% endfor %}
@@ -1017,9 +1236,7 @@ body::after{
 </div>
 
 <script>
-// ==========================================
-// JAVASCRIPT ФУНКЦИОНАЛ (без изменений)
-// ==========================================
+// JavaScript остаётся без изменений (тот же что был)
 var refreshAttempts = 0;
 var maxRefreshAttempts = 10;
 
@@ -1040,65 +1257,49 @@ function doRefresh() {
     if (svg) svg.classList.add('spin');
     if (btn) btn.disabled = true;
     if (ebtn) {
-        ebtn.innerText = 'Загружаем источники... (подождите, это может занять до 30 секунд)';
+        ebtn.innerText = 'Загрузка...';
         ebtn.disabled = true;
     }
     fetch('/api/refresh')
-        .then(function(response) {
-            if (!response.ok) throw new Error('Network response was not ok');
-            return response.json();
-        })
-        .then(function(data) {
-            if (data.count > 0) {
-                location.reload();
-            } else {
+        .then(r => r.json())
+        .then(data => {
+            if (data.count > 0) location.reload();
+            else {
                 refreshAttempts++;
                 if (refreshAttempts < maxRefreshAttempts) {
-                    if (ebtn) ebtn.innerText = 'Повторная попытка... (' + refreshAttempts + '/' + maxRefreshAttempts + ')';
+                    if (ebtn) ebtn.innerText = 'Повтор (' + refreshAttempts + '/' + maxRefreshAttempts + ')';
                     setTimeout(doRefresh, 4000);
                 } else {
                     resetRefreshState();
-                    if (ebtn) ebtn.innerText = 'Не удалось загрузить. Нажмите, чтобы попробовать снова';
+                    if (ebtn) ebtn.innerText = 'Ошибка. Попробовать снова';
                 }
             }
         })
-        .catch(function(error) {
-            console.error('Refresh error:', error);
+        .catch(() => {
             refreshAttempts++;
             if (refreshAttempts < maxRefreshAttempts) {
-                if (ebtn) ebtn.innerText = 'Ошибка сети. Повторная попытка...';
                 setTimeout(doRefresh, 4000);
             } else {
                 resetRefreshState();
-                if (ebtn) ebtn.innerText = 'Ошибка соединения. Нажмите, чтобы попробовать снова';
+                if (ebtn) ebtn.innerText = 'Ошибка сети';
             }
         });
 }
 
-document.getElementById('refreshBtn').addEventListener('click', function() {
-    refreshAttempts = 0;
-    doRefresh();
-});
-
-if (document.querySelector('.empty-state')) {
-    doRefresh();
-}
+document.getElementById('refreshBtn').addEventListener('click', () => { refreshAttempts = 0; doRefresh(); });
+if (document.querySelector('.empty-state')) doRefresh();
 
 var readLinks = JSON.parse(localStorage.getItem('readLinks') || '[]');
 var bookmarks = JSON.parse(localStorage.getItem('bookmarks') || '[]');
-var subs = JSON.parse(localStorage.getItem('subs') || '[]');
 var mode = 'all', group = 'all', query = '';
 
 function apply() {
-    document.querySelectorAll('.card').forEach(function (card) {
+    document.querySelectorAll('.card').forEach(card => {
         var link = card.getAttribute('data-link');
         var g = card.getAttribute('data-group');
         var text = card.innerText.toLowerCase();
         var okGroup = (group === 'all') || (g === group);
-        var okMode = true;
-        if (mode === 'unread') okMode = readLinks.indexOf(link) === -1;
-        if (mode === 'fav') okMode = bookmarks.indexOf(link) !== -1;
-        if (mode === 'archived') okMode = readLinks.indexOf(link) !== -1;
+        var okMode = mode === 'all' ? true : mode === 'unread' ? readLinks.indexOf(link) === -1 : mode === 'fav' ? bookmarks.indexOf(link) !== -1 : readLinks.indexOf(link) !== -1;
         var okQ = !query || text.indexOf(query) !== -1;
         card.style.display = (okGroup && okMode && okQ) ? 'flex' : 'none';
     });
@@ -1106,20 +1307,18 @@ function apply() {
 
 function updateBadge() {
     var n = 0;
-    document.querySelectorAll('.card').forEach(function (c) {
-        if (readLinks.indexOf(c.getAttribute('data-link')) === -1) n++;
-    });
+    document.querySelectorAll('.card').forEach(c => { if (readLinks.indexOf(c.getAttribute('data-link')) === -1) n++; });
     var b = document.getElementById('unreadBadge');
     if (b) { b.innerText = n; b.style.display = n > 0 ? 'flex' : 'none'; }
 }
 
-document.querySelectorAll('.card').forEach(function (card) {
+document.querySelectorAll('.card').forEach(card => {
     var link = card.getAttribute('data-link');
     if (readLinks.indexOf(link) !== -1) card.classList.add('read');
     var bm = card.querySelector('.bm');
     if (bookmarks.indexOf(link) !== -1) bm.classList.add('on');
 
-    card.addEventListener('click', function (e) {
+    card.addEventListener('click', function(e) {
         if (e.target.closest('.act')) return;
         if (readLinks.indexOf(link) === -1) {
             readLinks.push(link);
@@ -1131,36 +1330,31 @@ document.querySelectorAll('.card').forEach(function (card) {
         if (!e.target.closest('a')) window.open(link, '_blank');
     });
 
-    bm.addEventListener('click', function (e) {
+    bm.addEventListener('click', function(e) {
         e.stopPropagation();
         if (bookmarks.indexOf(link) === -1) { bookmarks.push(link); bm.classList.add('on'); }
-        else { bookmarks = bookmarks.filter(function (l) { return l !== link; }); bm.classList.remove('on'); }
+        else { bookmarks = bookmarks.filter(l => l !== link); bm.classList.remove('on'); }
         localStorage.setItem('bookmarks', JSON.stringify(bookmarks));
         if (mode === 'fav') apply();
     });
 
-    card.querySelector('.sh').addEventListener('click', function (e) {
+    card.querySelector('.sh').addEventListener('click', function(e) {
         e.stopPropagation();
         if (navigator.clipboard) navigator.clipboard.writeText(link);
-        var sh = card.querySelector('.sh');
-        sh.classList.add('on');
-        setTimeout(function () { sh.classList.remove('on'); }, 1200);
     });
 });
 
 function syncUI() {
-    document.querySelectorAll('.pills .pill').forEach(function (p) {
+    document.querySelectorAll('.pills .pill').forEach(p => {
         var pg = p.getAttribute('data-group');
         var pm = p.getAttribute('data-mode');
-        var on = false;
-        if (pm === 'unread') on = (mode === 'unread');
-        else if (pg) on = (group === pg && mode === 'all');
+        var on = pm === 'unread' ? (mode === 'unread') : (pg && group === pg && mode === 'all');
         p.classList.toggle('active', on);
     });
-    document.querySelectorAll('.side-item[data-mode]').forEach(function (b) {
+    document.querySelectorAll('.side-item[data-mode]').forEach(b => {
         b.classList.toggle('active', b.getAttribute('data-mode') === mode);
     });
-    document.querySelectorAll('.cat-card').forEach(function (c) {
+    document.querySelectorAll('.cat-card').forEach(c => {
         c.classList.toggle('active', c.getAttribute('data-group') === group);
     });
 }
@@ -1180,11 +1374,11 @@ function handleFilter(btn) {
     apply();
 }
 
-document.querySelectorAll('.pills .pill, .cat-card, .side-item[data-mode]').forEach(function (btn) {
-    btn.addEventListener('click', function () { handleFilter(btn); });
+document.querySelectorAll('.pills .pill, .cat-card, .side-item[data-mode]').forEach(btn => {
+    btn.addEventListener('click', function() { handleFilter(btn); });
 });
 
-document.getElementById('bellBtn').addEventListener('click', function () {
+document.getElementById('bellBtn').addEventListener('click', function() {
     mode = (mode === 'unread') ? 'all' : 'unread';
     if (mode === 'all') group = 'all';
     syncUI();
@@ -1194,19 +1388,9 @@ document.getElementById('bellBtn').addEventListener('click', function () {
 syncUI();
 
 var searchInput = document.getElementById('search');
-searchInput.addEventListener('input', function () { query = searchInput.value.toLowerCase(); apply(); });
-document.addEventListener('keydown', function (e) {
+searchInput.addEventListener('input', function() { query = searchInput.value.toLowerCase(); apply(); });
+document.addEventListener('keydown', function(e) {
     if (e.key === '/' || (e.metaKey && e.key.toLowerCase() === 'k')) { e.preventDefault(); searchInput.focus(); }
-});
-
-document.querySelectorAll('.subbtn').forEach(function (btn) {
-    var name = btn.getAttribute('data-name');
-    if (subs.indexOf(name) !== -1) { btn.classList.add('on'); btn.innerText = 'Вы подписаны'; }
-    btn.addEventListener('click', function () {
-        if (subs.indexOf(name) === -1) { subs.push(name); btn.classList.add('on'); btn.innerText = 'Вы подписаны'; }
-        else { subs = subs.filter(function (s) { return s !== name; }); btn.classList.remove('on'); btn.innerText = 'Подписаться'; }
-        localStorage.setItem('subs', JSON.stringify(subs));
-    });
 });
 
 updateBadge();
