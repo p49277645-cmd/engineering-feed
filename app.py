@@ -619,12 +619,64 @@ body::after{
     position:sticky;
     top:100px;
     height:fit-content;
-    /* ИЗЮМИНКА - асимметричная панель */
+    /* ИЗЮМИНКА - ограничение высоты + скролл */
+    max-height: calc(100vh - 140px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    
     background:var(--panel);
     border:1px solid var(--border);
     padding:24px;
-    /* Диагональный срез снизу */
-    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 20px), calc(100% - 20px) 100%, 0 100%);
+    /* Убрали clip-path — он мешал скроллу */
+    border-radius: 4px;
+    
+    /* Плавное затухание сверху/снизу — индикатор скролла */
+    mask-image: linear-gradient(
+        to bottom,
+        transparent 0px,
+        black 20px,
+        black calc(100% - 20px),
+        transparent 100%
+    );
+    -webkit-mask-image: linear-gradient(
+        to bottom,
+        transparent 0px,
+        black 20px,
+        black calc(100% - 20px),
+        transparent 100%
+    );
+}
+
+/* ===== КРАСИВЫЙ ИНЖЕНЕРНЫЙ ПОЛЗУНОК ===== */
+.sidebar::-webkit-scrollbar{
+    width: 6px;
+}
+
+.sidebar::-webkit-scrollbar-track{
+    background: transparent;
+    margin: 10px 0;
+}
+
+.sidebar::-webkit-scrollbar-thumb{
+    background: var(--accent-sand);
+    border-radius: 0;  /* Острые углы в стиле сайта */
+    border: 1px solid var(--panel);
+    min-height: 40px;  /* Минимальная длина ползунка */
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover{
+    background: var(--accent-coral);
+    border-color: var(--accent-coral);
+}
+
+.sidebar::-webkit-scrollbar-thumb:active{
+    background: var(--accent-rust);
+}
+
+/* Для Firefox */
+.sidebar{
+    scrollbar-width: thin;
+    scrollbar-color: var(--accent-sand) transparent;
 }
 
 .side-label{
