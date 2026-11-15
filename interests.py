@@ -244,6 +244,7 @@ INTERESTS_FRAGMENT = """
     <div class="int-chips" id="intChips"></div>
     <div class="int-count" id="intCount"></div>
     <button class="int-save" id="intSave">Сохранить интересы</button>
+    <button class="int-save" id="intClear" style="margin-top:8px;background:var(--card2);color:var(--t3);">Очистить всё</button>
   </div>
 </div>
 <script>
@@ -296,6 +297,9 @@ INTERESTS_FRAGMENT = """
     })
     .catch(function(){document.getElementById('intTops').innerHTML='';err('Ошибка сети');});
   });
+  document.getElementById('intClear').addEventListener('click',function(){
+    state.interests=[];renderChips();err('');
+  });
   document.getElementById('intSave').addEventListener('click',function(){
     var pins=state.interests.filter(function(i){return i.pinned;});
     if(pins.length>state.limits.pin_max){err('Закрепить можно максимум 3');return;}
@@ -307,8 +311,8 @@ INTERESTS_FRAGMENT = """
   });
   load(function(){
     renderPins();
-    if(!state.is_user&&state.interests.length===0&&!localStorage.getItem('intSeen')){
-      localStorage.setItem('intSeen','1');
+    if(!state.is_user&&state.interests.length===0&&!sessionStorage.getItem('intSeen')){
+      sessionStorage.setItem('intSeen','1');
       setTimeout(function(){renderChips();ov.classList.add('open');},1200);
     }
   });
