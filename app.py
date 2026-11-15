@@ -15,6 +15,7 @@ import feedparser
 import requests
 from bs4 import BeautifulSoup
 from flask import Flask, render_template_string, jsonify, request
+from auth import auth_bp, init_auth, AUTH_FRAGMENT
 
 logger = logging.getLogger("engfeed")
 handler = logging.StreamHandler(sys.stdout)
@@ -261,6 +262,8 @@ def fetch_all_data():
 @contextmanager
 def get_db():
     conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=5000")
     conn.row_factory = sqlite3.Row
     try:
         yield conn
@@ -315,6 +318,8 @@ def normalize(rows):
     return rows
 
 app = Flask(__name__)
+init_auth(app)
+app.register_blueprint(auth_bp)
 
 @app.route('/')
 def index():
@@ -661,7 +666,8 @@ body::after{bottom:20px;right:20px;border-left:none;border-top:none;}
         <button class="iconbtn" id="refreshBtn" title="Обновить">
             <svg viewBox="0 0 24 24"><path d="M21 2v6h-6M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/></svg>
         </button>
-        <div class="avatar">
+        <span class="avatar-nick" id="avatarNick"></span>
+        <div class="avatar" id="avatarBtn" style="cursor:pointer" title="Аккаунт">
             <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             <i class="online"></i>
         </div>
@@ -1008,9 +1014,11 @@ document.querySelectorAll('.mobile-cat').forEach(function(btn) {
     });
 });
 </script>
+<!--AUTH-->
 </body>
 </html>
 """
+HTML_TEMPLATE = HTML_TEMPLATE.replace("<!--AUTH-->", AUTH_FRAGMENT)
 
 init_db()
 
