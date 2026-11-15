@@ -26,32 +26,20 @@ def db():
     finally:
         conn.close()
 
-def init_auth(app):
-    # SECRET_KEY: env или локальный файл (одинаковый для всех воркеров gunicorn!)
+def _get_secret():
     key = os.environ.get("SECRET_KEY")
-    if not key:
-        p = os.path.join(os.path.dirname(__file__), ".secret_key")
-        if not os.path.exists(p):
-            with open(p, "w") as f:
-                f.write(secrets.token_hex(32))
-        key = open(p).read().strip()
-    app.config.update(
-        SECRET_KEY=key,
-        SESSION_COOKIE_HTTPONLY=True,
-        SESSION_COOKIE_SAMESITE="Lax",
-        SESSION_COOKIE_SECURE=os.environ.get("COOKIE_SECURE", "0") == "1",
-        PERMANENT_SESSION_LIFETIME=7 * 86400,
-    )
-    with db() as c:
-        c.execute("PRAGMA journal_mode=WAL")
-        c.executescript("""
-        CREATE TABLE IF NOT EXISTS users(
-            id INTEGER PRIMARY KEY, nick TEXT, nick_key TEXT UNIQUE,
-            pass_hash TEXT, created_at REAL, failed INTEGER DEFAULT 0,
-            locked_until REAL DEFAULT 0, role TEXT DEFAULT 'user');
-        CREATE TABLE IF NOT EXISTS attempts(key TEXT, ts REAL);
-        CREATE INDEX IF NOT EXISTS idx_attempts ON attempts(key, ts);
-        """)
+    if key:
+        return key
+    p = os.path.join(os.path.dirname(__file__), ".secret_key")
+    try:
+        if os.path.exists(p):
+            return open(p).read().strip()
+        key = secrets.token_hex(32)
+        with open(p, "w") as f:
+            f.write(key)
+        return key
+    except OSError:
+        return secrets.token_hex(32)   # read-only диск: ключ живёт в RAM
 
 def _client_ip():
     return request.headers.get("X-Forwarded-For", request.remote_addr or "?").split(",")[0].strip()
