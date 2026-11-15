@@ -296,6 +296,8 @@ AUTH_FRAGMENT = """
   function render(data){
     me=data&&data.nick?data.nick:null;
     document.getElementById('avatarNick').innerText=me||'';
+    var ob=document.getElementById('onboardingBanner');
+    if(ob){ob.style.display=me?'none':'block';}
     if(me){
       viewAuth.style.display='none';
       viewSettings.classList.add('active');
