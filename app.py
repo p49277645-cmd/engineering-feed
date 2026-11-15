@@ -664,7 +664,7 @@ body::after{bottom:20px;right:20px;border-left:none;border-top:none;}
     <div class="logo">EngFeed</div>
     <div class="searchwrap">
         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-        <input id="search" placeholder="Поиск...">
+        <input id="search" placeholder="Поиск..." autocomplete="off">
         <span class="kbd">K</span>
     </div>
     <div class="top-actions">
@@ -723,9 +723,9 @@ body::after{bottom:20px;right:20px;border-left:none;border-top:none;}
         <div class="side-label">Мои интересы</div>
         <div id="pinsBox"></div>
         <button class="side-item" onclick="openInterests()">＋ Выбрать интересы</button>
-        <div class="side-label">Категории</div>
-        {% for gid, g in groups.items() %}
-        <button class="side-item cat-mobile-item" data-group="{{ gid }}" style="--c:{{ g.color }}">
+        <div class="side-label">Мои интересы</div>
+        <div id="pinsBox"></div>
+        <button class="side-item" onclick="openInterests()">＋ Выбрать интересы</button>
             <span style="width:24px;height:24px;display:grid;place-items:center;background:var(--card2);border:1px solid var(--border);font-weight:700;color:var(--c);font-family:'JetBrains Mono',monospace;font-size:12px;">{{ g.letter }}</span>
             {{ g.name }}
         </button>
