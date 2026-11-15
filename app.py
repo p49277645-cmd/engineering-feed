@@ -723,13 +723,14 @@ body::after{bottom:20px;right:20px;border-left:none;border-top:none;}
         <div class="side-label">Мои интересы</div>
         <div id="pinsBox"></div>
         <button class="side-item" onclick="openInterests()">＋ Выбрать интересы</button>
-        <div class="side-label">Мои интересы</div>
-        <div id="pinsBox"></div>
-        <button class="side-item" onclick="openInterests()">＋ Выбрать интересы</button>
-            <span style="width:24px;height:24px;display:grid;place-items:center;background:var(--card2);border:1px solid var(--border);font-weight:700;color:var(--c);font-family:'JetBrains Mono',monospace;font-size:12px;">{{ g.letter }}</span>
-            {{ g.name }}
+        <div class="side-label">Категории</div>
+        {% for gid, g in groups.items() %}
+        <button class="cat-card" data-group="{{ gid }}" style="--c:{{ g.color }}">
+            <span class="cat-letter">{{ g.letter }}</span>
+            <span class="cat-name">{{ g.name }}</span>
         </button>
         {% endfor %}
+        <div class="manage">Управление →</div>
     </div>
 </div>
     <aside class="sidebar">
