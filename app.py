@@ -699,44 +699,6 @@ body::after{bottom:20px;right:20px;border-left:none;border-top:none;}
     <div class="sidebar-mobile">
         <button class="close-btn" id="closeSidebar">✕</button>
         <div class="side-label">Библиотека</div>
-        <button class="side-item" data-mode="all">
-            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-            Вся лента
-        </button>
-        <button class="side-item" data-mode="fav">
-            <svg viewBox="0 0 24 24"><path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg>
-            Избранное
-        </button>
-        <button class="side-item" data-mode="archived">
-            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></svg>
-            Прочитанное
-        </button>
-        <div class="side-label">Wiki</div>
-        <a class="side-item" href="/wiki/rust">
-            <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 19.5A2.5 2.5 0 0 0 6.5 22H20V2H6.5A2.5 2.5 0 0 0 4 4.5z"/></svg>
-            Rust
-        </a>
-        <a class="side-item" href="/wiki/python">
-            <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 19.5A2.5 2.5 0 0 0 6.5 22H20V2H6.5A2.5 2.5 0 0 0 4 4.5z"/></svg>
-            Python
-        </a>
-        <div class="side-label">Мои интересы</div>
-        <div id="pinsBox"></div>
-        <button class="side-item" onclick="openInterests()">＋ Выбрать интересы</button>
-        {% if session.get('nick') %}
-        <div class="side-label">Категории</div>
-        {% for gid, g in groups.items() %}
-        <button class="cat-card" data-group="{{ gid }}" style="--c:{{ g.color }}">
-            <span class="cat-letter">{{ g.letter }}</span>
-            <span class="cat-name">{{ g.name }}</span>
-        </button>
-        {% endfor %}
-        {% endif %}
-        <div class="manage">Управление →</div>
-    </div>
-</div>
-    <aside class="sidebar">
-        <div class="side-label">Библиотека</div>
         <button class="side-item active" data-mode="all">
             <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
             Вся лента
@@ -749,17 +711,29 @@ body::after{bottom:20px;right:20px;border-left:none;border-top:none;}
             <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></svg>
             Прочитанное
         </button>
-        {% if session.get('nick') %}
-        <div class="side-label">Wiki</div>
-        <a class="side-item" href="/wiki/rust">
-            <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 19.5A2.5 2.5 0 0 0 6.5 22H20V2H6.5A2.5 2.5 0 0 0 4 4.5z"/></svg>
-            Rust
-        </a>
-        <a class="side-item" href="/wiki/python">
-            <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 19.5A2.5 2.5 0 0 0 6.5 22H20V2H6.5A2.5 2.5 0 0 0 4 4.5z"/></svg>
-            Python
-        </a>
-        {% endif %}
+        <div class="side-label">Мои интересы</div>
+        <div id="pinsBox"></div>
+        <button class="side-item" onclick="openInterests()">＋ Выбрать интересы</button>
+        <div class="manage">Управление →</div>
+    </div>
+</div>
+    <aside class="sidebar">
+        <div class="side-label">Библиотека</div>
+        <button class="side-item" data-mode="all">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            Вся лента
+        </button>
+        <button class="side-item" data-mode="fav">
+            <svg viewBox="0 0 24 24"><path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg>
+            Избранное
+        </button>
+        <button class="side-item" data-mode="archived">
+            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></svg>
+            Прочитанное
+        </button>
+        <div class="side-label">Мои интересы</div>
+        <div id="pinsBox"></div>
+        <button class="side-item" onclick="openInterests()">＋ Выбрать интересы</button>
         <div class="side-label">Категории</div>
         {% for gid, g in groups.items() %}
         <button class="cat-card" data-group="{{ gid }}" style="--c:{{ g.color }}">
