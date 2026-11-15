@@ -685,21 +685,14 @@ body::after{bottom:20px;right:20px;border-left:none;border-top:none;}
         </div>
     </div>
 </header>
-<!-- Вставь это в HTML_TEMPLATE после </header> -->
+
 <div id="onboardingBanner" style="display:none; background: linear-gradient(90deg, var(--card) 0%, var(--panel) 100%); border-bottom: 1px solid var(--accent-sand); padding: 12px 32px; text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--t2); animation: slideDown 0.5s ease;">
     <span style="color:var(--accent-sand)">👋 Привет, инженер!</span> 
     Зарегистрируйся, чтобы сохранять закладки и историю чтения на любом устройстве. 
     <button onclick="document.getElementById('avatarBtn').click()" style="margin-left:12px; background:var(--accent-sand); border:none; color:var(--bg); padding:4px 12px; font-weight:bold; cursor:pointer; font-family:inherit;">Создать аккаунт</button>
 </div>
 
-<script>
-// Добавь этот скрипт в конец основного JS в app.py (или внутрь AUTH_FRAGMENT)
-setTimeout(() => {
-    if (!document.getElementById('avatarNick').innerText) {
-        document.getElementById('onboardingBanner').style.display = 'block';
-    }
-}, 1000);
-</script>
+
 
 <div class="shell">
 <div class="sidebar-overlay" id="sidebarOverlay">
