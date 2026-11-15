@@ -16,7 +16,7 @@ import requests
 from bs4 import BeautifulSoup
 from flask import Flask, render_template_string, jsonify, request
 from auth import auth_bp, init_auth, AUTH_FRAGMENT
-from interests import bp as interests_bp, init_interests
+from interests import bp as interests_bp, init_interests, INTERESTS_FRAGMENT, interest_source_items, current_slugs
 
 
 logger = logging.getLogger("engfeed")
@@ -230,7 +230,7 @@ def fetch_all_data():
     all_items = []
     pairs = []
     with ThreadPoolExecutor(max_workers=24) as executor:
-        for s in SOURCES:
+        for s in SOURCES + interest_source_items():
             fn = parse_rss if s["type"] == "rss" else scrape_html
             pairs.append((executor.submit(fn, s), s["source"]))
         for fut, name in pairs:
@@ -256,6 +256,7 @@ def fetch_all_data():
             "group": g, "group_name": meta["name"], "color": meta["color"], "letter": meta["letter"],
             "time_str": rel_time(ts), "read_min": read_minutes(it["title"]),
             "category": it["category"], "pub_time": ts, "day": "",
+            "interest": it.get("interest", ""),
         })
     enriched.sort(key=lambda x: x["pub_time"], reverse=True)
     logger.info(f"Итого: {len(enriched)} записей")
@@ -293,11 +294,11 @@ def save_to_db(items):
         for it in items:
             conn.execute("""
                 INSERT OR REPLACE INTO posts
-                (link, title, source, snippet, color, letter, day, time_str, category, fetched_at, image, read_min, "group")
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (link, title, source, snippet, color, letter, day, time_str, category, fetched_at, image, read_min, "group", interest)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (it["link"], it["title"], it["source"], it["snippet"], it["color"], it["letter"],
                   it["day"], it["time_str"], it["category"], time.time(),
-                  it.get("image", ""), it.get("read_min", 5), it.get("group", "physics")))
+                  it.get("image", ""), it.get("read_min", 5), it.get("group", "physics"), it.get("interest", "")))
 
 def load_from_db(limit=200):
     with get_db() as conn:
@@ -328,6 +329,12 @@ app.register_blueprint(interests_bp)
 @app.route('/')
 def index():
     news = normalize(load_from_db())
+    only = request.args.get("int", "")
+    slugs = current_slugs()
+    if only:
+        news = [n for n in news if n.get("interest") == only]
+    elif slugs:
+        news = [n for n in news if not n.get("interest") or n["interest"] in slugs]
     return render_template_string(HTML_TEMPLATE, news=news, groups=GROUP_META, active_tab='feed')
 
 @app.route('/wiki/rust')
@@ -719,6 +726,9 @@ setTimeout(() => {
             <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 19.5A2.5 2.5 0 0 0 6.5 22H20V2H6.5A2.5 2.5 0 0 0 4 4.5z"/></svg>
             Python
         </a>
+        <div class="side-label">Мои интересы</div>
+        <div id="pinsBox"></div>
+        <button class="side-item" onclick="openInterests()">＋ Выбрать интересы</button>
         <div class="side-label">Категории</div>
         {% for gid, g in groups.items() %}
         <button class="side-item cat-mobile-item" data-group="{{ gid }}" style="--c:{{ g.color }}">
@@ -1034,10 +1044,12 @@ document.querySelectorAll('.mobile-cat').forEach(function(btn) {
 });
 </script>
 <!--AUTH-->
+<!--INTERESTS-->
 </body>
 </html>
 """
 HTML_TEMPLATE = HTML_TEMPLATE.replace("<!--AUTH-->", AUTH_FRAGMENT)
+HTML_TEMPLATE = HTML_TEMPLATE.replace("<!--INTERESTS-->", INTERESTS_FRAGMENT)
 
 init_db()
 
