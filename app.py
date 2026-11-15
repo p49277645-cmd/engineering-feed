@@ -723,6 +723,7 @@ body::after{bottom:20px;right:20px;border-left:none;border-top:none;}
         <div class="side-label">Мои интересы</div>
         <div id="pinsBox"></div>
         <button class="side-item" onclick="openInterests()">＋ Выбрать интересы</button>
+        {% if session.get('nick') %}
         <div class="side-label">Категории</div>
         {% for gid, g in groups.items() %}
         <button class="cat-card" data-group="{{ gid }}" style="--c:{{ g.color }}">
@@ -730,6 +731,7 @@ body::after{bottom:20px;right:20px;border-left:none;border-top:none;}
             <span class="cat-name">{{ g.name }}</span>
         </button>
         {% endfor %}
+        {% endif %}
         <div class="manage">Управление →</div>
     </div>
 </div>
@@ -747,6 +749,7 @@ body::after{bottom:20px;right:20px;border-left:none;border-top:none;}
             <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></svg>
             Прочитанное
         </button>
+        {% if session.get('nick') %}
         <div class="side-label">Wiki</div>
         <a class="side-item" href="/wiki/rust">
             <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 19.5A2.5 2.5 0 0 0 6.5 22H20V2H6.5A2.5 2.5 0 0 0 4 4.5z"/></svg>
@@ -756,6 +759,7 @@ body::after{bottom:20px;right:20px;border-left:none;border-top:none;}
             <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 19.5A2.5 2.5 0 0 0 6.5 22H20V2H6.5A2.5 2.5 0 0 0 4 4.5z"/></svg>
             Python
         </a>
+        {% endif %}
         <div class="side-label">Категории</div>
         {% for gid, g in groups.items() %}
         <button class="cat-card" data-group="{{ gid }}" style="--c:{{ g.color }}">
