@@ -75,8 +75,18 @@ def me():
     if "csrf" not in session:
         session["csrf"] = secrets.token_urlsafe(24)
     session.permanent = True
-    return jsonify({"nick": session.get("nick"), "csrf": session["csrf"]})
-
+    
+    data = {"nick": session.get("nick"), "csrf": session["csrf"]}
+    
+    # Если пользователь залогинен, догружаем его данные из БД
+    if session.get("nick"):
+        with db() as c:
+            u = c.execute("SELECT id, created_at FROM users WHERE nick=?", (session["nick"],)).fetchone()
+            if u:
+                data["id"] = u["id"]
+                data["created_at"] = u[" "created_at"]
+                
+    return jsonify(data)
 @auth_bp.post("/api/register")
 def register():
     if not csrf_ok():
@@ -148,6 +158,30 @@ def login():
 def logout():
     session.clear()
     return jsonify({"ok": True})
+@auth_bp.post("/api/settings")
+def settings():
+    if not csrf_ok() or "nick" not in session:
+        return jsonify({"error": "unauthorized"}), 401
+    
+    d = request.get_json(silent=True) or {}
+    action = d.get("action")
+    
+    with db() as c:
+        u = c.execute("SELECT * FROM users WHERE nick=?", (session["nick"],)).fetchone()
+        if not u: return jsonify({"error": "not_found"}), 404
+        
+        if action == "change_pass":
+            pw = d.get("password", "")
+            if len(pw) < 10: return jsonify({"error": "pw_short"}), 400
+            c.execute("UPDATE users SET pass_hash=? WHERE id=?", (ph.hash(pw), u["id"]))
+            return jsonify({"ok": True})
+            
+        elif action == "delete":
+            c.execute("DELETE FROM users WHERE id=?", (u["id"],))
+            session.clear()
+            return jsonify({"ok": True})
+            
+    return jsonify({"error": "unknown_action"}), 400
 # Вставь это в конец auth.py вместо старого AUTH_FRAGMENT
 
 AUTH_FRAGMENT = """
