@@ -148,11 +148,14 @@ def login():
 def logout():
     session.clear()
     return jsonify({"ok": True})
+# Вставь это в конец auth.py вместо старого AUTH_FRAGMENT
+
 AUTH_FRAGMENT = """
 <style>
-.auth-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(6px);z-index:200;align-items:center;justify-content:center;}
+/* ... (все старые стили остаются) ... */
+.auth-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(8px);z-index:200;align-items:center;justify-content:center;}
 .auth-overlay.open{display:flex;}
-.auth-box{width:100%;max-width:420px;background:var(--panel);border:1px solid var(--border);border-top:3px solid var(--accent-sand);padding:32px;clip-path:polygon(0 0,100% 0,100% calc(100% - 24px),calc(100% - 24px) 100%,0 100%);}
+.auth-box{width:100%;max-width:440px;background:var(--panel);border:1px solid var(--border);padding:32px;clip-path:polygon(0 0,100% 0,100% calc(100% - 24px),calc(100% - 24px) 100%,0 100%);position:relative;}
 .auth-box h2{font-family:'JetBrains Mono',monospace;font-size:20px;margin-bottom:20px;color:var(--accent-sand);}
 .auth-box h2::before{content:'// ';color:var(--accent-coral);}
 .auth-tabs{display:flex;gap:8px;margin-bottom:20px;}
@@ -166,45 +169,81 @@ AUTH_FRAGMENT = """
 .auth-err{display:none;background:rgba(224,122,95,.12);border:1px solid var(--accent-coral);color:var(--accent-coral);padding:10px;font-size:12px;font-family:'JetBrains Mono',monospace;margin-bottom:14px;}
 .auth-submit{width:100%;height:44px;background:var(--accent-sand);border:none;color:var(--bg);font-weight:800;font-family:'JetBrains Mono',monospace;font-size:13px;cursor:pointer;}
 .auth-submit:hover{background:var(--accent-coral);}
-.auth-submit:disabled{opacity:.5;cursor:wait;}
 .auth-close{position:absolute;top:12px;right:12px;width:30px;height:30px;border:1px solid var(--border);background:var(--card);color:var(--t2);cursor:pointer;}
 .avatar-nick{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--accent-sand);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+/* Стили для настроек */
+.settings-view{display:none;}
+.settings-view.active{display:block;}
+.info-row{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border);font-size:13px;color:var(--t2);}
+.info-row span:last-child{color:var(--t1);font-family:'JetBrains Mono',monospace;}
+.danger-zone{margin-top:24px;padding-top:16px;border-top:1px dashed var(--accent-coral);}
+.btn-danger{width:100%;height:36px;background:transparent;border:1px solid var(--accent-coral);color:var(--accent-coral);font-family:'JetBrains Mono',monospace;font-size:12px;cursor:pointer;margin-top:8px;}
+.btn-danger:hover{background:var(--accent-coral);color:var(--bg);}
 </style>
+
 <div class="auth-overlay" id="authOverlay">
-  <div class="auth-box" style="position:relative">
+  <div class="auth-box">
     <button class="auth-close" id="authClose">✕</button>
-    <h2 id="authTitle">Вход</h2>
-    <div class="auth-tabs">
-      <button class="auth-tab active" id="tabLogin">Вход</button>
-      <button class="auth-tab" id="tabReg">Регистрация</button>
+    
+    <!-- Вид входа/регистрации -->
+    <div id="viewAuth">
+        <h2 id="authTitle">Вход</h2>
+        <div class="auth-tabs">
+          <button class="auth-tab active" id="tabLogin">Вход</button>
+          <button class="auth-tab" id="tabReg">Регистрация</button>
+        </div>
+        <div class="auth-err" id="authErr"></div>
+        <form id="authForm">
+          <div class="auth-field"><label>Никнейм</label>
+            <input id="authNickInput" maxlength="24" autocomplete="username" placeholder="fox_лис">
+            <div class="auth-hint">3–24 символа, RU/EN, цифры, _ - .</div></div>
+          <div class="auth-field"><label>Пароль</label>
+            <input id="authPw" type="password" maxlength="128" autocomplete="current-password">
+            <div class="auth-hint" id="pwHint">минимум 10 символов</div></div>
+          <div class="auth-field" id="authPw2Wrap" style="display:none"><label>Повтори пароль</label>
+            <input id="authPw2" type="password" maxlength="128" autocomplete="new-password"></div>
+          <button class="auth-submit" id="authSubmit" type="submit">Войти</button>
+        </form>
     </div>
-    <div class="auth-err" id="authErr"></div>
-    <div id="authLogged" style="display:none">
-      <p style="color:var(--t2);font-size:14px;margin-bottom:16px">Привет, <b id="authNick" style="color:var(--accent-sand)"></b></p>
-      <button class="auth-submit" id="authLogout">Выйти</button>
+
+    <!-- Вид настроек профиля -->
+    <div id="viewSettings" class="settings-view">
+        <h2>Настройки</h2>
+        <div class="info-row"><span>Никнейм</span><span id="settNick">...</span></div>
+        <div class="info-row"><span>ID пользователя</span><span id="settId">...</span></div>
+        <div class="info-row"><span>Дата регистрации</span><span id="settDate">...</span></div>
+        
+        <div class="auth-field" style="margin-top:20px;"><label>Новый пароль</label>
+            <input id="newPw" type="password" placeholder="Оставьте пустым, если не меняете">
+        </div>
+        <button class="auth-submit" id="saveSettingsBtn" style="height:36px;font-size:12px;">Сохранить изменения</button>
+
+        <div class="danger-zone">
+            <div class="auth-hint" style="color:var(--accent-coral);margin-bottom:8px;">Опасная зона</div>
+            <button class="btn-danger" id="deleteAccountBtn">Удалить аккаунт</button>
+        </div>
+        <button class="auth-submit" id="logoutBtn" style="margin-top:16px;background:var(--card2);color:var(--t2);">Выйти из аккаунта</button>
     </div>
-    <form id="authForm">
-      <div class="auth-field"><label>Никнейм</label>
-        <input id="authNickInput" maxlength="24" autocomplete="username" placeholder="fox_лис">
-        <div class="auth-hint">3–24 символа, RU/EN, цифры, _ - .</div></div>
-      <div class="auth-field"><label>Пароль</label>
-        <input id="authPw" type="password" maxlength="128" autocomplete="current-password">
-        <div class="auth-hint" id="pwHint">минимум 10 символов</div></div>
-      <div class="auth-field" id="authPw2Wrap" style="display:none"><label>Повтори пароль</label>
-        <input id="authPw2" type="password" maxlength="128" autocomplete="new-password"></div>
-      <button class="auth-submit" id="authSubmit" type="submit">Войти</button>
-    </form>
   </div>
 </div>
+
 <script>
 (function(){
   var csrf=null, me=null, mode='login';
   var ov=document.getElementById('authOverlay');
-  var ERR={nick_length:'Ник: 3–24 символа',nick_chars:'Ник: только буквы RU/EN, цифры, _ - .',
-    nick_reserved:'Ник зарезервирован (admin/support/...)',nick_banned:'Ник содержит запрещённую лексику',
-    nick_taken:'Ник уже занят',pw_length:'Пароль: 10–128 символов',pw_common:'Слишком популярный пароль',
-    bad_credentials:'Неверный логин или пароль',rate:'Слишком много попыток, подожди',csrf:'Сессия устарела, обнови страницу'};
-  function showErr(c){var e=document.getElementById('authErr');e.innerText=ERR[c]||('Ошибка: '+c);e.style.display='block';}
+  var viewAuth=document.getElementById('viewAuth');
+  var viewSettings=document.getElementById('viewSettings');
+  
+  // Тексты ошибок
+  var ERR={nick_length:'Ник: 3–24 символа',nick_chars:'Только буквы RU/EN, цифры, _ - .',
+    nick_reserved:'Ник зарезервирован',nick_banned:'Запрещенная лексика',
+    nick_taken:'Ник занят',pw_length:'Пароль: 10–128 символов',
+    bad_credentials:'Неверный логин или пароль',rate:'Слишком много попыток'};
+
+  function showErr(c){var e=document.getElementById('authErr');e.innerText=ERR[c]||c;e.style.display='block';}
+  
+  // Переключение табов Вход/Рег
   function setMode(m){mode=m;
     document.getElementById('tabLogin').classList.toggle('active',m==='login');
     document.getElementById('tabReg').classList.toggle('active',m==='reg');
@@ -212,39 +251,86 @@ AUTH_FRAGMENT = """
     document.getElementById('authSubmit').innerText=m==='reg'?'Создать аккаунт':'Войти';
     document.getElementById('authTitle').innerText=m==='reg'?'Регистрация':'Вход';
     document.getElementById('authErr').style.display='none';}
-  function render(){
-    document.getElementById('authForm').style.display=me?'none':'block';
-    document.getElementById('authLogged').style.display=me?'block':'none';
-    document.querySelector('.auth-tabs').style.display=me?'none':'flex';
-    if(me){document.getElementById('authNick').innerText=me;}
-    document.getElementById('avatarNick').innerText=me||'';}
-  fetch('/api/me').then(r=>r.json()).then(d=>{csrf=d.csrf;me=d.nick;render();});
-  document.getElementById('avatarBtn').addEventListener('click',()=>{render();ov.classList.add('open');});
+
+  // Главная функция отрисовки состояния
+  function render(data){
+    me = data ? data.nick : null;
+    document.getElementById('avatarNick').innerText = me || '';
+    
+    if(me && data){
+        // Пользователь авторизован -> показываем настройки
+        viewAuth.style.display='none';
+        viewSettings.classList.add('active');
+        document.getElementById('settNick').innerText = data.nick;
+        document.getElementById('settId').innerText = '#' + (data.id || 'N/A');
+        document.getElementById('settDate').innerText = new Date((data.created_at||0)*1000).toLocaleDateString();
+    } else {
+        // Гость -> показываем вход
+        viewSettings.classList.remove('active');
+        viewAuth.style.display='block';
+    }
+  }
+
+  // Загрузка данных при открытии
+  function openModal(){
+    fetch('/api/me').then(r=>r.json()).then(d=>{
+        csrf=d.csrf; 
+        render(d.nick ? d : null); 
+        ov.classList.add('open');
+    });
+  }
+
+  // Обработчики кнопок
+  document.getElementById('avatarBtn').addEventListener('click', openModal);
   document.getElementById('authClose').addEventListener('click',()=>ov.classList.remove('open'));
   ov.addEventListener('click',e=>{if(e.target===ov)ov.classList.remove('open');});
+  
   document.getElementById('tabLogin').addEventListener('click',()=>setMode('login'));
   document.getElementById('tabReg').addEventListener('click',()=>setMode('reg'));
+  
+  // Индикатор силы пароля
   document.getElementById('authPw').addEventListener('input',function(){
     var n=this.value.length,h=document.getElementById('pwHint');
-    h.innerText=n<10?'минимум 10 символов':n<14?'нормально, но длиннее = лучше':'отличная длина';
+    h.innerText=n<10?'минимум 10':n<14?'нормально':'отлично';
     h.style.color=n<10?'var(--t3)':n<14?'var(--accent-sand)':'var(--accent-emerald)';});
-  document.getElementById('authLogout').addEventListener('click',function(){
-    fetch('/api/logout',{method:'POST',headers:{'X-CSRF-Token':csrf}}).then(()=>{me=null;csrf=null;
-      fetch('/api/me').then(r=>r.json()).then(d=>{csrf=d.csrf;render();});});});
+
+  // Логика формы входа/регистрации
   document.getElementById('authForm').addEventListener('submit',function(e){
     e.preventDefault();
     var nick=document.getElementById('authNickInput').value.trim();
     var pw=document.getElementById('authPw').value;
-    if(mode==='reg'&&pw!==document.getElementById('authPw2').value){showErr('pw_mismatch');ERR.pw_mismatch='Пароли не совпадают';return;}
+    if(mode==='reg'&&pw!==document.getElementById('authPw2').value){showErr('Пароли не совпадают');return;}
+    
     var btn=document.getElementById('authSubmit');btn.disabled=true;
     fetch(mode==='reg'?'/api/register':'/api/login',{method:'POST',
       headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},
       body:JSON.stringify({nick:nick,password:pw})})
     .then(r=>r.json().then(d=>({s:r.status,d:d})))
     .then(x=>{btn.disabled=false;
-      if(x.s===200){me=x.d.nick;ov.classList.remove('open');render();}
-      else showErr(x.d.error||'unknown');})
-    .catch(()=>{btn.disabled=false;showErr('network');ERR.network='Ошибка сети';});});
+      if(x.s===200){render(x.d);} // Обновляем модалку на настройки
+      else showErr(x.d.error||'error');})
+    .catch(()=>{btn.disabled=false;showErr('Ошибка сети');});});
+
+  // Логика настроек (смена пароля / выход)
+  document.getElementById('saveSettingsBtn').addEventListener('click', function(){
+      var pw = document.getElementById('newPw').value;
+      if(!pw) return;
+      fetch('/api/settings', {method:'POST', headers:{'Content-Type':'application/json','X-CSRF-Token':csrf}, body:JSON.stringify({action:'change_pass', password:pw})})
+      .then(r=>r.json()).then(d=>{if(d.ok){alert('Пароль изменен');document.getElementById('newPw').value='';}});
+  });
+
+  document.getElementById('logoutBtn').addEventListener('click',function(){
+    fetch('/api/logout',{method:'POST',headers:{'X-CSRF-Token':csrf}}).then(()=>{me=null;csrf=null;render(null);});});
+    
+  document.getElementById('deleteAccountBtn').addEventListener('click', function(){
+      if(confirm('Точно удалить аккаунт? Это необратимо.')){
+          fetch('/api/settings', {method:'POST', headers:{'Content-Type':'application/json','X-CSRF-Token':csrf}, body:JSON.stringify({action:'delete'})})
+          .then(r=>r.json()).then(d=>{if(d.ok){location.reload();}});
+      }
+  });
+
+  // Инициализация при загрузке страницы (чтобы показать ник в хедере)
+  fetch('/api/me').then(r=>r.json()).then(d=>{csrf=d.csrf;render(d.nick?d:null);});
 })();
 </script>
 """
