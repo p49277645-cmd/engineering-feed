@@ -265,6 +265,7 @@ AUTH_FRAGMENT = """
         <div class="auth-field" style="margin-top:20px;"><label>Новый пароль</label>
             <input id="newPw" type="password" placeholder="Оставь пустым, если не меняешь">
         </div>
+        <button class="auth-submit" id="editInterestsBtn" style="height:36px;font-size:12px;margin-bottom:8px;background:var(--card2);color:var(--accent-emerald);">Изменить интересы</button>
         <button class="auth-submit" id="saveSettingsBtn" style="height:36px;font-size:12px;">Сохранить</button>
         <div class="danger-zone">
             <div class="auth-hint" style="color:var(--accent-coral);margin-bottom:8px;">Опасная зона</div>
@@ -332,6 +333,11 @@ AUTH_FRAGMENT = """
     .then(function(x){btn.disabled=false;
       if(x.s===200){render(x.d);}else{showErr(x.d.error||'unknown');}})
     .catch(function(){btn.disabled=false;showErr('Ошибка сети');});});
+
+  document.getElementById('editInterestsBtn').addEventListener('click',function(){
+    ov.classList.remove('open');
+    if(window.openInterests){window.openInterests();}
+  });
   document.getElementById('saveSettingsBtn').addEventListener('click',function(){
     var pw=document.getElementById('newPw').value;
     if(!pw)return;
