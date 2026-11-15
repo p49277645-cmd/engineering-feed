@@ -321,6 +321,7 @@ def normalize(rows):
     return rows
 
 app = Flask(__name__)
+init_db()
 init_auth(app)
 init_interests(app)
 app.register_blueprint(auth_bp)
