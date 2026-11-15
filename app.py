@@ -283,7 +283,7 @@ def init_db():
                 category TEXT, fetched_at REAL, image TEXT, read_min INTEGER, "group" TEXT
             );
         """)
-        for col, typ in [("image", "TEXT"), ("read_min", "INTEGER"), ('"group"', "TEXT")]:
+        for col, typ in [("image", "TEXT"), ("read_min", "INTEGER"), ('"group"', "TEXT"), ("interest", "TEXT")]:
             try:
                 conn.execute("ALTER TABLE posts ADD COLUMN " + col + " " + typ)
             except Exception:
