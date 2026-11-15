@@ -734,13 +734,6 @@ body::after{bottom:20px;right:20px;border-left:none;border-top:none;}
         <div class="side-label">Мои интересы</div>
         <div id="pinsBox"></div>
         <button class="side-item" onclick="openInterests()">＋ Выбрать интересы</button>
-        <div class="side-label">Категории</div>
-        {% for gid, g in groups.items() %}
-        <button class="cat-card" data-group="{{ gid }}" style="--c:{{ g.color }}">
-            <span class="cat-letter">{{ g.letter }}</span>
-            <span class="cat-name">{{ g.name }}</span>
-        </button>
-        {% endfor %}
         <div class="manage">Управление →</div>
     </aside>
 
