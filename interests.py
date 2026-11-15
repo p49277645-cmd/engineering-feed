@@ -170,6 +170,127 @@ def api_add():
     if not r["sources"]:
         return jsonify({"error": "no_sources"}), 404
     return jsonify({"slug": r["slug"], "title": r["title"], "top_sites": r["top_sites"]})
+def current_slugs():
+    return [i["slug"] for i in get_state()["interests"]]
+
+def interest_source_items():
+    with db() as c:
+        rows = c.execute("SELECT slug,url,name FROM interest_sources").fetchall()
+    return [{"type": "rss", "url": r["url"], "source": r["name"],
+             "category": "interest", "limit": 8, "interest": r["slug"]} for r in rows]
+
+INTERESTS_FRAGMENT = """
+<style>
+.int-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(8px);z-index:210;align-items:center;justify-content:center;}
+.int-overlay.open{display:flex;}
+.int-box{width:100%;max-width:560px;max-height:86vh;overflow-y:auto;background:var(--panel);border:1px solid var(--border);border-top:3px solid var(--accent-emerald);padding:28px;position:relative;}
+.int-box h2{font-family:'JetBrains Mono',monospace;font-size:20px;color:var(--accent-emerald);margin-bottom:6px;}
+.int-box h2::before{content:'// ';color:var(--accent-coral);}
+.int-sub{font-size:12px;color:var(--t3);margin-bottom:18px;font-family:'JetBrains Mono',monospace;}
+.int-search{display:flex;gap:8px;margin-bottom:14px;}
+.int-search input{flex:1;height:42px;background:var(--card);border:1px solid var(--border);color:var(--t1);padding:0 12px;font-family:'JetBrains Mono',monospace;outline:none;}
+.int-search button{height:42px;padding:0 18px;background:var(--accent-emerald);border:none;color:var(--bg);font-weight:700;font-family:'JetBrains Mono',monospace;cursor:pointer;}
+.int-tops{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;}
+.int-top{font-size:11px;color:var(--t3);border:1px dashed var(--border);padding:4px 8px;font-family:'JetBrains Mono',monospace;}
+.int-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px;}
+.int-chip{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--card);border:1px solid var(--accent-emerald);color:var(--t1);font-family:'JetBrains Mono',monospace;font-size:12px;cursor:pointer;}
+.int-chip .pin{width:20px;height:20px;border:1px solid var(--border);display:grid;place-items:center;font-size:10px;color:var(--t3);}
+.int-chip.pinned .pin{background:var(--accent-coral);border-color:var(--accent-coral);color:var(--bg);}
+.int-chip .rm{color:var(--accent-coral);font-weight:700;}
+.int-count{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--t2);margin-bottom:14px;}
+.int-count b{color:var(--accent-emerald);}
+.int-save{width:100%;height:44px;background:var(--accent-sand);border:none;color:var(--bg);font-weight:800;font-family:'JetBrains Mono',monospace;cursor:pointer;}
+.int-close{position:absolute;top:12px;right:12px;width:30px;height:30px;border:1px solid var(--border);background:var(--card);color:var(--t2);cursor:pointer;}
+.int-err{color:var(--accent-coral);font-size:12px;font-family:'JetBrains Mono',monospace;margin-bottom:10px;display:none;}
+.side-pin{display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;margin-bottom:6px;border:1px solid var(--border);background:var(--card);color:var(--t2);font-size:12px;font-family:'JetBrains Mono',monospace;cursor:pointer;text-align:left;}
+.side-pin:hover{border-color:var(--accent-emerald);color:var(--t1);}
+.side-pin .p-dot{width:8px;height:8px;border-radius:50%;background:var(--accent-emerald);flex-shrink:0;}
+</style>
+<div class="int-overlay" id="intOverlay">
+  <div class="int-box">
+    <button class="int-close" id="intClose">✕</button>
+    <h2>Твои интересы</h2>
+    <div class="int-sub">до <span id="intMax">10</span> интересов в ленту · до 3 закрепи слева (клик по ★)</div>
+    <div class="int-search">
+      <input id="intQ" placeholder="например: квантовая физика / rust / нейросети">
+      <button id="intFind">Найти источники</button>
+    </div>
+    <div class="int-err" id="intErr"></div>
+    <div class="int-tops" id="intTops"></div>
+    <div class="int-chips" id="intChips"></div>
+    <div class="int-count" id="intCount"></div>
+    <button class="int-save" id="intSave">Сохранить интересы</button>
+  </div>
+</div>
+<script>
+(function(){
+  var state={interests:[],limits:{feed_max:10,pin_max:3},is_user:false};
+  var ov=document.getElementById('intOverlay');
+  function err(t){var e=document.getElementById('intErr');e.innerText=t||'';e.style.display=t?'block':'none';}
+  function load(cb){fetch('/api/interests').then(function(r){return r.json();}).then(function(d){state=d;if(cb)cb();});}
+  function renderChips(){
+    var box=document.getElementById('intChips');box.innerHTML='';
+    state.interests.forEach(function(it){
+      var c=document.createElement('button');
+      c.type='button';
+      c.className='int-chip'+(it.pinned?' pinned':'');
+      c.innerHTML='<span class="pin">★</span> '+it.title+' <span class="rm">✕</span>';
+      c.querySelector('.pin').addEventListener('click',function(ev){ev.stopPropagation();it.pinned=!it.pinned;renderChips();});
+      c.querySelector('.rm').addEventListener('click',function(ev){ev.stopPropagation();state.interests=state.interests.filter(function(x){return x.slug!==it.slug;});renderChips();});
+      box.appendChild(c);
+    });
+    var pins=state.interests.filter(function(i){return i.pinned;}).length;
+    document.getElementById('intCount').innerHTML='в ленте: <b>'+state.interests.length+'/'+state.limits.feed_max+'</b> · слева: <b>'+pins+'/'+state.limits.pin_max+'</b>';
+    document.getElementById('intMax').innerText=state.limits.feed_max;
+  }
+  function renderPins(){
+    var host=document.getElementById('pinsBox');if(!host)return;host.innerHTML='';
+    state.interests.filter(function(i){return i.pinned;}).forEach(function(i){
+      var b=document.createElement('button');b.type='button';b.className='side-pin';
+      b.innerHTML='<span class="p-dot"></span>'+i.title;
+      b.addEventListener('click',function(){location.href='/?int='+i.slug;});
+      host.appendChild(b);
+    });
+  }
+  window.openInterests=function(){load(function(){err('');renderChips();renderPins();ov.classList.add('open');});};
+  document.getElementById('intClose').addEventListener('click',function(){ov.classList.remove('open');});
+  ov.addEventListener('click',function(e){if(e.target===ov)ov.classList.remove('open');});
+  document.getElementById('intFind').addEventListener('click',function(){
+    var q=document.getElementById('intQ').value.trim();if(!q)return;
+    err('');document.getElementById('intTops').innerText='ищу топовые сайты…';
+    fetch('/api/interests/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({q:q})})
+    .then(function(r){return r.json().then(function(d){return {s:r.status,d:d};});})
+    .then(function(x){
+      document.getElementById('intTops').innerHTML='';
+      if(x.s!==200){err('Не нашёл живых источников по запросу');return;}
+      if(state.interests.length>=state.limits.feed_max){err('Лимит: '+state.limits.feed_max+' интересов в ленте');return;}
+      if(state.interests.some(function(i){return i.slug===x.d.slug;})){err('Уже добавлено');return;}
+      state.interests.push({slug:x.d.slug,title:x.d.title,pinned:false});
+      var t=document.getElementById('intTops');
+      (x.d.top_sites||[]).forEach(function(s){var sp=document.createElement('span');sp.className='int-top';sp.innerText=s;t.appendChild(sp);});
+      renderChips();
+    })
+    .catch(function(){document.getElementById('intTops').innerHTML='';err('Ошибка сети');});
+  });
+  document.getElementById('intSave').addEventListener('click',function(){
+    var pins=state.interests.filter(function(i){return i.pinned;});
+    if(pins.length>state.limits.pin_max){err('Закрепить можно максимум 3');return;}
+    fetch('/api/interests/save',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({interests:state.interests.map(function(i){return i.slug;}),
+        pins:pins.map(function(i){return i.slug;})})})
+    .then(function(r){return r.json();})
+    .then(function(d){state=d;ov.classList.remove('open');renderPins();location.reload();});
+  });
+  load(function(){
+    renderPins();
+    if(!state.is_user&&state.interests.length===0&&!localStorage.getItem('intSeen')){
+      localStorage.setItem('intSeen','1');
+      setTimeout(function(){renderChips();ov.classList.add('open');},1200);
+    }
+  });
+})();
+</script>
+"""
 
 @bp.post("/api/interests/save")
 def api_save():
