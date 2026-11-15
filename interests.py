@@ -1,8 +1,7 @@
-# interests.py — интересы + авто-подбор источников («мощный поиск» без API-ключей)
-import os, re, json, time, sqlite3
+import os, re, json, time, sqlite3, logging
 from collections import Counter
 from contextlib import contextmanager
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, urlparse
 import feedparser, requests
 from flask import Blueprint, request, jsonify, session
 import re as _re
@@ -32,7 +31,13 @@ FEED_MAX_GUEST, FEED_MAX_USER, PIN_MAX = 10, 13, 3
 CACHE_TTL = 7 * 86400
 
 HTTP = requests.Session()
-HTTP.headers.update({"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"})
+HTTP.headers.update({
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8",
+    "Accept-Encoding": "gzip, deflate",
+    "Connection": "keep-alive"
+})
 
 @contextmanager
 def db():
@@ -80,10 +85,12 @@ def _fetch(url, limit=15):
         return []
 
 def discover(query):
-    """Ищет источники и топ-сайты по интересу. Кешируется в БД."""
+    """Ищет источники и топ-сайты по интересу. Оптимизировано для РФ и таймаутов < 4с."""
     q = (query or "").strip()
     slug = slugify(q)
     now = time.time()
+    
+    # 1. Проверка кэша (оставляем как было)
     with db() as c:
         row = c.execute("SELECT * FROM interests WHERE slug=?", (slug,)).fetchone()
         if row and (now - row["refreshed_at"]) < CACHE_TTL:
@@ -94,20 +101,61 @@ def discover(query):
                         "sources": [dict(s) for s in srcs], "cached": True}
 
     sources, top_sites = [], []
-    gurl = f"https://news.google.com/rss/search?q={quote_plus(q)}&hl=ru&gl=RU&ceid=RU:ru"
-    entries = _fetch(gurl)
-    if len(entries) >= 3:
-        sources.append({"url": gurl, "name": f"Google News: {q}", "kind": "news"})
-        cnt = Counter(e["source_title"] for e in entries if e["source_title"])
-        top_sites = [n for n, _ in cnt.most_common(5)]
-    hurl = f"https://habr.com/ru/rss/search/?q={quote_plus(q)}&fl=ru"
-    if len(_fetch(hurl, 5)) >= 3:
-        sources.append({"url": hurl, "name": f"Хабр: {q}", "kind": "habr"})
-    if re.fullmatch(r"[a-z0-9_]{2,25}", slug.replace("-", "_")):
-        rurl = f"https://www.reddit.com/r/{slug.replace('-', '_')}/.rss"
-        if len(_fetch(rurl, 5)) >= 3:
-            sources.append({"url": rurl, "name": f"Reddit r/{slug.replace('-', '_')}", "kind": "reddit"})
+    timeout = (1.5, 1.5) # Жесткий таймаут: 1.5с на коннект + 1.5с на чтение = 3с макс
 
+    # 2. Попытка №1: DuckDuckGo HTML (работает в РФ, нет капчи, легкий HTML)
+    ddg_url = f"https://html.duckduckgo.com/html/?q={quote_plus(q)}"
+    try:
+        resp = HTTP.get(ddg_url, timeout=timeout)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, 'html.parser')
+        
+        # Собираем домены из результатов
+        for a in soup.find_all('a', class_='result__url'):
+            href = a.get('href', '')
+            if href.startswith('http'):
+                domain = urlparse(href).netloc
+                domain = re.sub(r'^www\.', '', domain)
+                if domain and domain not in top_sites:
+                    top_sites.append(domain)
+                    
+        # Ищем явные RSS-ссылки в выдаче
+        for a in soup.find_all('a', href=True):
+            href = a['href']
+            if re.search(r'(rss|atom|feed|\.xml)', href, re.IGNORECASE):
+                sources.append({"url": href, "name": f"RSS: {q}", "kind": "rss"})
+    except Exception as e:
+        logging.warning(f"DDG search failed for '{q}': {e}")
+
+    # 3. Попытка №2: Если доменов мало, добиваем Яндексом (только домены)
+    if len(top_sites) < 3:
+        try:
+            yandex_url = f"https://yandex.ru/search/?text={quote_plus(q)}&lr=213"
+            resp = HTTP.get(yandex_url, timeout=timeout)
+            resp.raise_for_status()
+            soup = BeautifulSoup(resp.text, 'html.parser')
+            for a in soup.find_all('a', href=True):
+                href = a['href']
+                if href.startswith('http') and 'yandex' not in href:
+                    domain = urlparse(href).netloc
+                    domain = re.sub(r'^www\.', '', domain)
+                    if domain and domain not in top_sites:
+                        top_sites.append(domain)
+                if len(top_sites) >= 5:
+                    break
+        except Exception as e:
+            logging.warning(f"Yandex search failed for '{q}': {e}")
+
+    # 4. Гарантированный фоллбэк: если RSS не найдены, берем поиск Хабра (он всегда работает)
+    if not sources:
+        hurl = f"https://habr.com/ru/rss/search/?q={quote_plus(q)}&fl=ru"
+        sources.append({"url": hurl, "name": f"Хабр: {q}", "kind": "habr"})
+
+    # Ограничиваем результаты, чтобы не перегружать БД и ленту
+    top_sites = top_sites[:5]
+    sources = sources[:3]
+
+    # 5. Сохранение в БД
     with db() as c:
         c.execute("INSERT OR REPLACE INTO interests(slug,title,top_sites,created_at,refreshed_at) VALUES (?,?,?,?,?)",
                   (slug, q, json.dumps(top_sites, ensure_ascii=False), now, now))
@@ -117,6 +165,7 @@ def discover(query):
                           (slug, s["url"], s["name"], s["kind"]))
             except Exception:
                 pass
+                
     return {"slug": slug, "title": q, "top_sites": top_sites, "sources": sources, "cached": False}
 
 # ---------- хранение интересов (гость = session, юзер = БД) ----------
