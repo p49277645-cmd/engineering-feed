@@ -109,6 +109,8 @@ def register():
         return jsonify({"error": "nick_taken"}), 409
     session.clear()
     session["nick"] = nick
+    session["uid"] = u["id"]          # в login
+    # и в register после INSERT получи id: cur.lastrowid
     session["csrf"] = secrets.token_urlsafe(24)
     session.permanent = True
     return jsonify({"nick": nick})
