@@ -75,17 +75,16 @@ def me():
     if "csrf" not in session:
         session["csrf"] = secrets.token_urlsafe(24)
     session.permanent = True
-    
+
     data = {"nick": session.get("nick"), "csrf": session["csrf"]}
-    
-    # Если пользователь залогинен, догружаем его данные из БД
+
     if session.get("nick"):
         with db() as c:
             u = c.execute("SELECT id, created_at FROM users WHERE nick=?", (session["nick"],)).fetchone()
             if u:
                 data["id"] = u["id"]
-                data["created_at"] = u[" "created_at"]
-                
+                data["created_at"] = u["created_at"]   # ✅ правильно, без пробела и лишней кавычки
+
     return jsonify(data)
 @auth_bp.post("/api/register")
 def register():
