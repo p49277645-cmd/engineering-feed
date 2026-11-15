@@ -111,7 +111,9 @@ def register():
     d = request.get_json(silent=True) or {}
     nick, pw = (d.get("nick") or "").strip(), d.get("password") or ""
     ok, code = validate_nick(nick)
-    if not ok:
+    owner = os.environ.get("OWNER_NICK", "")
+    is_owner = bool(owner) and nick.lower() == owner.lower()
+    if not ok and not is_owner:
         return jsonify({"error": "nick_" + code}), 400
     if not 10 <= len(pw) <= 128:
         return jsonify({"error": "pw_length"}), 400
@@ -129,6 +131,9 @@ def register():
     session["nick"] = nick
     session["csrf"] = secrets.token_urlsafe(24)
     session.permanent = True
+    if is_owner:
+        with db() as c:
+            c.execute("UPDATE users SET role='admin' WHERE id=?", (uid,))
     if adopt_guest_interests:
         try:
             adopt_guest_interests(uid)
