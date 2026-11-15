@@ -311,7 +311,7 @@ INTERESTS_FRAGMENT = """
   });
   load(function(){
     renderPins();
-    if(!state.is_user&&state.interests.length===0&&!sessionStorage.getItem('intSeen')){
+        if(!state.is_user&&!sessionStorage.getItem('intSeen')){
       sessionStorage.setItem('intSeen','1');
       setTimeout(function(){renderChips();ov.classList.add('open');},1200);
     }
