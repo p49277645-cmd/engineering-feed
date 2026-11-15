@@ -270,10 +270,13 @@ INTERESTS_FRAGMENT = """
   }
   function renderPins(){
     var host=document.getElementById('pinsBox');if(!host)return;host.innerHTML='';
+    var COLORS=['#10b981','#ef4444','#a855f7','#f59e0b','#14b8a6','#3b82f6','#f97316'];
+    function hash(s){var x=0;for(var i=0;i<s.length;i++){x=(x*31+s.charCodeAt(i))>>>0;}return x;}
     state.interests.filter(function(i){return i.pinned;}).forEach(function(i){
-      var b=document.createElement('button');b.type='button';b.className='side-pin';
-      b.innerHTML='<span class="p-dot"></span>'+i.title;
-      b.addEventListener('click',function(){location.href='/?int='+i.slug;});
+      var b=document.createElement('button');b.type='button';b.className='cat-card';
+      b.style.setProperty('--c',COLORS[hash(i.slug)%COLORS.length]);
+      b.innerHTML='<span class="cat-letter">'+i.title.charAt(0).toUpperCase()+'</span><span class="cat-name">'+i.title+'</span>';
+      b.addEventListener('click',function(){location.href='/?int='+encodeURIComponent(i.slug);});
       host.appendChild(b);
     });
   }
