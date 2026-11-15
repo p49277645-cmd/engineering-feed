@@ -492,9 +492,9 @@ body::after{bottom:20px;right:20px;border-left:none;border-top:none;}
 .sidebar{
     position:sticky;top:100px;height:fit-content;
     max-height: calc(100vh - 140px);overflow-y: auto;overflow-x: hidden;
-    background:var(--panel);border:1px solid var(--border);padding:24px;border-radius: 4px;
-    mask-image: linear-gradient(to bottom, transparent 0px, black 20px, black calc(100% - 20px), transparent 100%);
-    -webkit-mask-image: linear-gradient(to bottom, transparent 0px, black 20px, black calc(100% - 20px), transparent 100%);
+    background:var(--panel);border:1px solid var(--border);padding:24px 24px 40px 24px;border-radius: 4px;
+    mask-image: linear-gradient(to bottom, transparent 0px, black 30px);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0px, black 30px);
 }
 
 .sidebar::-webkit-scrollbar{width: 6px;}
