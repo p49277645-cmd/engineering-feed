@@ -353,6 +353,10 @@ AUTH_FRAGMENT = """
         body:JSON.stringify({action:'delete'})})
       .then(function(){location.reload();});}});
   load(function(d){render(d.nick?d:null);});
+  setTimeout(function(){
+    var ob=document.getElementById('onboardingBanner');
+    if(ob && ob.style.display==='none' && !me){ob.style.display='block';}
+  },2500);
 })();
 </script>
 """
