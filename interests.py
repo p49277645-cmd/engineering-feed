@@ -5,6 +5,25 @@ from contextlib import contextmanager
 from urllib.parse import quote_plus
 import feedparser, requests
 from flask import Blueprint, request, jsonify, session
+import re as _re
+
+BANNED_TOPICS = {
+    "порно", "porno", "porn", "xxx", "sex", "секс", "хентай", "hentai",
+    "эротика", "erotica", "nude", "onlyfans",
+    "наркотики", "drugs", "weed", "марихуана", "кокаин", "cocaine",
+    "насилие", "violence", "терроризм", "terrorism", "нацизм", "nazism",
+    "казино", "casino", "ставки", "betting", "скам", "scam",
+}
+
+def _norm(s):
+    return _re.sub(r"[^a-zа-яё0-9]+", "", (s or "").lower())
+
+def topic_is_clean(query):
+    n = _norm(query)
+    for w in BANNED_TOPICS:
+        if _norm(w) in n:
+            return False
+    return True
 
 bp = Blueprint("interests", __name__)
 DB_PATH = os.environ.get("DB_PATH", "engfeed.db")
@@ -161,12 +180,17 @@ def api_discover():
     q = request.args.get("q", "").strip()
     if not q or len(q) > 60:
         return jsonify({"error": "bad_query"}), 400
+    if not topic_is_clean(q):
+        return jsonify({"error": "banned_topic"}), 400
     return jsonify(discover(q))
 
 @bp.post("/api/interests/add")
 def api_add():
     d = request.get_json(silent=True) or {}
-    r = discover(d.get("q", ""))
+    q = d.get("q", "")
+    if not topic_is_clean(q):
+        return jsonify({"error": "banned_topic"}), 400
+    r = discover(q)
     if not r["sources"]:
         return jsonify({"error": "no_sources"}), 404
     return jsonify({"slug": r["slug"], "title": r["title"], "top_sites": r["top_sites"]})
@@ -262,7 +286,7 @@ INTERESTS_FRAGMENT = """
     .then(function(r){return r.json().then(function(d){return {s:r.status,d:d};});})
     .then(function(x){
       document.getElementById('intTops').innerHTML='';
-      if(x.s!==200){err('Не нашёл живых источников по запросу');return;}
+      if(x.s!==200){err(x.d.error==='banned_topic'?'Такая тема запрещена':'Не нашёл живых источников');return;}
       if(state.interests.length>=state.limits.feed_max){err('Лимит: '+state.limits.feed_max+' интересов в ленте');return;}
       if(state.interests.some(function(i){return i.slug===x.d.slug;})){err('Уже добавлено');return;}
       state.interests.push({slug:x.d.slug,title:x.d.title,pinned:false});
