@@ -668,7 +668,7 @@ body::after{bottom:20px;right:20px;border-left:none;border-top:none;}
     <div class="logo">EngFeed</div>
     <div class="searchwrap">
         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-        <input id="search" placeholder="Поиск..." autocomplete="off">
+        <input id="search" placeholder="Поиск..." autocomplete="new-password" name="engq">
         <span class="kbd">K</span>
     </div>
     <div class="top-actions">
@@ -865,7 +865,8 @@ function doRefresh() {
 }
 
 document.getElementById('refreshBtn').addEventListener('click', () => { refreshAttempts = 0; doRefresh(); });
-if (document.querySelector('.empty-state')) doRefresh();
+var NO_INTERESTS = {{ 'true' if no_interests else 'false' }};
+if (!NO_INTERESTS && document.querySelector('.empty-state')) doRefresh();
 
 var readLinks = JSON.parse(localStorage.getItem('readLinks') || '[]');
 var bookmarks = JSON.parse(localStorage.getItem('bookmarks') || '[]');
