@@ -161,7 +161,7 @@ def read_minutes(title):
 
 def parse_rss(item):
     try:
-        resp = SESSION.get(item["url"], timeout=6)
+        resp = SESSION.get(item["url"], timeout=4)
         resp.raise_for_status()
         feed = feedparser.parse(resp.content)
         results = []
@@ -187,7 +187,7 @@ def parse_rss(item):
 
 def scrape_html(item):
     try:
-        resp = SESSION.get(item["url"], timeout=8)
+        resp = SESSION.get(item["url"], timeout=4)
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
         base_url = "/".join(item["url"].split("/")[:3])
@@ -229,19 +229,21 @@ def scrape_html(item):
 def fetch_all_data():
     all_items = []
     pairs = []
-    with ThreadPoolExecutor(max_workers=24) as executor:
+    # Уменьшаем workers с 24 до 6 для слабого контейнера
+    with ThreadPoolExecutor(max_workers=6) as executor:
         for s in SOURCES + interest_source_items():
             fn = parse_rss if s["type"] == "rss" else scrape_html
             pairs.append((executor.submit(fn, s), s["source"]))
         for fut, name in pairs:
             try:
-                r = fut.result(timeout=15)
+                # Уменьшаем таймаут с 15 до 10 секунд
+                r = fut.result(timeout=10)
                 if r:
                     all_items.extend(r)
                 else:
                     logger.warning(f"[EMPTY] {name}: 0 записей")
             except FuturesTimeoutError:
-                logger.warning(f"[SKIP] {name}: таймаут потока >15с")
+                logger.warning(f"[SKIP] {name}: таймаут потока >10с")
             except Exception as e:
                 logger.warning(f"[SKIP] {name}: {e}")
     enriched = []
@@ -261,7 +263,6 @@ def fetch_all_data():
     enriched.sort(key=lambda x: x["pub_time"], reverse=True)
     logger.info(f"Итого: {len(enriched)} записей")
     return enriched
-
 @contextmanager
 def get_db():
     conn = sqlite3.connect(DB_PATH)
