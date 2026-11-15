@@ -17,8 +17,7 @@ from bs4 import BeautifulSoup
 from flask import Flask, render_template_string, jsonify, request
 from auth import auth_bp, init_auth, AUTH_FRAGMENT
 from interests import bp as interests_bp, init_interests
-init_interests(app)
-app.register_blueprint(interests_bp)
+
 
 logger = logging.getLogger("engfeed")
 handler = logging.StreamHandler(sys.stdout)
@@ -322,7 +321,9 @@ def normalize(rows):
 
 app = Flask(__name__)
 init_auth(app)
+init_interests(app)
 app.register_blueprint(auth_bp)
+app.register_blueprint(interests_bp)
 
 @app.route('/')
 def index():
