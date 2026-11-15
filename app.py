@@ -332,11 +332,15 @@ def index():
     news = normalize(load_from_db())
     only = request.args.get("int", "")
     slugs = current_slugs()
+    no_interests = not slugs and not only
     if only:
         news = [n for n in news if n.get("interest") == only]
     elif slugs:
-        news = [n for n in news if not n.get("interest") or n["interest"] in slugs]
-    return render_template_string(HTML_TEMPLATE, news=news, groups=GROUP_META, active_tab='feed')
+        news = [n for n in news if n.get("interest") in slugs]
+    else:
+        news = []
+    return render_template_string(HTML_TEMPLATE, news=news, groups=GROUP_META,
+                                  active_tab='feed', no_interests=no_interests)
 
 @app.route('/wiki/rust')
 def wiki_rust():
@@ -752,26 +756,22 @@ body::after{bottom:20px;right:20px;border-left:none;border-top:none;}
             </div>
         </div>
     {% else %}
-    <div class="mobile-cats" id="mobileCats">
-        <button class="mobile-cat active" data-group="all">Все</button>
-        {% for gid, g in groups.items() %}
-        <button class="mobile-cat" data-group="{{ gid }}" style="--c:{{ g.color }}">
-            <span class="cat-dot"></span>{{ g.name }}
-        </button>
-        {% endfor %}
-    </div>
+    
         <div class="main-head">
             <h1>Лента на сегодня</h1>
             <div class="pills">
                 <button class="pill active" data-group="all">Все</button>
                 <button class="pill" data-mode="unread">Непрочитанные</button>
-                <button class="pill" data-group="physics">Физика</button>
-                <button class="pill" data-group="olympiads">Олимпиады</button>
-                <button class="pill" data-group="code">Код</button>
             </div>
         </div>
 
-        {% if not news %}
+        {% if no_interests %}
+        <div class="empty-state">
+            <p style="font-size:18px;color:var(--t1);">Собери свою ленту</p>
+            <p style="font-size:13px;color:var(--t3);">Выбери интересы — источники подтянутся автоматически</p>
+            <button onclick="openInterests()">Выбрать интересы</button>
+        </div>
+        {% elif not news %}
         <div class="empty-state">
             <p>Лента пуста</p>
             <p style="font-size:13px;color:var(--t3);">Загрузка источников...</p>
