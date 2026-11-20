@@ -16,8 +16,7 @@ import requests
 from bs4 import BeautifulSoup
 from flask import Flask, render_template_string, jsonify, request
 from auth import auth_bp, init_auth, AUTH_FRAGMENT
-from interests import bp as interests_bp, init_interests, INTERESTS_FRAGMENT, interest_source_items, current_slugs
-
+from interests import bp as interests_bp, init_interests, INTERESTS_FRAGMENT, interest_source_items, current_slugs, report_source
 
 logger = logging.getLogger("engfeed")
 handler = logging.StreamHandler(sys.stdout)
@@ -233,19 +232,21 @@ def fetch_all_data():
     with ThreadPoolExecutor(max_workers=6) as executor:
         for s in SOURCES + interest_source_items():
             fn = parse_rss if s["type"] == "rss" else scrape_html
-            pairs.append((executor.submit(fn, s), s["source"]))
-        for fut, name in pairs:
+            pairs.append((executor.submit(fn, s), s))
+        for fut, s in pairs:
+            ok = False
             try:
-                # Уменьшаем таймаут с 15 до 10 секунд
                 r = fut.result(timeout=10)
                 if r:
-                    all_items.extend(r)
+                    all_items.extend(r); ok = True
                 else:
-                    logger.warning(f"[EMPTY] {name}: 0 записей")
+                    logger.warning(f"[EMPTY] {s['source']}: 0 записей")
             except FuturesTimeoutError:
-                logger.warning(f"[SKIP] {name}: таймаут потока >10с")
+                logger.warning(f"[SKIP] {s['source']}: таймаут >10с")
             except Exception as e:
-                logger.warning(f"[SKIP] {name}: {e}")
+                logger.warning(f"[SKIP] {s['source']}: {e}")
+            if s.get("interest"):
+                report_source(s["url"], ok)
     enriched = []
     for it in all_items:
         g = CAT_GROUP.get(it["category"], "physics")
@@ -492,8 +493,10 @@ body::after{bottom:20px;right:20px;border-left:none;border-top:none;}
 
 .sidebar{
     position:sticky;top:100px;height:fit-content;
-    max-height: calc(100vh - 140px);overflow-y: auto;overflow-x: hidden;
-    background:var(--panel);border:1px solid var(--border);padding:24px 24px 40px 24px;border-radius: 4px;
+    min-height:min(560px, calc(100vh - 140px));
+    max-height: calc(100vh - 140px);overflow-y:auto;overflow-x:hidden;
+    background:var(--panel);border:1px solid var(--border);
+    padding:24px 24px 32px 24px;border-radius:4px;
     mask-image: linear-gradient(to bottom, transparent 0px, black 30px);
     -webkit-mask-image: linear-gradient(to bottom, transparent 0px, black 30px);
 }
@@ -717,8 +720,10 @@ body::after{bottom:20px;right:20px;border-left:none;border-top:none;}
             Прочитанное
         </button>
         <div class="side-label">Мои интересы</div>
-        <div id="pinsBox"></div>
-        <button class="side-item" onclick="openInterests()">＋ Выбрать интересы</button>
+        <div id="interestsBox"></div>
+        <div class="side-label">Мои курсы ★</div>
+        <div id="coursesBox"></div>
+        <button class="side-item" onclick="openInterests()">＋ Настроить ленту</button>
         <div class="manage">Управление →</div>
     </div>
 </div>
@@ -737,8 +742,10 @@ body::after{bottom:20px;right:20px;border-left:none;border-top:none;}
             Прочитанное
         </button>
         <div class="side-label">Мои интересы</div>
-        <div id="pinsBox"></div>
-        <button class="side-item" onclick="openInterests()">＋ Выбрать интересы</button>
+        <div id="interestsBox"></div>
+        <div class="side-label">Мои курсы ★</div>
+        <div id="coursesBox"></div>
+        <button class="side-item" onclick="openInterests()">＋ Настроить ленту</button>
         <div class="manage">Управление →</div>
     </aside>
 
