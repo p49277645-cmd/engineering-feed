@@ -17,6 +17,7 @@ from bs4 import BeautifulSoup
 from flask import Flask, render_template_string, jsonify, request
 from auth import auth_bp, init_auth, AUTH_FRAGMENT
 from interests import bp as interests_bp, init_interests, INTERESTS_FRAGMENT, interest_source_items, current_slugs, report_source
+import engine
 
 logger = logging.getLogger("engfeed")
 handler = logging.StreamHandler(sys.stdout)
@@ -160,7 +161,7 @@ def read_minutes(title):
 
 def parse_rss(item):
     try:
-        resp = SESSION.get(item["url"], timeout=4)
+        resp = SESSION.get(item["url"], timeout=(2, 3))
         resp.raise_for_status()
         feed = feedparser.parse(resp.content)
         results = []
@@ -186,7 +187,7 @@ def parse_rss(item):
 
 def scrape_html(item):
     try:
-        resp = SESSION.get(item["url"], timeout=4)
+        resp = SESSION.get(item["url"], timeout=(2, 3))
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
         base_url = "/".join(item["url"].split("/")[:3])
@@ -225,28 +226,7 @@ def scrape_html(item):
         logger.warning(f"[Scrape] {item['source']}: {e}")
         return []
 
-def fetch_all_data():
-    all_items = []
-    pairs = []
-    # Уменьшаем workers с 24 до 6 для слабого контейнера
-    with ThreadPoolExecutor(max_workers=6) as executor:
-        for s in SOURCES + interest_source_items():
-            fn = parse_rss if s["type"] == "rss" else scrape_html
-            pairs.append((executor.submit(fn, s), s))
-        for fut, s in pairs:
-            ok = False
-            try:
-                r = fut.result(timeout=10)
-                if r:
-                    all_items.extend(r); ok = True
-                else:
-                    logger.warning(f"[EMPTY] {s['source']}: 0 записей")
-            except FuturesTimeoutError:
-                logger.warning(f"[SKIP] {s['source']}: таймаут >10с")
-            except Exception as e:
-                logger.warning(f"[SKIP] {s['source']}: {e}")
-            if s.get("interest"):
-                report_source(s["url"], ok)
+def enrich_items(all_items):
     enriched = []
     for it in all_items:
         g = CAT_GROUP.get(it["category"], "physics")
@@ -264,6 +244,10 @@ def fetch_all_data():
     enriched.sort(key=lambda x: x["pub_time"], reverse=True)
     logger.info(f"Итого: {len(enriched)} записей")
     return enriched
+
+def current_sources():
+    base = [s for s in SOURCES if engine.live(s["url"])]
+    return base + interest_source_items()
 @contextmanager
 def get_db():
     conn = sqlite3.connect(DB_PATH)
@@ -326,6 +310,7 @@ app = Flask(__name__)
 init_db()
 init_auth(app)
 init_interests(app)
+engine.init_engine([s["url"] for s in SOURCES])
 app.register_blueprint(auth_bp)
 app.register_blueprint(interests_bp)
 
