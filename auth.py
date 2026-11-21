@@ -1,12 +1,12 @@
 # auth.py — регистрация/вход/выход/настройки, защита от перебора
-import os, time, secrets, sqlite3
+import os, time, secrets, sqlite3, logging
 from contextlib import contextmanager
 from flask import Blueprint, request, jsonify, session
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError, VerificationError
 from nickguard import validate_nick, nick_key
 
-try:  # interests появится в Шаге B — пока опционально
+try:
     from interests import adopt_guest_interests
 except Exception:
     adopt_guest_interests = None
@@ -126,6 +126,14 @@ def register():
             uid = cur.lastrowid
     except sqlite3.IntegrityError:
         return jsonify({"error": "nick_taken"}), 409
+    
+    # === ПЕРЕНОСИМ ИНТЕРЕСЫ ГOSTЯ В АККАУНТ ПЕРЕД ОЧИСТКОЙ ===
+    if adopt_guest_interests:
+        try:
+            adopt_guest_interests(uid)
+        except Exception as e:
+            logging.warning(f"adopt_guest_interests on register failed: {e}")
+
     session.clear()
     session["uid"] = uid
     session["nick"] = nick
@@ -134,19 +142,7 @@ def register():
     if is_owner:
         with db() as c:
             c.execute("UPDATE users SET role='admin' WHERE id=?", (uid,))
-    if adopt_guest_interests:
-        try:
-            adopt_guest_interests(uid)
-        except Exception:
-            pass
-
-    # После установки session['uid'] = user_id
-try:
-    from interests import adopt_guest_interests
-    adopt_guest_interests(session['uid'])
-except Exception as e:
-    import logging
-    logging.warning(f"adopt_guest_interests failed: {e}")
+            
     return jsonify({"nick": nick, "id": uid, "created_at": time.time()})
 
 @auth_bp.post("/api/login")
@@ -180,6 +176,14 @@ def login():
         c.execute("UPDATE users SET failed=0, locked_until=0 WHERE id=?", (u["id"],))
         if ph.check_needs_rehash(u["pass_hash"]):
             c.execute("UPDATE users SET pass_hash=? WHERE id=?", (ph.hash(pw), u["id"]))
+    
+    # === ПЕРЕНОСИМ ИНТЕРЕСЫ ГOSTЯ В АККАУНТ ПЕРЕД ОЧИСТКОЙ (ЭТО БЫЛО ПРОПУЩЕНО!) ===
+    if adopt_guest_interests:
+        try:
+            adopt_guest_interests(u["id"])
+        except Exception as e:
+            logging.warning(f"adopt_guest_interests on login failed: {e}")
+
     session.clear()
     session["uid"] = u["id"]
     session["nick"] = u["nick"]
