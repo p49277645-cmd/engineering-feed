@@ -114,6 +114,10 @@ def init_interests(app):
             c.execute("DELETE FROM interest_sources")
             c.execute("DELETE FROM interests")
             c.execute("INSERT OR REPLACE INTO meta(k,v) VALUES ('v4_wipe','1')")
+        done8 = c.execute("SELECT v FROM meta WHERE k='v8_pubtime'").fetchone()
+        if not done8:
+            c.execute("DELETE FROM posts WHERE pub_time IS NULL")
+            c.execute("INSERT OR REPLACE INTO meta(k,v) VALUES ('v8_pubtime','1')")
 
 def slugify(text):
     text = re.sub(r"[^a-zа-яё0-9]+", "-", (text or "").lower().strip())
@@ -428,6 +432,10 @@ def load_fragment():
     except Exception as e:
         logging.error(f"interests fragment load failed: {e}")
         return ""
+_refresher = None
+def set_refresher(fn):
+    global _refresher
+    _refresher = fn
 
 INTERESTS_FRAGMENT = load_fragment()
 
@@ -520,7 +528,13 @@ def api_courses():
 @bp.post("/api/interests/save")
 def api_save():
     d = request.get_json(silent=True) or {}
-    return jsonify(save_state(d.get("interests", []), d.get("courses", [])))
+    st = save_state(d.get("interests", []), d.get("courses", []))
+    if _refresher:
+        try:
+            _refresher()
+        except Exception as e:
+            logging.warning(f"auto-refresh after save failed: {e}")
+    return jsonify(st)
 
 @bp.post("/api/interests/skip")
 def api_skip():
