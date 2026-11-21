@@ -89,8 +89,6 @@
     function hash(s){var x=0;for(var i=0;i<s.length;i++){x=(x*31+s.charCodeAt(i))>>>0;}return x;}
     var currentInt='';
     try{ currentInt=new URLSearchParams(location.search).get('int')||''; }catch(e){}
-    
-    // Рисуем интересы во ВСЕХ блоках #interestsBox (мобильный + десктоп)
     document.querySelectorAll('#interestsBox').forEach(function(box){
       box.innerHTML='';
       state.interests.forEach(function(i){
@@ -104,8 +102,6 @@
         box.appendChild(b);
       });
     });
-    
-    // Рисуем курсы во ВСЕХ блоках #coursesBox
     document.querySelectorAll('#coursesBox').forEach(function(box){
       box.innerHTML='';
       state.courses.forEach(function(cr){
@@ -114,19 +110,10 @@
         a.href=cr.url;
         a.target='_blank';
         a.rel='noopener';
-        a.innerHTML='<span class="course-star">★</span><div class="course-info"><span class="course-title">'+cr.title+'</span><span class="course-learners">'+(cr.learners||0)+' уч.</span></div>';
+        a.innerHTML='<span class="star">★</span><div class="course-info"><span class="course-title">'+cr.title+'</span><span class="course-learners">'+(cr.learners||0)+' уч.</span></div>';
         box.appendChild(a);
       });
     });
-  }
-    var cb=document.getElementById('coursesBox');
-    if(cb){cb.innerHTML='';
-      state.courses.forEach(function(cr){
-        var a=document.createElement('a');a.className='course-card';a.href=cr.url;a.target='_blank';a.rel='noopener';
-        a.innerHTML='<span class="star">★</span><span>'+cr.title+'</span>';
-        cb.appendChild(a);
-      });
-    }
   }
   window.openInterests=function(){load(function(){err('');renderInt();renderCrs();renderSidebar();counts();ov.classList.add('open');});};
   document.getElementById('intClose').addEventListener('click',function(){ov.classList.remove('open');});
