@@ -1,7 +1,8 @@
-# engine.py — один общий прогон на все воркеры, атомарный замок, монотонный прогресс
+# engine.py v2 — один прогон, учёт новизны по источникам, ротация застоя
 import os, time, sqlite3, threading, logging
 from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FutTimeout
 from contextlib import contextmanager
+import interests
 
 DB_PATH = os.environ.get("DB_PATH", "engfeed.db")
 log = logging.getLogger("engfeed.engine")
@@ -62,7 +63,6 @@ def _set_run(**kw):
         c.execute("UPDATE refresh_runs SET " + sets + " WHERE id=1", tuple(kw.values()))
 
 def start(sources, parse_fn, scrape_fn, enrich_fn, save_fn, force=False):
-    """Атомарный межпроцессный замок: ровно один воркер выигрывает гонку."""
     global _thread_alive
     now = time.time()
     with db() as c:
@@ -88,6 +88,13 @@ def _run(sources, parse_fn, scrape_fn, enrich_fn, save_fn):
     global _thread_alive
     ok = failed = 0
     items = []
+    name_to_url = {s["source"]: s["url"] for s in sources}
+    try:
+        with db() as c:
+            known = {r["link"] for r in c.execute("SELECT link FROM posts").fetchall()}
+    except Exception:
+        known = set()
+    new_per_url = {}
     ex = ThreadPoolExecutor(max_workers=8)
     futs = {}
     try:
@@ -105,6 +112,12 @@ def _run(sources, parse_fn, scrape_fn, enrich_fn, save_fn):
                 except Exception:
                     r = None
                 if r:
+                    fresh = [it for it in r if it.get("link") not in known]
+                    for it in fresh:
+                        known.add(it.get("link"))
+                    u = name_to_url.get(s["source"])
+                    if u:
+                        new_per_url[u] = new_per_url.get(u, 0) + len(fresh)
                     items.extend(r)
                     ok += 1
                     report(s["url"], True, round(time.time() - t0, 2))
@@ -118,6 +131,18 @@ def _run(sources, parse_fn, scrape_fn, enrich_fn, save_fn):
                     failed += 1
                     report(s["url"], False)
             _set_run(failed=failed, last_error="deadline 20s: часть источников пропущена")
+        for u, n in new_per_url.items():
+            try:
+                interests.report_novelty(u, n)
+            except Exception as e:
+                log.warning(f"novelty report failed: {e}")
+        for s in sources:
+            u = s["url"]
+            if u not in new_per_url and s.get("interest"):
+                try:
+                    interests.report_novelty(u, 0)
+                except Exception:
+                    pass
         enriched = enrich_fn(items)
         save_fn(enriched)
     except Exception as e:
