@@ -11,7 +11,7 @@ from contextlib import contextmanager
 import feedparser
 import requests
 from bs4 import BeautifulSoup
-from flask import Flask, render_template_string, jsonify, request
+from flask import Flask, render_template_string, jsonify, request, session
 from auth import auth_bp, init_auth, AUTH_FRAGMENT
 import interests as interests_mod
 from interests import bp as interests_bp, init_interests, INTERESTS_FRAGMENT, interest_source_items, current_slugs
