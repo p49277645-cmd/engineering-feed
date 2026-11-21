@@ -801,16 +801,24 @@ body::after{bottom:20px;right:20px;border-left:none;border-top:none;}
 <script>
 var refreshTimer = null;
 var pollCount = 0;
+var runStamp = 0;
+var shownDone = 0;
 
 function emptyBtn(){ return document.querySelector('.empty-state button'); }
+
+function progressDone(st){
+    if (st.started_at !== runStamp){ runStamp = st.started_at; shownDone = 0; }
+    shownDone = Math.max(shownDone, (st.ok||0) + (st.failed||0));
+    return shownDone;
+}
 
 function setRefreshUI(running, st){
     var btn = document.getElementById('refreshBtn');
     var svg = btn ? btn.querySelector('svg') : null;
     var ebtn = emptyBtn();
     var bar = document.getElementById('refreshProgress');
-    var done = (st.ok||0) + (st.failed||0);
     if (running){
+        var done = progressDone(st);
         if (svg) svg.classList.add('spin');
         if (btn) btn.disabled = true;
         if (ebtn){ ebtn.disabled = true; ebtn.innerText = 'Обновление… ' + done + '/' + (st.total||0); }
@@ -828,9 +836,9 @@ function setRefreshUI(running, st){
 function calmState(title){
     var ps = document.querySelectorAll('.empty-state p');
     if (ps[0]) ps[0].innerText = title || 'Лента пока пуста';
-    if (ps[1]) ps[1].innerText = 'Источники опрошены. Свежих статей по твоим интересам ещё нет — обнови позже или добавь интересы.';
+    if (ps[1]) ps[1].innerText = 'Нажми «Обновить» — опросим источники и соберём статьи';
     var b = emptyBtn();
-    if (b){ b.disabled = false; b.innerText = 'Обновить ещё'; }
+    if (b){ b.disabled = false; b.innerText = 'Обновить'; }
 }
 
 function pollRefresh(){
@@ -861,6 +869,15 @@ function doRefresh(){
 }
 
 document.getElementById('refreshBtn').addEventListener('click', doRefresh);
+var NO_INTERESTS = {{ 'true' if no_interests else 'false' }};
+(function(){
+    if (NO_INTERESTS) return;
+    if (!document.querySelector('.empty-state')) return;
+    fetch('/api/refresh/status').then(function(r){return r.json();}).then(function(st){
+        if (st.running){ setRefreshUI(true, st); pollRefresh(); }
+        else { calmState('Лента пока пуста'); }
+    }).catch(function(){ calmState('Лента пока пуста'); });
+})();
 
 var readLinks = JSON.parse(localStorage.getItem('readLinks') || '[]');
 var bookmarks = JSON.parse(localStorage.getItem('bookmarks') || '[]');
