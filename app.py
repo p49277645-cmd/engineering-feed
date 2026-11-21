@@ -171,7 +171,11 @@ def interest_titles():
 def enrich_items(all_items):
     titles = interest_titles()
     enriched = []
+    now = time.time()
     for it in all_items:
+        ts0 = it.get("pub_time") or now
+        if ts0 < now - 45 * 86400:
+            continue
         slug = it.get("interest", "") or "topic"
         title = titles.get(slug, slug)
         ts = it.get("pub_time") or time.time()
@@ -213,7 +217,8 @@ def init_db():
                 category TEXT, fetched_at REAL, image TEXT, read_min INTEGER, "group" TEXT
             );
         """)
-        for col, typ in [("image", "TEXT"), ("read_min", "INTEGER"), ('"group"', "TEXT"), ("interest", "TEXT"), ("pub_time", "REAL")]:
+        for col, typ in [("image", "TEXT"), ("read_min", "INTEGER"), ('"group"', "TEXT"),
+                         ("interest", "TEXT"), ("pub_time", "REAL")]:
             try:
                 conn.execute("ALTER TABLE posts ADD COLUMN " + col + " " + typ)
             except Exception:
@@ -224,11 +229,12 @@ def save_to_db(items):
         for it in items:
             conn.execute("""
                 INSERT OR REPLACE INTO posts
-                (link, title, source, snippet, color, letter, day, time_str, category, fetched_at, image, read_min, "group", interest)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (link, title, source, snippet, color, letter, day, time_str, category, fetched_at, image, read_min, "group", interest, pub_time)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (it["link"], it["title"], it["source"], it["snippet"], it["color"], it["letter"],
                   it["day"], it["time_str"], it["category"], time.time(),
-                  it.get("image", ""), it.get("read_min", 5), it.get("group", "topic"), it.get("interest", "")))
+                  it.get("image", ""), it.get("read_min", 5), it.get("group", "topic"), it.get("interest", ""),
+                  it.get("pub_time", time.time())))
 
 def load_from_db(limit=200):
     with get_db() as conn:
