@@ -135,57 +135,114 @@ def reprobe(url):
     except Exception:
         return False
 
-def evaluate(q, text, domain):
-    f = feedparser.parse(text)
-    entries = f.entries[:20]
-    n = len(entries)
-    if n < 5:
-        return None
-    toks = [t for t in re.split(r"[^a-zа-яё0-9]+", q.lower()) if len(t) > 2]
-    rel_hits = 0
-    titles = []
-    stamps = []
-    cyr = 0
-    total_chars = 0
+def discover(query, force=False):
+    q = (query or "").strip()
+    slug = slugify(q)
     now = time.time()
-    fresh = 0
-    for e in entries:
-        title = e.get("title", "")
-        summ = e.get("summary", "")
-        titles.append(title.strip().lower())
-        blob = (title + " " + summ).lower()
-        if any(t in blob for t in toks):
-            rel_hits += 1 if any(t in title.lower() for t in toks) else 0.6
-        pp = getattr(e, "published_parsed", None)
-        if pp:
-            ts = time.mktime(pp)
-            stamps.append(ts)
-            if (now - ts) < 7 * 86400:
-                fresh += 1
-        body = title + " " + summ
-        total_chars += len(body)
-        cyr += sum(1 for ch in body if "а" <= ch <= "я" or ch == "ё")
-    rel = min(1.0, rel_hits / n)
-    fresh_ratio = fresh / n
-    if fresh_ratio == 0:
-        return None
-    stamps.sort(reverse=True)
-    gaps = [(stamps[i] - stamps[i + 1]) / 3600 for i in range(len(stamps) - 1)]
-    cadence_h = statistics.median(gaps) if gaps else 999
-    cadence_score = max(0.0, min(1.0, 1 - cadence_h / 168))
-    volume = min(1.0, n / 20)
-    want_ru = any("а" <= ch <= "я" for ch in q.lower())
-    lang_ratio = cyr / max(1, total_chars)
-    lang_ok = 1 if (not want_ru or lang_ratio > 0.15) else 0
-    uniq = len(set(titles)) / n
-    trust = 0.05 if domain in WHITELIST_BONUS else 0
-    score = (0.35 * rel + 0.25 * fresh_ratio + 0.15 * cadence_score +
-             0.10 * volume + 0.10 * lang_ok + trust)
-    score *= (0.5 + 0.5 * uniq)
-    if score < 0.35:
-        return None
-    return {"score": round(score, 3), "entries": n, "fresh": round(fresh_ratio, 2),
-            "cadence": round(cadence_h, 1), "rel": round(rel, 2), "lang": lang_ok}
+    with db() as c:
+        row = c.execute("SELECT * FROM interests WHERE slug=?", (slug,)).fetchone()
+        if row and not force and (now - row["refreshed_at"]) < CACHE_TTL:
+            srcs = c.execute("SELECT url,name,kind,domain,score FROM interest_sources WHERE slug=? AND rf_ok=1 AND stale=0 ORDER BY score DESC", (slug,)).fetchall()
+            if srcs:
+                return {"slug": slug, "title": row["title"],
+                        "top_sites": json.loads(row["top_sites"] or "[]"),
+                        "sources": [dict(s) for s in srcs], "cached": True}
+
+    top_sites, cands = [], []
+    try:
+        r = HTTP.get(f"https://html.duckduckgo.com/html/?q={quote_plus(q)}", timeout=(1.5, 2.0))
+        soup = BeautifulSoup(r.text, "html.parser")
+        links = []
+        for a in soup.find_all("a", href=True):
+            href = a["href"]
+            if "uddg=" in href:
+                href = unquote(href.split("uddg=")[1].split("&")[0])
+            if not href.startswith("http"):
+                continue
+            dom = re.sub(r"^www\.", "", urlparse(href).netloc)
+            if not dom or "duckduckgo" in dom:
+                continue
+            if dom not in top_sites:
+                top_sites.append(dom)
+            links.append((dom, href))
+        for dom, href in links:
+            if re.search(r"(rss|atom|feed|\.xml)", href, re.IGNORECASE):
+                cands.append((dom, href))
+        seen = set()
+        for dom, page in links:
+            if dom in seen:
+                continue
+            seen.add(dom)
+            for path in FEED_PATHS:
+                cands.append((dom, "https://" + dom + path))
+            if len(seen) >= 4:
+                break
+    except Exception as e:
+        logging.warning(f"DDG failed: {e}")
+
+    # Запросные фоллбэки, живые в РФ (не категории, а поиск по твоей теме)
+    cands = [("habr.com", f"https://habr.com/ru/rss/search/?q={quote_plus(q)}&fl=ru"),
+             ("arxiv.org", f"http://export.arxiv.org/api/query?search_query=all:{quote_plus(q)}&max_results=10")] + cands
+
+    rank_bonus = {}
+    for i, d in enumerate(top_sites[:5]):
+        rank_bonus[d] = max(0.0, 0.20 - 0.04 * i)
+
+    accepted = {}
+    def try_one(dom, url):
+        ok, lat, text = probe(url)
+        if not ok:
+            return None
+        m = evaluate(q, text, dom, rank_bonus.get(dom, 0.0))
+        if not m:
+            return None
+        if not reprobe(url):
+            return None
+        m.update({"url": url, "domain": dom, "latency": lat})
+        return m
+
+    with ThreadPoolExecutor(max_workers=10) as ex:
+        futs = [ex.submit(try_one, d, u) for d, u in cands[:12]]
+        try:
+            for fut in as_completed(futs, timeout=DISCOVER_DEADLINE):
+                m = fut.result()
+                if m and m["url"] not in accepted:
+                    accepted[m["url"]] = m
+        except Exception:
+            pass
+
+    ranked = sorted(accepted.values(), key=lambda m: -m["score"])[:6]
+    if not ranked:
+        gurl = f"https://news.google.com/rss/search?q={quote_plus(q)}&hl=ru&gl=RU&ceid=RU:ru"
+        ok, lat, text = probe(gurl)
+        if ok:
+            m = evaluate(q, text, "news.google.com", 0.0)
+            if m:
+                m.update({"url": gurl, "domain": "news.google.com", "latency": lat})
+                ranked = [m]
+    for m in ranked:
+        if m["domain"] not in top_sites:
+            top_sites.append(m["domain"])
+    top_sites = top_sites[:5]
+
+    with db() as c:
+        c.execute("INSERT OR REPLACE INTO interests(slug,title,top_sites,created_at,refreshed_at) VALUES (?,?,?,?,?)",
+                  (slug, q, json.dumps(top_sites, ensure_ascii=False), now, now))
+        if force:
+            c.execute("DELETE FROM interest_sources WHERE slug=?", (slug,))
+        for m in ranked:
+            c.execute("""INSERT INTO interest_sources(slug,url,name,kind,domain,score,rf_ok,fails,latency,checked_at,entries,fresh,cadence,rel,lang,stale)
+                         VALUES (?,?,?,?,?,?,1,0,?,?,?,?,?,?,?,0)
+                         ON CONFLICT(url) DO UPDATE SET rf_ok=1, fails=0, stale=0, stale_rounds=0,
+                         score=excluded.score, latency=excluded.latency, checked_at=excluded.checked_at,
+                         entries=excluded.entries, fresh=excluded.fresh, cadence=excluded.cadence,
+                         rel=excluded.rel, lang=excluded.lang""",
+                      (slug, m["url"], f"{m['domain']}: {q}", "site", m["domain"], m["score"],
+                       m["latency"], now, m["entries"], m["fresh"], m["cadence"], m["rel"], m["lang"]))
+    return {"slug": slug, "title": q, "top_sites": top_sites,
+            "sources": [{"url": m["url"], "name": f"{m['domain']}: {q}", "kind": "site",
+                         "domain": m["domain"], "score": m["score"]} for m in ranked],
+            "cached": False}
 
 def discover(query, force=False):
     q = (query or "").strip()
