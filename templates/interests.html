@@ -114,6 +114,26 @@
         box.appendChild(a);
       });
     });
+      // Рисуем чаты в сайдбаре
+    const chatBox = document.getElementById('chatRoomsBox');
+    if (chatBox) {
+      fetch('/api/chat/rooms').then(r => r.json()).then(data => {
+        chatBox.innerHTML = '';
+        if (data.rooms && data.rooms.length) {
+          data.rooms.forEach(room => {
+            const a = document.createElement('a');
+            a.className = 'side-item';
+            a.href = `/chat?room=${room.slug}`;
+            a.innerHTML = `
+              <svg viewBox="0 0 24 24" style="width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              <span>${room.title}</span>
+              ${room.unread_count > 0 ? `<span style="margin-left:auto;background:var(--accent-coral);color:var(--bg);padding:2px 8px;font-size:10px;font-weight:700;border-radius:10px;">${room.unread_count}</span>` : ''}
+            `;
+            chatBox.appendChild(a);
+          });
+        }
+      }).catch(e => console.error('Load chat rooms error:', e));
+    }
   }
   window.openInterests=function(){load(function(){err('');renderInt();renderCrs();renderSidebar();counts();ov.classList.add('open');});};
   document.getElementById('intClose').addEventListener('click',function(){ov.classList.remove('open');});
