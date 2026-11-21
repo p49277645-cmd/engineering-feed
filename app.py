@@ -802,19 +802,21 @@ body::after{bottom:20px;right:20px;border-left:none;border-top:none;}
 var refreshTimer = null;
 var pollCount = 0;
 
+function emptyBtn(){ return document.querySelector('.empty-state button'); }
+
 function setRefreshUI(running, st){
     var btn = document.getElementById('refreshBtn');
     var svg = btn ? btn.querySelector('svg') : null;
-    var ebtn = document.querySelector('.empty-state button');
+    var ebtn = emptyBtn();
     var bar = document.getElementById('refreshProgress');
+    var done = (st.ok||0) + (st.failed||0);
     if (running){
         if (svg) svg.classList.add('spin');
         if (btn) btn.disabled = true;
-        if (ebtn){ ebtn.disabled = true; ebtn.innerText = 'Обновление… ' + (st.ok||0) + '/' + (st.total||0); }
+        if (ebtn){ ebtn.disabled = true; ebtn.innerText = 'Обновление… ' + done + '/' + (st.total||0); }
         if (bar){
             bar.style.display = 'block';
-            var pct = st.total ? Math.round(100 * ((st.ok||0)+(st.failed||0)) / st.total) : 0;
-            bar.querySelector('i').style.width = pct + '%';
+            bar.querySelector('i').style.width = (st.total ? Math.round(100*done/st.total) : 0) + '%';
         }
     } else {
         if (svg) svg.classList.remove('spin');
@@ -823,25 +825,26 @@ function setRefreshUI(running, st){
     }
 }
 
+function calmState(title){
+    var ps = document.querySelectorAll('.empty-state p');
+    if (ps[0]) ps[0].innerText = title || 'Лента пока пуста';
+    if (ps[1]) ps[1].innerText = 'Источники опрошены. Свежих статей по твоим интересам ещё нет — обнови позже или добавь интересы.';
+    var b = emptyBtn();
+    if (b){ b.disabled = false; b.innerText = 'Обновить ещё'; }
+}
+
 function pollRefresh(){
     pollCount++;
-    if (pollCount > 40){
-        setRefreshUI(false, {});
-        var eb = document.querySelector('.empty-state button');
-        if (eb){ eb.disabled = false; eb.innerText = 'Ошибка. Попробовать снова'; }
-        return;
-    }
+    if (pollCount > 60){ setRefreshUI(false, {}); calmState('Обновление заняло слишком долго'); return; }
     fetch('/api/refresh/status').then(function(r){return r.json();}).then(function(st){
         if (st.running){
             setRefreshUI(true, st);
             refreshTimer = setTimeout(pollRefresh, 2500);
         } else {
+            sessionStorage.setItem('ef_run', String(Date.now()));
             setRefreshUI(false, st);
             if (st.ok > 0){ location.reload(); }
-            else {
-                var ebtn = document.querySelector('.empty-state button');
-                if (ebtn){ ebtn.disabled = false; ebtn.innerText = 'Попробовать снова'; }
-            }
+            else { calmState('Источники не ответили'); }
         }
     }).catch(function(){ refreshTimer = setTimeout(pollRefresh, 4000); });
 }
@@ -852,14 +855,20 @@ function doRefresh(){
         setRefreshUI(true, st);
         pollRefresh();
     }).catch(function(){
-        var ebtn = document.querySelector('.empty-state button');
-        if (ebtn){ ebtn.disabled = false; ebtn.innerText = 'Ошибка сети'; }
+        var b = emptyBtn();
+        if (b){ b.disabled = false; b.innerText = 'Ошибка сети'; }
     });
 }
 
 document.getElementById('refreshBtn').addEventListener('click', doRefresh);
 var NO_INTERESTS = {{ 'true' if no_interests else 'false' }};
-if (!NO_INTERESTS && document.querySelector('.empty-state')) doRefresh();
+(function(){
+    if (NO_INTERESTS) return;
+    if (!document.querySelector('.empty-state')) return;
+    var last = parseInt(sessionStorage.getItem('ef_run') || '0', 10);
+    if (Date.now() - last < 60000){ calmState('Лента пока пуста'); return; }
+    doRefresh();
+})();
 
 var readLinks = JSON.parse(localStorage.getItem('readLinks') || '[]');
 var bookmarks = JSON.parse(localStorage.getItem('bookmarks') || '[]');
