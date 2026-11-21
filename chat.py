@@ -109,44 +109,36 @@ def leave_room(slug):
 
 @bp.get("/api/chat/rooms/<slug>/messages")
 def get_messages(slug):
-    """Получить сообщения (long polling)"""
+    """Получить сообщения. Короткий ответ — не блокируем единственный sync-воркер."""
     uid = _uid()
     if not uid:
         return jsonify({"error": "not_authenticated"}), 401
-    
+
     since = request.args.get("since", 0, type=float)
-    timeout = request.args.get("timeout", 25, type=float)
-    
+
     with db() as c:
         room = c.execute("SELECT id FROM chat_rooms WHERE slug=?", (slug,)).fetchone()
         if not room:
             return jsonify({"error": "room_not_found"}), 404
-        
-        # Long polling: ждём новые сообщения
-        start = time.time()
-        while time.time() - start < timeout:
-            messages = c.execute("""
-                SELECT m.id, m.user_id, m.username, m.content, 
-                       m.attachment_type, m.attachment_url, m.attachment_size,
-                       m.created_at, m.edited_at
-                FROM chat_messages m
-                WHERE m.room_id = ? AND m.created_at > ? AND m.is_deleted = 0
-                ORDER BY m.created_at ASC
-                LIMIT 50
-            """, (room["id"], since)).fetchall()
-            
-            if messages:
-                # Обновляем last_read_at
-                c.execute("UPDATE chat_members SET last_read_at = ? WHERE user_id = ? AND room_id = ?",
-                          (time.time(), uid, room["id"]))
-                return jsonify({
-                    "messages": [dict(m) for m in messages],
-                    "last_timestamp": messages[-1]["created_at"]
-                })
-            
-            time.sleep(1)
-        
-        # Если ничего не появилось
+
+        messages = c.execute("""
+            SELECT m.id, m.user_id, m.username, m.content,
+                   m.attachment_type, m.attachment_url, m.attachment_size,
+                   m.created_at, m.edited_at
+            FROM chat_messages m
+            WHERE m.room_id = ? AND m.created_at > ? AND m.is_deleted = 0
+            ORDER BY m.created_at ASC
+            LIMIT 50
+        """, (room["id"], since)).fetchall()
+
+        if messages:
+            c.execute("UPDATE chat_members SET last_read_at = ? WHERE user_id = ? AND room_id = ?",
+                      (time.time(), uid, room["id"]))
+            return jsonify({
+                "messages": [dict(m) for m in messages],
+                "last_timestamp": messages[-1]["created_at"]
+            })
+
         return jsonify({"messages": [], "last_timestamp": since})
 
 @bp.post("/api/chat/rooms/<slug>/messages")
