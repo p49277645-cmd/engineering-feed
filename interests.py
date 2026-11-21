@@ -528,6 +528,12 @@ def save_state(feed_slugs, courses):
             session["interests"] = feed_slugs
             session["courses"] = courses
     session["onboarded"] = 1
+        # Создаём комнаты чатов для новых интересов
+        from chat import create_room_for_interest
+        for slug in feed_slugs:
+            row = c.execute("SELECT title FROM interests WHERE slug=?", (slug,)).fetchone()
+            if row:
+                create_room_for_interest(slug, row["title"])
     return get_state()
 
 def adopt_guest_interests(uid):
