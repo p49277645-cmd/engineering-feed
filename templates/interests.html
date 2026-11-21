@@ -1,0 +1,172 @@
+<style>
+.int-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(8px);z-index:210;align-items:center;justify-content:center;}
+.int-overlay.open{display:flex;}
+.int-box{width:100%;max-width:600px;max-height:88vh;overflow-y:auto;background:var(--panel);border:1px solid var(--border);border-top:3px solid var(--accent-emerald);padding:28px;position:relative;}
+.int-box h2{font-family:'JetBrains Mono',monospace;font-size:20px;color:var(--accent-emerald);margin-bottom:6px;}
+.int-box h2::before{content:'// ';color:var(--accent-coral);}
+.int-sub{font-size:12px;color:var(--t3);margin-bottom:16px;font-family:'JetBrains Mono',monospace;}
+.int-tabs{display:flex;gap:8px;margin-bottom:16px;}
+.int-tab{flex:1;height:36px;border:1px solid var(--border);background:var(--card);color:var(--t2);font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;cursor:pointer;}
+.int-tab.active{background:var(--accent-emerald);color:var(--bg);border-color:var(--accent-emerald);}
+.int-search{display:flex;gap:8px;margin-bottom:12px;}
+.int-search input{flex:1;height:42px;background:var(--card);border:1px solid var(--border);color:var(--t1);padding:0 12px;font-family:'JetBrains Mono',monospace;outline:none;}
+.int-search button{height:42px;padding:0 16px;background:var(--accent-emerald);border:none;color:var(--bg);font-weight:700;font-family:'JetBrains Mono',monospace;cursor:pointer;}
+.int-tops{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;}
+.int-top{font-size:11px;color:var(--t3);border:1px dashed var(--border);padding:4px 8px;font-family:'JetBrains Mono',monospace;}
+.int-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
+.int-chip{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--card);border:1px solid var(--accent-emerald);color:var(--t1);font-family:'JetBrains Mono',monospace;font-size:12px;}
+.int-chip .rm{color:var(--accent-coral);font-weight:700;cursor:pointer;}
+.int-count{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--t2);margin-bottom:12px;}
+.int-count b{color:var(--accent-emerald);}
+.int-save{width:100%;height:44px;background:var(--accent-sand);border:none;color:var(--bg);font-weight:800;font-family:'JetBrains Mono',monospace;cursor:pointer;}
+.int-ghost{width:100%;height:36px;margin-top:8px;background:var(--card2);border:none;color:var(--t3);font-family:'JetBrains Mono',monospace;font-size:12px;cursor:pointer;}
+.int-close{position:absolute;top:12px;right:12px;width:30px;height:30px;border:1px solid var(--border);background:var(--card);color:var(--t2);cursor:pointer;}
+.int-err{color:var(--accent-coral);font-size:12px;font-family:'JetBrains Mono',monospace;margin-bottom:10px;display:none;}
+.crs-row{display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--border);background:var(--card);margin-bottom:8px;}
+.crs-row .t{flex:1;font-size:12px;color:var(--t1);font-family:'JetBrains Mono',monospace;}
+.crs-row .n{font-size:10px;color:var(--t3);}
+.crs-row button{height:30px;padding:0 12px;background:var(--accent-emerald);border:none;color:var(--bg);font-weight:700;font-family:'JetBrains Mono',monospace;font-size:11px;cursor:pointer;}
+.course-card{display:flex;align-items:center;gap:10px;width:100%;padding:12px;margin-bottom:8px;border:1px solid var(--border);border-left:3px solid var(--accent-sand);background:var(--card);color:var(--t1);font-size:12px;font-family:'JetBrains Mono',monospace;text-decoration:none;transition:.2s;}
+.course-card:hover{border-color:var(--accent-sand);background:var(--card2);transform:translateX(4px);}
+.course-card .star{color:var(--accent-sand);}
+</style>
+<div class="int-overlay" id="intOverlay">
+  <div class="int-box">
+    <button class="int-close" id="intClose">✕</button>
+    <h2>Настрой свою ленту</h2>
+    <div class="int-sub">до <span id="intMax">10</span> любых интересов · до 3 бесплатных курсов ★</div>
+    <div class="int-tabs">
+      <button class="int-tab active" id="tabInt">Интересы</button>
+      <button class="int-tab" id="tabCrs">Курсы ★</button>
+    </div>
+    <div class="int-err" id="intErr"></div>
+    <div id="panInt">
+      <div class="int-search"><input id="intQ" placeholder="любая тема: квантовая физика / выпечка / rust"><button id="intFind">Найти</button></div>
+      <div class="int-tops" id="intTops"></div>
+      <div class="int-chips" id="intChips"></div>
+    </div>
+    <div id="panCrs" style="display:none">
+      <div class="int-search"><input id="crsQ" placeholder="python / физика / электроника"><button id="crsFind">Найти бесплатные</button></div>
+      <div id="crsList"></div>
+      <div class="int-chips" id="crsChips"></div>
+    </div>
+    <div class="int-count" id="intCount"></div>
+    <button class="int-save" id="intSave">Сохранить и собрать ленту</button>
+    <button class="int-ghost" id="intClear">Очистить всё</button>
+    <button class="int-ghost" id="intSkip">Пропустить (выберу позже)</button>
+  </div>
+</div>
+<script>
+(function(){
+  var state={interests:[],courses:[],limits:{feed_max:10,course_max:3},is_user:false,onboarded:false,stale:false};
+  var ov=document.getElementById('intOverlay');
+  function err(t){var e=document.getElementById('intErr');e.innerText=t||'';e.style.display=t?'block':'none';}
+  function load(cb){fetch('/api/interests').then(function(r){return r.json();}).then(function(d){state=d;if(cb)cb();});}
+  function counts(){
+    document.getElementById('intCount').innerHTML='интересов: <b>'+state.interests.length+'/'+state.limits.feed_max+'</b> · курсов: <b>'+state.courses.length+'/'+state.limits.course_max+'</b>';
+    document.getElementById('intMax').innerText=state.limits.feed_max;
+  }
+  function renderInt(){
+    var box=document.getElementById('intChips');box.innerHTML='';
+    state.interests.forEach(function(it){
+      var c=document.createElement('span');c.className='int-chip';
+      c.innerHTML=it.title+' <span class="rm">✕</span>';
+      c.querySelector('.rm').addEventListener('click',function(){state.interests=state.interests.filter(function(x){return x.slug!==it.slug;});renderInt();counts();});
+      box.appendChild(c);
+    });
+  }
+  function renderCrs(){
+    var box=document.getElementById('crsChips');box.innerHTML='';
+    state.courses.forEach(function(cr){
+      var c=document.createElement('span');c.className='int-chip';
+      c.innerHTML='★ '+cr.title+' <span class="rm">✕</span>';
+      c.querySelector('.rm').addEventListener('click',function(){state.courses=state.courses.filter(function(x){return x.url!==cr.url;});renderCrs();counts();});
+      box.appendChild(c);
+    });
+  }
+  function renderSidebar(){
+    var COLORS=['#10b981','#ef4444','#a855f7','#f59e0b','#14b8a6','#3b82f6','#f97316'];
+    function hash(s){var x=0;for(var i=0;i<s.length;i++){x=(x*31+s.charCodeAt(i))>>>0;}return x;}
+    var ib=document.getElementById('interestsBox');
+    if(ib){ib.innerHTML='';
+      state.interests.forEach(function(i){
+        var b=document.createElement('button');b.type='button';b.className='cat-card';
+        b.style.setProperty('--c',COLORS[hash(i.slug)%COLORS.length]);
+        b.innerHTML='<span class="cat-letter">'+i.title.charAt(0).toUpperCase()+'</span><span class="cat-name">'+i.title+'</span>';
+        b.addEventListener('click',function(){location.href='/?int='+encodeURIComponent(i.slug);});
+        ib.appendChild(b);
+      });
+    }
+    var cb=document.getElementById('coursesBox');
+    if(cb){cb.innerHTML='';
+      state.courses.forEach(function(cr){
+        var a=document.createElement('a');a.className='course-card';a.href=cr.url;a.target='_blank';a.rel='noopener';
+        a.innerHTML='<span class="star">★</span><span>'+cr.title+'</span>';
+        cb.appendChild(a);
+      });
+    }
+  }
+  window.openInterests=function(){load(function(){err('');renderInt();renderCrs();renderSidebar();counts();ov.classList.add('open');});};
+  document.getElementById('intClose').addEventListener('click',function(){ov.classList.remove('open');});
+  ov.addEventListener('click',function(e){if(e.target===ov)ov.classList.remove('open');});
+  document.getElementById('tabInt').addEventListener('click',function(){
+    this.classList.add('active');document.getElementById('tabCrs').classList.remove('active');
+    document.getElementById('panInt').style.display='block';document.getElementById('panCrs').style.display='none';});
+  document.getElementById('tabCrs').addEventListener('click',function(){
+    this.classList.add('active');document.getElementById('tabInt').classList.remove('active');
+    document.getElementById('panCrs').style.display='block';document.getElementById('panInt').style.display='none';});
+  document.getElementById('intFind').addEventListener('click',function(){
+    var q=document.getElementById('intQ').value.trim();if(!q)return;
+    err('');document.getElementById('intTops').innerText='перебираю пути и оцениваю сайты…';
+    fetch('/api/interests/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({q:q})})
+    .then(function(r){return r.json().then(function(d){return {s:r.status,d:d};});})
+    .then(function(x){
+      document.getElementById('intTops').innerHTML='';
+      if(x.s!==200){err(x.d.error==='banned_topic'?'Такая тема запрещена':'Не нашёл качественных источников по этой теме');return;}
+      if(state.interests.length>=state.limits.feed_max){err('Лимит интересов');return;}
+      if(state.interests.some(function(i){return i.slug===x.d.slug;})){err('Уже добавлено');return;}
+      state.interests.push({slug:x.d.slug,title:x.d.title});
+      (x.d.top_sites||[]).forEach(function(s){var sp=document.createElement('span');sp.className='int-top';sp.innerText=s;document.getElementById('intTops').appendChild(sp);});
+      renderInt();counts();
+    }).catch(function(){document.getElementById('intTops').innerHTML='';err('Ошибка сети');});
+  });
+  document.getElementById('crsFind').addEventListener('click',function(){
+    var q=document.getElementById('crsQ').value.trim();if(!q)return;
+    err('');document.getElementById('crsList').innerHTML='ищу бесплатные курсы…';
+    fetch('/api/interests/courses?q='+encodeURIComponent(q))
+    .then(function(r){return r.json();})
+    .then(function(d){
+      var box=document.getElementById('crsList');box.innerHTML='';
+      if(!d.courses||!d.courses.length){box.innerHTML='';err('Бесплатных курсов не найдено');return;}
+      d.courses.forEach(function(cr){
+        var row=document.createElement('div');row.className='crs-row';
+        row.innerHTML='<span class="t">'+cr.title+'</span><span class="n">'+(cr.learners||0)+' уч.</span>';
+        var b=document.createElement('button');b.innerText='Добавить';
+        b.addEventListener('click',function(){
+          if(state.courses.length>=state.limits.course_max){err('Максимум 3 курса');return;}
+          if(state.courses.some(function(x){return x.url===cr.url;})){err('Уже добавлен');return;}
+          state.courses.push(cr);renderCrs();counts();
+        });
+        row.appendChild(b);box.appendChild(row);
+      });
+    }).catch(function(){document.getElementById('crsList').innerHTML='';err('Ошибка сети');});
+  });
+  document.getElementById('intClear').addEventListener('click',function(){state.interests=[];state.courses=[];renderInt();renderCrs();counts();err('');});
+  document.getElementById('intSkip').addEventListener('click',function(){
+    sessionStorage.setItem('ef_skip','1');
+    fetch('/api/interests/skip',{method:'POST'}).then(function(){ov.classList.remove('open');});
+  });
+  document.getElementById('intSave').addEventListener('click',function(){
+    fetch('/api/interests/save',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({interests:state.interests.map(function(i){return i.slug;}),courses:state.courses})})
+    .then(function(r){return r.json();})
+    .then(function(d){state=d;sessionStorage.removeItem('ef_skip');ov.classList.remove('open');renderSidebar();location.reload();});
+  });
+  load(function(){
+    renderSidebar();
+    if(state.interests.length===0 && !sessionStorage.getItem('ef_skip')){
+      setTimeout(function(){renderInt();renderCrs();counts();ov.classList.add('open');},800);
+    }
+  });
+})();
+</script>
