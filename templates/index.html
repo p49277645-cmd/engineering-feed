@@ -140,6 +140,57 @@ body::after{bottom:20px;right:20px;border-left:none;border-top:none;}
 .cat-card:hover{border-color:var(--c);transform:translateX(4px);background:var(--card2);}
 .cat-card.active{border-color:var(--c);background:rgba(255,255,255,0.02);}
 .cat-card.active::before{transform:scaleX(1);}
+.cat-card{animation:catIn .4s ease both;}
+@keyframes catIn{from{opacity:0;transform:translateY(10px) scale(.96);}to{opacity:1;transform:none;}}
+
+/* Стили для карточек курсов в сайдбаре */
+.course-card{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  width:100%;
+  padding:12px;
+  margin-bottom:8px;
+  border:1px solid var(--border);
+  border-left:3px solid var(--accent-sand);
+  background:var(--card);
+  color:var(--t1);
+  font-size:12px;
+  font-family:'JetBrains Mono',monospace;
+  text-decoration:none;
+  transition:.2s;
+  animation:courseIn .4s ease both;
+}
+@keyframes courseIn{from{opacity:0;transform:translateX(-10px);}to{opacity:1;transform:none;}}
+.course-card:hover{
+  border-color:var(--accent-sand);
+  background:var(--card2);
+  transform:translateX(4px);
+}
+.course-star{
+  color:var(--accent-sand);
+  font-size:18px;
+  font-weight:700;
+  flex-shrink:0;
+}
+.course-info{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  min-width:0;
+}
+.course-title{
+  font-size:12px;
+  font-weight:600;
+  color:var(--t1);
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.course-learners{
+  font-size:10px;
+  color:var(--t3);
+}
 .cat-letter{width:36px;height:36px;display:grid;place-items:center;background:var(--card2);border:1px solid var(--border);font-size:16px;font-weight:700;color:var(--c);font-family:'JetBrains Mono', monospace;}
 .cat-name{font-size:13px;font-weight:600;color:var(--t1);}
 .manage{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--t3);margin-top:20px;padding:10px;cursor:pointer;border-top:1px solid var(--border);font-family:'JetBrains Mono', monospace;}
