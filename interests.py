@@ -406,9 +406,11 @@ def search_courses(q, limit=6):
         r = HTTP.get(f"https://stepik.org/api/courses?search={quote_plus(q)}&page=1", timeout=(2.0, 3.0))
         r.raise_for_status()
         for c in r.json().get("courses", []):
-            if c.get("is_paid"):
-                continue
-            if c.get("price") not in (None, 0, "0", ""):
+            # Берём курс, если он бесплатный (price=0) ИЛИ если у него есть бесплатный доступ
+            price = c.get("price")
+            is_paid = c.get("is_paid", False)
+            # Если цена 0 или None — берём, даже если is_paid=True (бесплатный доступ)
+            if price not in (0, "0", None, ""):
                 continue
             out.append({"id": c["id"], "title": c.get("title", "Курс"),
                         "url": f"https://stepik.org/course/{c['id']}",
