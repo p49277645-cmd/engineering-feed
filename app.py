@@ -339,6 +339,11 @@ def api_refresh():
 @app.route('/api/refresh/status')
 def api_refresh_status():
     return jsonify(engine.status())
+@app.route('/chat')
+def chat_page():
+    if not session.get("uid"):
+        return jsonify({"error": "not_authenticated"}), 401
+    return render_template_string(CHAT_TEMPLATE)
 
 @app.route('/health')
 def health():
@@ -348,6 +353,6 @@ try:
     engine.warm_if_needed(current_sources(), parse_rss, scrape_html, enrich_items, save_to_db)
 except Exception as e:
     logger.error(f"warm failed: {e}")
-
+CHAT_TEMPLATE = open(os.path.join(BASE_DIR, "templates", "chat.html"), encoding="utf-8").read()
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=PORT, debug=False)
