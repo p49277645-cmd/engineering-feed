@@ -757,9 +757,9 @@ body::after{bottom:20px;right:20px;border-left:none;border-top:none;}
         </div>
         {% elif not news %}
         <div class="empty-state">
-            <p>Лента пуста</p>
-            <p style="font-size:13px;color:var(--t3);">Загрузка источников...</p>
-            <button onclick="doRefresh()">Загрузить</button>
+            <p>Лента пока пуста</p>
+            <p style="font-size:13px;color:var(--t3);">Нажми «Обновить» — опросим источники и соберём статьи</p>
+            <button onclick="doRefresh()">Обновить</button>
         </div>
         {% endif %}
 
@@ -861,14 +861,6 @@ function doRefresh(){
 }
 
 document.getElementById('refreshBtn').addEventListener('click', doRefresh);
-var NO_INTERESTS = {{ 'true' if no_interests else 'false' }};
-(function(){
-    if (NO_INTERESTS) return;
-    if (!document.querySelector('.empty-state')) return;
-    var last = parseInt(sessionStorage.getItem('ef_run') || '0', 10);
-    if (Date.now() - last < 60000){ calmState('Лента пока пуста'); return; }
-    doRefresh();
-})();
 
 var readLinks = JSON.parse(localStorage.getItem('readLinks') || '[]');
 var bookmarks = JSON.parse(localStorage.getItem('bookmarks') || '[]');
