@@ -1,3 +1,4 @@
+import interests as interests_mod
 import os
 import re
 import time
@@ -281,6 +282,7 @@ except Exception as e:
     logger.error(f"init_engine failed: {e}")
 app.register_blueprint(auth_bp)
 app.register_blueprint(interests_bp)
+interests_mod.set_refresher(lambda: engine.start(current_sources(), parse_rss, scrape_html, enrich_items, save_to_db))
 interests_mod.set_refresher(lambda: engine.start(current_sources(), parse_rss, scrape_html, enrich_items, save_to_db))
 
 HTML_TEMPLATE = load_template()
