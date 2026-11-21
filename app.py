@@ -1,4 +1,3 @@
-import interests as interests_mod
 import os
 import re
 import time
@@ -29,6 +28,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get("DB_PATH", "engfeed.db")
 PORT = int(os.environ.get("PORT", 5000))
 TPL_PATH = os.path.join(BASE_DIR, "templates", "index.html")
+CHAT_TPL_PATH = os.path.join(BASE_DIR, "templates", "chat.html")
 
 PALETTE = ['#10b981', '#ef4444', '#a855f7', '#f59e0b', '#14b8a6', '#3b82f6', '#f97316']
 
@@ -60,10 +60,7 @@ PYTHON_DB = {
     }
 }
 
-FALLBACK_HTML = ('<!DOCTYPE html><html><head><meta charset="utf-8"><title>EngFeed</title></head>'
-                 '<body style="background:#0d0e0f;color:#e8e6e3;font-family:monospace;padding:40px">'
-                 '<h1>EngFeed</h1><p>Шаблон ленты недоступен: проверь файл templates/index.html.</p>'
-                 '<p><a href="/health" style="color:#d4b896">/health</a></p></body></html>')
+FALLBACK_HTML = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>EngFeed</title></head><body style="background:#0d0e0f;color:#e8e6e3;font-family:monospace;padding:40px"><h1>EngFeed</h1><p>Шаблон недоступен.</p></body></html>'
 
 def clean_text(text):
     if not text: return ""
@@ -104,7 +101,7 @@ def read_minutes(title):
 
 def parse_rss(item):
     try:
-        resp = SESSION.get(item["url"], timeout=(2, 3))
+        resp = SESSION.get(item["url"], timeout=(3, 6))
         resp.raise_for_status()
         feed = feedparser.parse(resp.content)
         results = []
@@ -130,7 +127,7 @@ def parse_rss(item):
 
 def scrape_html(item):
     try:
-        resp = SESSION.get(item["url"], timeout=(2, 3))
+        resp = SESSION.get(item["url"], timeout=(3, 6))
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
         base_url = "/".join(item["url"].split("/")[:3])
@@ -264,6 +261,14 @@ def load_template():
         logger.error(f"template load failed: {e}")
         return FALLBACK_HTML
 
+def load_chat_template():
+    try:
+        with open(CHAT_TPL_PATH, encoding="utf-8") as f:
+            return f.read()
+    except Exception as e:
+        logger.error(f"chat template load failed: {e}")
+        return FALLBACK_HTML
+
 app = Flask(__name__)
 try:
     init_db()
@@ -278,16 +283,20 @@ try:
 except Exception as e:
     logger.error(f"init_interests failed: {e}")
 try:
+    init_chat(app)
+except Exception as e:
+    logger.error(f"init_chat failed: {e}")
+try:
     engine.init_engine([])
 except Exception as e:
     logger.error(f"init_engine failed: {e}")
 app.register_blueprint(auth_bp)
 app.register_blueprint(interests_bp)
 app.register_blueprint(chat_bp)
-init_chat(app)
 interests_mod.set_refresher(lambda: engine.start(current_sources(), parse_rss, scrape_html, enrich_items, save_to_db))
 
 HTML_TEMPLATE = load_template()
+CHAT_TEMPLATE = load_chat_template()
 
 def render_page(**ctx):
     try:
@@ -323,6 +332,16 @@ def wiki_python():
     topic = request.args.get('topic', list(PYTHON_DB.keys())[0])
     return render_page(active_tab='python', db=PYTHON_DB, current_topic=topic, news=[], groups={}, no_interests=False)
 
+@app.route('/chat')
+def chat_page():
+    if not session.get("uid"):
+        return jsonify({"error": "not_authenticated"}), 401
+    try:
+        return render_template_string(CHAT_TEMPLATE, session=session)
+    except Exception as e:
+        logger.error(f"chat render failed: {e}")
+        return FALLBACK_HTML
+
 @app.route('/api/feed')
 def api_feed():
     news, no_interests = feed_news()
@@ -339,11 +358,6 @@ def api_refresh():
 @app.route('/api/refresh/status')
 def api_refresh_status():
     return jsonify(engine.status())
-@app.route('/chat')
-def chat_page():
-    if not session.get("uid"):
-        return jsonify({"error": "not_authenticated"}), 401
-    return render_template_string(CHAT_TEMPLATE)
 
 @app.route('/health')
 def health():
@@ -353,6 +367,6 @@ try:
     engine.warm_if_needed(current_sources(), parse_rss, scrape_html, enrich_items, save_to_db)
 except Exception as e:
     logger.error(f"warm failed: {e}")
-CHAT_TEMPLATE = open(os.path.join(BASE_DIR, "templates", "chat.html"), encoding="utf-8").read()
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=PORT, debug=False)
