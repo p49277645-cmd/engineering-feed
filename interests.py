@@ -91,6 +91,46 @@ def init_interests(app):
         CREATE TABLE IF NOT EXISTS user_courses(
             user_id INTEGER, course_id INTEGER, pos INTEGER, PRIMARY KEY(user_id, course_id));
         CREATE TABLE IF NOT EXISTS meta(k TEXT PRIMARY KEY, v TEXT);
+                # Таблицы для чатов
+        c.executescript("""
+        CREATE TABLE IF NOT EXISTS chat_rooms(
+            id INTEGER PRIMARY KEY,
+            slug TEXT UNIQUE NOT NULL,
+            title TEXT NOT NULL,
+            created_at REAL DEFAULT 0,
+            is_active INTEGER DEFAULT 1);
+        
+        CREATE TABLE IF NOT EXISTS chat_members(
+            user_id INTEGER,
+            room_id INTEGER,
+            joined_at REAL DEFAULT 0,
+            last_read_at REAL DEFAULT 0,
+            is_muted INTEGER DEFAULT 0,
+            PRIMARY KEY(user_id, room_id));
+        
+        CREATE TABLE IF NOT EXISTS chat_messages(
+            id INTEGER PRIMARY KEY,
+            room_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            username TEXT NOT NULL,
+            content TEXT NOT NULL,
+            attachment_type TEXT,
+            attachment_url TEXT,
+            attachment_size INTEGER,
+            created_at REAL NOT NULL,
+            is_deleted INTEGER DEFAULT 0,
+            edited_at REAL);
+        
+        CREATE TABLE IF NOT EXISTS chat_reports(
+            id INTEGER PRIMARY KEY,
+            message_id INTEGER NOT NULL,
+            reporter_id INTEGER NOT NULL,
+            reason TEXT NOT NULL,
+            created_at REAL NOT NULL,
+            resolved INTEGER DEFAULT 0);
+        
+        CREATE INDEX IF NOT EXISTS idx_messages_room ON chat_messages(room_id, created_at);
+        CREATE INDEX IF NOT EXISTS idx_members_user ON chat_members(user_id);
         """)
         try:
             c.execute("ALTER TABLE posts ADD COLUMN interest TEXT DEFAULT ''")
