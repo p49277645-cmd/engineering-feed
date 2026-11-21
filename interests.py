@@ -286,14 +286,38 @@ def discover(query, force=False):
 
     ranked = sorted(accepted.values(), key=lambda m: -m["score"])[:6]
     logging.info(f"discover '{q}': cands={len(cands)} accepted={len(ranked)}")
+    
+    # === АВАРИЙНЫЙ ФАЛЛБЭК ДЛЯ РФ С ПРОВЕРКОЙ СВЕЖЕСТИ (не старше 30 дней) ===
     if not ranked:
-        gurl = f"https://news.google.com/rss/search?q={quote_plus(q)}&hl=ru&gl=RU&ceid=RU:ru"
-        ok, lat, text = probe(gurl)
-        if ok:
-            m = evaluate(q, text, "news.google.com", 0.0)
-            if m:
-                m.update({"url": gurl, "domain": "news.google.com", "latency": lat})
-                ranked = [m]
+        fallback = [
+            ("habr.com", f"https://habr.com/ru/rss/search/?q={quote_plus(q)}&fl=ru"),
+            ("nplus1.ru", "https://nplus1.ru/rss"),
+            ("elementy.ru", "https://elementy.ru/rss/news"),
+            ("opennet.ru", "https://www.opennet.ru/opennews/opennews_all.rss"),
+            ("cyberleninka.ru", "https://cyberleninka.ru/article/rss"),
+        ]
+        with ThreadPoolExecutor(max_workers=5) as ex_fb:
+            futs_fb = [ex_fb.submit(probe, u) for _, u in fallback]
+            for (dom, u), fut in zip(fallback, futs_fb):
+                try:
+                    ok, lat, text = fut.result(timeout=6)
+                except Exception:
+                    continue
+                if not ok:
+                    continue
+                ent = feedparser.parse(text).entries
+                if len(ent) < 3:
+                    continue
+                # Проверка: есть ли хотя бы одна статья за последние 30 дней
+                if not any((time.time() - time.mktime(e.published_parsed)) < 30*86400
+                           for e in ent if getattr(e, "published_parsed", None)):
+                    continue
+                
+                accepted[u] = {"url": u, "domain": dom, "score": 0.5,
+                               "latency": lat, "entries": 3, "fresh": 0.5,
+                               "cadence": 24, "rel": 0.5, "lang": 1}
+        ranked = sorted(accepted.values(), key=lambda m: -m["score"])[:6]
+        logging.info(f"discover '{q}' FALLBACK: accepted={len(ranked)}")
     for m in ranked:
         if m["domain"] not in top_sites:
             top_sites.append(m["domain"])
