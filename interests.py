@@ -1,4 +1,4 @@
-# interests.py v7 — широкие таймауты, морфология RU, запросные фоллбэки, свободный порог
+# interests.py — Полная версия с интеграцией чатов и исправленными кавычками
 import os, re, json, time, sqlite3, logging, threading, statistics
 from contextlib import contextmanager
 from urllib.parse import quote_plus, urlparse, unquote
@@ -91,49 +91,28 @@ def init_interests(app):
         CREATE TABLE IF NOT EXISTS user_courses(
             user_id INTEGER, course_id INTEGER, pos INTEGER, PRIMARY KEY(user_id, course_id));
         CREATE TABLE IF NOT EXISTS meta(k TEXT PRIMARY KEY, v TEXT);
-                # Таблицы для чатов
-        c.executescript("""
+        
         CREATE TABLE IF NOT EXISTS chat_rooms(
-            id INTEGER PRIMARY KEY,
-            slug TEXT UNIQUE NOT NULL,
-            title TEXT NOT NULL,
-            created_at REAL DEFAULT 0,
-            is_active INTEGER DEFAULT 1);
-        
+            id INTEGER PRIMARY KEY, slug TEXT UNIQUE NOT NULL, title TEXT NOT NULL,
+            created_at REAL DEFAULT 0, is_active INTEGER DEFAULT 1);
         CREATE TABLE IF NOT EXISTS chat_members(
-            user_id INTEGER,
-            room_id INTEGER,
-            joined_at REAL DEFAULT 0,
-            last_read_at REAL DEFAULT 0,
-            is_muted INTEGER DEFAULT 0,
+            user_id INTEGER, room_id INTEGER, joined_at REAL DEFAULT 0,
+            last_read_at REAL DEFAULT 0, is_muted INTEGER DEFAULT 0,
             PRIMARY KEY(user_id, room_id));
-        
         CREATE TABLE IF NOT EXISTS chat_messages(
-            id INTEGER PRIMARY KEY,
-            room_id INTEGER NOT NULL,
-            user_id INTEGER NOT NULL,
-            username TEXT NOT NULL,
-            content TEXT NOT NULL,
-            attachment_type TEXT,
-            attachment_url TEXT,
-            attachment_size INTEGER,
-            created_at REAL NOT NULL,
-            is_deleted INTEGER DEFAULT 0,
-            edited_at REAL);
-        
+            id INTEGER PRIMARY KEY, room_id INTEGER NOT NULL, user_id INTEGER NOT NULL,
+            username TEXT NOT NULL, content TEXT NOT NULL, attachment_type TEXT,
+            attachment_url TEXT, attachment_size INTEGER, created_at REAL NOT NULL,
+            is_deleted INTEGER DEFAULT 0, edited_at REAL);
         CREATE TABLE IF NOT EXISTS chat_reports(
-            id INTEGER PRIMARY KEY,
-            message_id INTEGER NOT NULL,
-            reporter_id INTEGER NOT NULL,
-            reason TEXT NOT NULL,
-            created_at REAL NOT NULL,
-            resolved INTEGER DEFAULT 0);
-        
+            id INTEGER PRIMARY KEY, message_id INTEGER NOT NULL, reporter_id INTEGER NOT NULL,
+            reason TEXT NOT NULL, created_at REAL NOT NULL, resolved INTEGER DEFAULT 0);
         CREATE INDEX IF NOT EXISTS idx_messages_room ON chat_messages(room_id, created_at);
         CREATE INDEX IF NOT EXISTS idx_members_user ON chat_members(user_id);
         """)
         try:
             c.execute("ALTER TABLE posts ADD COLUMN interest TEXT DEFAULT ''")
+            c.execute("ALTER TABLE posts ADD COLUMN pub_time REAL")
         except Exception:
             pass
         for col, typ in [("domain", "TEXT DEFAULT ''"), ("score", "REAL DEFAULT 0"),
@@ -191,7 +170,6 @@ def _stem(w):
     return w
 
 def evaluate(q, text, domain, bonus=0.0):
-    """Честная оценка: релевантность по основам слов, свежесть, частота, объём, язык, дубли."""
     f = feedparser.parse(text)
     entries = f.entries[:20]
     n = len(entries)
@@ -331,7 +309,6 @@ def discover(query, force=False):
     ranked = sorted(accepted.values(), key=lambda m: -m["score"])[:6]
     logging.info(f"discover '{q}': cands={len(cands)} accepted={len(ranked)}")
     
-    # === АВАРИЙНЫЙ ФАЛЛБЭК ДЛЯ РФ С ПРОВЕРКОЙ СВЕЖЕСТИ (не старше 30 дней) ===
     if not ranked:
         fallback = [
             ("habr.com", f"https://habr.com/ru/rss/search/?q={quote_plus(q)}&fl=ru"),
@@ -352,16 +329,15 @@ def discover(query, force=False):
                 ent = feedparser.parse(text).entries
                 if len(ent) < 3:
                     continue
-                # Проверка: есть ли хотя бы одна статья за последние 30 дней
                 if not any((time.time() - time.mktime(e.published_parsed)) < 30*86400
                            for e in ent if getattr(e, "published_parsed", None)):
                     continue
-                
                 accepted[u] = {"url": u, "domain": dom, "score": 0.5,
                                "latency": lat, "entries": 3, "fresh": 0.5,
                                "cadence": 24, "rel": 0.5, "lang": 1}
         ranked = sorted(accepted.values(), key=lambda m: -m["score"])[:6]
         logging.info(f"discover '{q}' FALLBACK: accepted={len(ranked)}")
+
     for m in ranked:
         if m["domain"] not in top_sites:
             top_sites.append(m["domain"])
@@ -446,10 +422,7 @@ def search_courses(q, limit=6):
         r = HTTP.get(f"https://stepik.org/api/courses?search={quote_plus(q)}&page=1", timeout=(2.0, 3.0))
         r.raise_for_status()
         for c in r.json().get("courses", []):
-            # Берём курс, если он бесплатный (price=0) ИЛИ если у него есть бесплатный доступ
             price = c.get("price")
-            is_paid = c.get("is_paid", False)
-            # Если цена 0 или None — берём, даже если is_paid=True (бесплатный доступ)
             if price not in (0, "0", None, ""):
                 continue
             out.append({"id": c["id"], "title": c.get("title", "Курс"),
@@ -474,6 +447,7 @@ def load_fragment():
     except Exception as e:
         logging.error(f"interests fragment load failed: {e}")
         return ""
+
 _refresher = None
 def set_refresher(fn):
     global _refresher
@@ -528,13 +502,17 @@ def save_state(feed_slugs, courses):
             session["interests"] = feed_slugs
             session["courses"] = courses
     session["onboarded"] = 1
-        # Создаём комнаты чатов для новых интересов
+    
+    # Создание комнат чатов для новых интересов
+    try:
         from chat import create_room_for_interest
         for slug in feed_slugs:
             row = c.execute("SELECT title FROM interests WHERE slug=?", (slug,)).fetchone()
             if row:
                 create_room_for_interest(slug, row["title"])
-
+    except Exception as e:
+        logging.warning(f"Chat room creation failed: {e}")
+        
     return get_state()
 
 def adopt_guest_interests(uid):
