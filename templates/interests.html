@@ -30,6 +30,7 @@
 .course-card:hover{border-color:var(--accent-sand);background:var(--card2);transform:translateX(4px);}
 .course-card .star{color:var(--accent-sand);}
 </style>
+
 <div class="int-overlay" id="intOverlay">
   <div class="int-box">
     <button class="int-close" id="intClose">✕</button>
@@ -56,146 +57,241 @@
     <button class="int-ghost" id="intSkip">Пропустить (выберу позже)</button>
   </div>
 </div>
+
 <script>
+console.log("Interests script loaded!");
+
 (function(){
-  var state={interests:[],courses:[],limits:{feed_max:10,course_max:3},is_user:false,onboarded:false,stale:false};
-  var ov=document.getElementById('intOverlay');
-  function err(t){var e=document.getElementById('intErr');e.innerText=t||'';e.style.display=t?'block':'none';}
-  function load(cb){fetch('/api/interests').then(function(r){return r.json();}).then(function(d){state=d;if(cb)cb();});}
+  var state = {interests:[], courses:[], limits:{feed_max:10, course_max:3}, is_user:false, onboarded:false, stale:false};
+  var ov = document.getElementById('intOverlay');
+  
+  function err(t){
+    var e = document.getElementById('intErr');
+    e.innerText = t || '';
+    e.style.display = t ? 'block' : 'none';
+  }
+  
+  function load(cb){
+    console.log("Fetching /api/interests...");
+    fetch('/api/interests')
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        console.log("API response:", d);
+        state = d;
+        if(cb) cb();
+      })
+      .catch(function(e){
+        console.error("Fetch error:", e);
+        err("Ошибка загрузки данных");
+      });
+  }
+  
   function counts(){
-    document.getElementById('intCount').innerHTML='интересов: <b>'+state.interests.length+'/'+state.limits.feed_max+'</b> · курсов: <b>'+state.courses.length+'/'+state.limits.course_max+'</b>';
-    document.getElementById('intMax').innerText=state.limits.feed_max;
+    document.getElementById('intCount').innerHTML = 'интересов: <b>'+state.interests.length+'/'+state.limits.feed_max+'</b> · курсов: <b>'+state.courses.length+'/'+state.limits.course_max+'</b>';
+    document.getElementById('intMax').innerText = state.limits.feed_max;
   }
+  
   function renderInt(){
-    var box=document.getElementById('intChips');box.innerHTML='';
+    var box = document.getElementById('intChips');
+    box.innerHTML = '';
     state.interests.forEach(function(it){
-      var c=document.createElement('span');c.className='int-chip';
-      c.innerHTML=it.title+' <span class="rm">✕</span>';
-      c.querySelector('.rm').addEventListener('click',function(){state.interests=state.interests.filter(function(x){return x.slug!==it.slug;});renderInt();counts();});
+      var c = document.createElement('span');
+      c.className = 'int-chip';
+      c.innerHTML = it.title + ' <span class="rm">✕</span>';
+      c.querySelector('.rm').addEventListener('click', function(){
+        state.interests = state.interests.filter(function(x){ return x.slug !== it.slug; });
+        renderInt();
+        counts();
+      });
       box.appendChild(c);
     });
   }
+  
   function renderCrs(){
-    var box=document.getElementById('crsChips');box.innerHTML='';
+    var box = document.getElementById('crsChips');
+    box.innerHTML = '';
     state.courses.forEach(function(cr){
-      var c=document.createElement('span');c.className='int-chip';
-      c.innerHTML='★ '+cr.title+' <span class="rm">✕</span>';
-      c.querySelector('.rm').addEventListener('click',function(){state.courses=state.courses.filter(function(x){return x.url!==cr.url;});renderCrs();counts();});
+      var c = document.createElement('span');
+      c.className = 'int-chip';
+      c.innerHTML = '★ '+cr.title+' <span class="rm">✕</span>';
+      c.querySelector('.rm').addEventListener('click', function(){
+        state.courses = state.courses.filter(function(x){ return x.url !== cr.url; });
+        renderCrs();
+        counts();
+      });
       box.appendChild(c);
     });
   }
+  
   function renderSidebar(){
-    var COLORS=['#10b981','#ef4444','#a855f7','#f59e0b','#14b8a6','#3b82f6','#f97316'];
-    function hash(s){var x=0;for(var i=0;i<s.length;i++){x=(x*31+s.charCodeAt(i))>>>0;}return x;}
-    var currentInt='';
-    try{ currentInt=new URLSearchParams(location.search).get('int')||''; }catch(e){}
+    console.log("Rendering sidebar...");
+    var COLORS = ['#10b981','#ef4444','#a855f7','#f59e0b','#14b8a6','#3b82f6','#f97316'];
+    function hash(s){ var x=0; for(var i=0;i<s.length;i++){ x=(x*31+s.charCodeAt(i))>>>0; } return x; }
+    var currentInt = '';
+    try{ currentInt = new URLSearchParams(location.search).get('int') || ''; }catch(e){}
+    
+    // Обновляем ВСЕ блоки интересов (и в мобильном, и в десктопном сайдбаре)
     document.querySelectorAll('#interestsBox').forEach(function(box){
-      box.innerHTML='';
+      box.innerHTML = '';
       state.interests.forEach(function(i){
-        var b=document.createElement('button');
-        b.type='button';
-        b.className='cat-card'+(i.slug===currentInt?' active':'');
-        b.setAttribute('data-group',i.slug);
-        b.style.setProperty('--c',COLORS[hash(i.slug)%COLORS.length]);
-        b.innerHTML='<span class="cat-letter">'+i.title.charAt(0).toUpperCase()+'</span><span class="cat-name">'+i.title+'</span>';
-        b.addEventListener('click',function(){location.href='/?int='+encodeURIComponent(i.slug);});
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'cat-card' + (i.slug === currentInt ? ' active' : '');
+        b.setAttribute('data-group', i.slug);
+        b.style.setProperty('--c', COLORS[hash(i.slug) % COLORS.length]);
+        b.innerHTML = '<span class="cat-letter">'+i.title.charAt(0).toUpperCase()+'</span><span class="cat-name">'+i.title+'</span>';
+        b.addEventListener('click', function(){ location.href = '/?int=' + encodeURIComponent(i.slug); });
         box.appendChild(b);
       });
     });
+
+    // Обновляем ВСЕ блоки курсов
     document.querySelectorAll('#coursesBox').forEach(function(box){
-      box.innerHTML='';
+      box.innerHTML = '';
       state.courses.forEach(function(cr){
-        var a=document.createElement('a');
-        a.className='course-card';
-        a.href=cr.url;
-        a.target='_blank';
-        a.rel='noopener';
-        a.innerHTML='<span class="star">★</span><div class="course-info"><span class="course-title">'+cr.title+'</span><span class="course-learners">'+(cr.learners||0)+' уч.</span></div>';
+        var a = document.createElement('a');
+        a.className = 'course-card';
+        a.href = cr.url;
+        a.target = '_blank';
+        a.rel = 'noopener';
+        a.innerHTML = '<span class="star">★</span><div class="course-info"><span class="course-title">'+cr.title+'</span><span class="course-learners">'+(cr.learners||0)+' уч.</span></div>';
         box.appendChild(a);
       });
     });
-      // Рисуем чаты в сайдбаре
-    const chatBox = document.getElementById('chatRoomsBox');
+    
+    // Обновляем блок чатов, если он есть
+    var chatBox = document.getElementById('chatRoomsBox');
     if (chatBox) {
       fetch('/api/chat/rooms').then(r => r.json()).then(data => {
         chatBox.innerHTML = '';
         if (data.rooms && data.rooms.length) {
           data.rooms.forEach(room => {
-            const a = document.createElement('a');
+            var a = document.createElement('a');
             a.className = 'side-item';
-            a.href = `/chat?room=${room.slug}`;
-            a.innerHTML = `
-              <svg viewBox="0 0 24 24" style="width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-              <span>${room.title}</span>
-              ${room.unread_count > 0 ? `<span style="margin-left:auto;background:var(--accent-coral);color:var(--bg);padding:2px 8px;font-size:10px;font-weight:700;border-radius:10px;">${room.unread_count}</span>` : ''}
-            `;
+            a.href = '/chat?room=' + room.slug;
+            a.innerHTML = '<svg viewBox="0 0 24 24" style="width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span>' + room.title + '</span>' + (room.unread_count > 0 ? '<span style="margin-left:auto;background:var(--accent-coral);color:var(--bg);padding:2px 8px;font-size:10px;font-weight:700;border-radius:10px;">'+room.unread_count+'</span>' : '');
             chatBox.appendChild(a);
           });
         }
-      }).catch(e => console.error('Load chat rooms error:', e));
+      }).catch(e => console.error('Chat rooms load error:', e));
     }
   }
-  window.openInterests=function(){load(function(){err('');renderInt();renderCrs();renderSidebar();counts();ov.classList.add('open');});};
-  document.getElementById('intClose').addEventListener('click',function(){ov.classList.remove('open');});
-  ov.addEventListener('click',function(e){if(e.target===ov)ov.classList.remove('open');});
-  document.getElementById('tabInt').addEventListener('click',function(){
-    this.classList.add('active');document.getElementById('tabCrs').classList.remove('active');
-    document.getElementById('panInt').style.display='block';document.getElementById('panCrs').style.display='none';});
-  document.getElementById('tabCrs').addEventListener('click',function(){
-    this.classList.add('active');document.getElementById('tabInt').classList.remove('active');
-    document.getElementById('panCrs').style.display='block';document.getElementById('panInt').style.display='none';});
-  document.getElementById('intFind').addEventListener('click',function(){
-    var q=document.getElementById('intQ').value.trim();if(!q)return;
-    err('');document.getElementById('intTops').innerText='перебираю пути и оцениваю сайты…';
-    fetch('/api/interests/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({q:q})})
-    .then(function(r){return r.json().then(function(d){return {s:r.status,d:d};});})
-    .then(function(x){
-      document.getElementById('intTops').innerHTML='';
-      if(x.s!==200){err(x.d.error==='banned_topic'?'Такая тема запрещена':'Не нашёл качественных источников по этой теме');return;}
-      if(state.interests.length>=state.limits.feed_max){err('Лимит интересов');return;}
-      if(state.interests.some(function(i){return i.slug===x.d.slug;})){err('Уже добавлено');return;}
-      state.interests.push({slug:x.d.slug,title:x.d.title});
-      (x.d.top_sites||[]).forEach(function(s){var sp=document.createElement('span');sp.className='int-top';sp.innerText=s;document.getElementById('intTops').appendChild(sp);});
-      renderInt();counts();
-    }).catch(function(){document.getElementById('intTops').innerHTML='';err('Ошибка сети');});
+  
+  // Делаем функцию глобальной, чтобы onclick="openInterests()" работал из HTML
+  window.openInterests = function(){
+    console.log("openInterests called!");
+    load(function(){
+      err('');
+      renderInt();
+      renderCrs();
+      renderSidebar();
+      counts();
+      ov.classList.add('open');
+    });
+  };
+  
+  document.getElementById('intClose').addEventListener('click', function(){ ov.classList.remove('open'); });
+  ov.addEventListener('click', function(e){ if(e.target === ov) ov.classList.remove('open'); });
+  
+  document.getElementById('tabInt').addEventListener('click', function(){
+    this.classList.add('active');
+    document.getElementById('tabCrs').classList.remove('active');
+    document.getElementById('panInt').style.display = 'block';
+    document.getElementById('panCrs').style.display = 'none';
   });
-  document.getElementById('crsFind').addEventListener('click',function(){
-    var q=document.getElementById('crsQ').value.trim();if(!q)return;
-    err('');document.getElementById('crsList').innerHTML='ищу бесплатные курсы…';
-    fetch('/api/interests/courses?q='+encodeURIComponent(q))
-    .then(function(r){return r.json();})
-    .then(function(d){
-      var box=document.getElementById('crsList');box.innerHTML='';
-      if(!d.courses||!d.courses.length){box.innerHTML='';err('Бесплатных курсов не найдено');return;}
-      d.courses.forEach(function(cr){
-        var row=document.createElement('div');row.className='crs-row';
-        row.innerHTML='<span class="t">'+cr.title+'</span><span class="n">'+(cr.learners||0)+' уч.</span>';
-        var b=document.createElement('button');b.innerText='Добавить';
-        b.addEventListener('click',function(){
-          if(state.courses.length>=state.limits.course_max){err('Максимум 3 курса');return;}
-          if(state.courses.some(function(x){return x.url===cr.url;})){err('Уже добавлен');return;}
-          state.courses.push(cr);renderCrs();counts();
+  
+  document.getElementById('tabCrs').addEventListener('click', function(){
+    this.classList.add('active');
+    document.getElementById('tabInt').classList.remove('active');
+    document.getElementById('panCrs').style.display = 'block';
+    document.getElementById('panInt').style.display = 'none';
+  });
+  
+  document.getElementById('intFind').addEventListener('click', function(){
+    var q = document.getElementById('intQ').value.trim();
+    if(!q) return;
+    err('');
+    document.getElementById('intTops').innerText = 'перебираю пути и оцениваю сайты…';
+    fetch('/api/interests/add', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({q:q})})
+      .then(function(r){ return r.json().then(function(d){ return {s:r.status, d:d}; }); })
+      .then(function(x){
+        document.getElementById('intTops').innerHTML = '';
+        if(x.s !== 200){ err(x.d.error === 'banned_topic' ? 'Такая тема запрещена' : 'Не нашёл качественных источников по этой теме'); return; }
+        if(state.interests.length >= state.limits.feed_max){ err('Лимит интересов'); return; }
+        if(state.interests.some(function(i){ return i.slug === x.d.slug; })){ err('Уже добавлено'); return; }
+        state.interests.push({slug:x.d.slug, title:x.d.title});
+        (x.d.top_sites || []).forEach(function(s){
+          var sp = document.createElement('span');
+          sp.className = 'int-top';
+          sp.innerText = s;
+          document.getElementById('intTops').appendChild(sp);
         });
-        row.appendChild(b);box.appendChild(row);
+        renderInt();
+        counts();
+      }).catch(function(){
+        document.getElementById('intTops').innerHTML = '';
+        err('Ошибка сети');
       });
-    }).catch(function(){document.getElementById('crsList').innerHTML='';err('Ошибка сети');});
   });
-  document.getElementById('intClear').addEventListener('click',function(){state.interests=[];state.courses=[];renderInt();renderCrs();counts();err('');});
-  document.getElementById('intSkip').addEventListener('click',function(){
-    sessionStorage.setItem('ef_skip','1');
-    fetch('/api/interests/skip',{method:'POST'}).then(function(){ov.classList.remove('open');});
+  
+  document.getElementById('crsFind').addEventListener('click', function(){
+    var q = document.getElementById('crsQ').value.trim();
+    if(!q) return;
+    err('');
+    document.getElementById('crsList').innerHTML = 'ищу бесплатные курсы…';
+    fetch('/api/interests/courses?q=' + encodeURIComponent(q))
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        var box = document.getElementById('crsList');
+        box.innerHTML = '';
+        if(!d.courses || !d.courses.length){ box.innerHTML = ''; err('Бесплатных курсов не найдено'); return; }
+        d.courses.forEach(function(cr){
+          var row = document.createElement('div');
+          row.className = 'crs-row';
+          row.innerHTML = '<span class="t">'+cr.title+'</span><span class="n">'+(cr.learners||0)+' уч.</span>';
+          var b = document.createElement('button');
+          b.innerText = 'Добавить';
+          b.addEventListener('click', function(){
+            if(state.courses.length >= state.limits.course_max){ err('Максимум 3 курса'); return; }
+            if(state.courses.some(function(x){ return x.url === cr.url; })){ err('Уже добавлен'); return; }
+            state.courses.push(cr);
+            renderCrs();
+            counts();
+          });
+          row.appendChild(b);
+          box.appendChild(row);
+        });
+      }).catch(function(){
+        document.getElementById('crsList').innerHTML = '';
+        err('Ошибка сети');
+      });
   });
-  document.getElementById('intSave').addEventListener('click',function(){
-    fetch('/api/interests/save',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({interests:state.interests.map(function(i){return i.slug;}),courses:state.courses})})
-    .then(function(r){return r.json();})
+  
+  document.getElementById('intClear').addEventListener('click', function(){
+    state.interests = [];
+    state.courses = [];
+    renderInt();
+    renderCrs();
+    counts();
+    err('');
+  });
+  
+  document.getElementById('intSkip').addEventListener('click', function(){
+    sessionStorage.setItem('ef_skip', '1');
+    fetch('/api/interests/skip', {method:'POST'}).then(function(){ ov.classList.remove('open'); });
+  });
+  
+  document.getElementById('intSave').addEventListener('click', function(){
+    fetch('/api/interests/save', {method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({interests: state.interests.map(function(i){ return i.slug; }), courses: state.courses})})
+    .then(function(r){ return r.json(); })
     .then(function(d){
-      state=d;
+      state = d;
       sessionStorage.removeItem('ef_skip');
       ov.classList.remove('open');
       renderSidebar();
       
-      // Показываем модалку чатов
+      // Если есть интересы, предлагаем чаты
       if (state.interests.length > 0) {
         showChatJoinModal(state.interests);
       } else {
@@ -203,40 +299,33 @@
       }
     });
   });
-  
+
   function showChatJoinModal(interests) {
-    const modal = document.createElement('div');
+    var modal = document.createElement('div');
     modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(8px);z-index:300;display:flex;align-items:center;justify-content:center;';
-    modal.innerHTML = `
-      <div style="width:100%;max-width:500px;background:var(--panel);border:1px solid var(--border);border-top:3px solid var(--accent-emerald);padding:28px;position:relative;">
-        <h2 style="font-family:'JetBrains Mono',monospace;font-size:20px;color:var(--accent-emerald);margin-bottom:16px;">// Присоединиться к чатам?</h2>
-        <p style="font-size:14px;color:var(--t2);margin-bottom:20px;line-height:1.6;">По вашим интересам есть активные обсуждения. Хотите присоединиться?</p>
-        <div id="chatRoomsList" style="margin-bottom:20px;"></div>
-        <button id="joinChatsBtn" style="width:100%;height:44px;background:var(--accent-emerald);border:none;color:var(--bg);font-weight:700;font-family:'JetBrains Mono',monospace;cursor:pointer;margin-bottom:8px;">Присоединиться</button>
-        <button id="skipChatsBtn" style="width:100%;height:36px;background:var(--card2);border:none;color:var(--t3);font-family:'JetBrains Mono',monospace;font-size:12px;cursor:pointer;">Пропустить</button>
-      </div>
-    `;
+    modal.innerHTML = '<div style="width:100%;max-width:500px;background:var(--panel);border:1px solid var(--border);border-top:3px solid var(--accent-emerald);padding:28px;position:relative;">' +
+      '<h2 style="font-family:\'JetBrains Mono\',monospace;font-size:20px;color:var(--accent-emerald);margin-bottom:16px;">// Присоединиться к чатам?</h2>' +
+      '<p style="font-size:14px;color:var(--t2);margin-bottom:20px;line-height:1.6;">По вашим интересам есть активные обсуждения. Хотите присоединиться?</p>' +
+      '<div id="chatRoomsList" style="margin-bottom:20px;"></div>' +
+      '<button id="joinChatsBtn" style="width:100%;height:44px;background:var(--accent-emerald);border:none;color:var(--bg);font-weight:700;font-family:\'JetBrains Mono\',monospace;cursor:pointer;margin-bottom:8px;">Присоединиться</button>' +
+      '<button id="skipChatsBtn" style="width:100%;height:36px;background:var(--card2);border:none;color:var(--t3);font-family:\'JetBrains Mono\',monospace;font-size:12px;cursor:pointer;">Пропустить</button>' +
+      '</div>';
     document.body.appendChild(modal);
     
-    const list = modal.querySelector('#chatRoomsList');
+    var list = modal.querySelector('#chatRoomsList');
     interests.forEach(function(interest) {
-      const item = document.createElement('label');
+      var item = document.createElement('label');
       item.style.cssText = 'display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--border);background:var(--card);margin-bottom:8px;cursor:pointer;';
-      item.innerHTML = `
-        <input type="checkbox" value="${interest.slug}" checked style="width:18px;height:18px;accent-color:var(--accent-emerald);">
-        <span style="font-size:14px;color:var(--t1);font-family:'JetBrains Mono',monospace;">${interest.title}</span>
-      `;
+      item.innerHTML = '<input type="checkbox" value="' + interest.slug + '" checked style="width:18px;height:18px;accent-color:var(--accent-emerald);"><span style="font-size:14px;color:var(--t1);font-family:\'JetBrains Mono\',monospace;">' + interest.title + '</span>';
       list.appendChild(item);
     });
     
     modal.querySelector('#joinChatsBtn').addEventListener('click', async function() {
-      const checkboxes = list.querySelectorAll('input[type="checkbox"]:checked');
-      const slugs = Array.from(checkboxes).map(cb => cb.value);
-      
-      for (const slug of slugs) {
-        await fetch(`/api/chat/rooms/${slug}/join`, {method: 'POST'});
+      var checkboxes = list.querySelectorAll('input[type="checkbox"]:checked');
+      var slugs = Array.from(checkboxes).map(function(cb) { return cb.value; });
+      for (var i = 0; i < slugs.length; i++) {
+        await fetch('/api/chat/rooms/' + slugs[i] + '/join', {method: 'POST'});
       }
-      
       modal.remove();
       location.href = '/chat?room=' + slugs[0];
     });
@@ -246,6 +335,20 @@
       location.reload();
     });
   }
+  
+  // Автозапуск при загрузке страницы
+  console.log("Initializing on load...");
+  load(function(){
+    renderSidebar();
+    if(state.interests.length === 0 && !sessionStorage.getItem('ef_skip')){
+      console.log("No interests, opening modal...");
+      setTimeout(function(){
+        renderInt();
+        renderCrs();
+        counts();
+        ov.classList.add('open');
+      }, 800);
+    }
   });
 })();
 </script>
