@@ -283,7 +283,6 @@ except Exception as e:
 app.register_blueprint(auth_bp)
 app.register_blueprint(interests_bp)
 interests_mod.set_refresher(lambda: engine.start(current_sources(), parse_rss, scrape_html, enrich_items, save_to_db))
-interests_mod.set_refresher(lambda: engine.start(current_sources(), parse_rss, scrape_html, enrich_items, save_to_db))
 
 HTML_TEMPLATE = load_template()
 
