@@ -1,4 +1,4 @@
-# engine.py — фоновое обновление, здоровье источников, дедлайн 20с, прогрев
+# engine.py — один общий прогон на все воркеры, атомарный замок, монотонный прогресс
 import os, time, sqlite3, threading, logging
 from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FutTimeout
 from contextlib import contextmanager
@@ -6,8 +6,9 @@ from contextlib import contextmanager
 DB_PATH = os.environ.get("DB_PATH", "engfeed.db")
 log = logging.getLogger("engfeed.engine")
 _lock = threading.Lock()
-_running = False
+_thread_alive = False
 DEADLINE = 20
+COOLDOWN = 5
 
 @contextmanager
 def db():
@@ -53,29 +54,38 @@ def live(url):
 def status():
     with db() as c:
         r = c.execute("SELECT * FROM refresh_runs WHERE id=1").fetchone()
-    return dict(r) if r else {"running": 0, "total": 0, "ok": 0, "failed": 0, "finished_at": 0, "last_error": ""}
+    return dict(r) if r else {"running": 0, "started_at": 0, "total": 0, "ok": 0, "failed": 0, "finished_at": 0, "last_error": ""}
 
 def _set_run(**kw):
     sets = ", ".join(k + "=?" for k in kw)
     with db() as c:
         c.execute("UPDATE refresh_runs SET " + sets + " WHERE id=1", tuple(kw.values()))
 
-def start(sources, parse_fn, scrape_fn, enrich_fn, save_fn):
-    global _running
-    st = status()
-    if st["running"] and (time.time() - st["started_at"]) < 60:
+def start(sources, parse_fn, scrape_fn, enrich_fn, save_fn, force=False):
+    """Атомарный межпроцессный замок: ровно один воркер выигрывает гонку."""
+    global _thread_alive
+    now = time.time()
+    with db() as c:
+        if force:
+            cur = c.execute(
+                "UPDATE refresh_runs SET running=1, started_at=?, finished_at=0, total=?, ok=0, failed=0, last_error='' "
+                "WHERE id=1 AND running=0", (now, len(sources)))
+        else:
+            cur = c.execute(
+                "UPDATE refresh_runs SET running=1, started_at=?, finished_at=0, total=?, ok=0, failed=0, last_error='' "
+                "WHERE id=1 AND running=0 AND finished_at < ?", (now, len(sources), now - COOLDOWN))
+        won = cur.rowcount == 1
+    if not won:
         return False
     with _lock:
-        if _running:
+        if _thread_alive:
             return False
-        _running = True
-    _set_run(running=1, started_at=time.time(), finished_at=0,
-             total=len(sources), ok=0, failed=0, last_error="")
+        _thread_alive = True
     threading.Thread(target=_run, args=(sources, parse_fn, scrape_fn, enrich_fn, save_fn), daemon=True).start()
     return True
 
 def _run(sources, parse_fn, scrape_fn, enrich_fn, save_fn):
-    global _running
+    global _thread_alive
     ok = failed = 0
     items = []
     ex = ThreadPoolExecutor(max_workers=8)
@@ -119,7 +129,7 @@ def _run(sources, parse_fn, scrape_fn, enrich_fn, save_fn):
         except TypeError:
             ex.shutdown(wait=False)
         _set_run(running=0, finished_at=time.time(), ok=ok, failed=failed)
-        _running = False
+        _thread_alive = False
 
 def warm_if_needed(sources, parse_fn, scrape_fn, enrich_fn, save_fn, max_age=6*3600):
     try:
