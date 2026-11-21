@@ -16,6 +16,7 @@ from flask import Flask, render_template_string, jsonify, request
 from auth import auth_bp, init_auth, AUTH_FRAGMENT
 import interests as interests_mod
 from interests import bp as interests_bp, init_interests, INTERESTS_FRAGMENT, interest_source_items, current_slugs
+from chat import bp as chat_bp, init_chat
 import engine
 
 logger = logging.getLogger("engfeed")
@@ -282,6 +283,8 @@ except Exception as e:
     logger.error(f"init_engine failed: {e}")
 app.register_blueprint(auth_bp)
 app.register_blueprint(interests_bp)
+app.register_blueprint(chat_bp)
+init_chat(app)
 interests_mod.set_refresher(lambda: engine.start(current_sources(), parse_rss, scrape_html, enrich_items, save_to_db))
 
 HTML_TEMPLATE = load_template()
