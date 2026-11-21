@@ -248,6 +248,7 @@ def enrich_items(all_items):
 def current_sources():
     base = [s for s in SOURCES if engine.live(s["url"])]
     return base + interest_source_items()
+
 @contextmanager
 def get_db():
     conn = sqlite3.connect(DB_PATH)
@@ -339,16 +340,17 @@ def wiki_python():
     topic = request.args.get('topic', list(PYTHON_DB.keys())[0])
     return render_template_string(HTML_TEMPLATE, active_tab='python', db=PYTHON_DB, current_topic=topic, news=[], groups=GROUP_META)
 
-@app.route('/api/refresh')
+@app.route('/api/refresh', methods=['GET', 'POST'])
 def api_refresh():
-    try:
-        items = fetch_all_data()
-        save_to_db(items)
-        logger.info(f"REFRESH OK: {len(items)} записей сохранено")
-        return jsonify({"status": "ok", "count": len(items)})
-    except Exception as e:
-        logger.error(f"Refresh error: {e}")
-        return jsonify({"status": "error", "count": 0, "error": str(e)}), 500
+    started = engine.start(current_sources(), parse_rss, scrape_html, enrich_items, save_to_db)
+    st = engine.status()
+    return jsonify({"status": "started" if started else "already_running",
+                    "running": st["running"], "total": st["total"],
+                    "ok": st["ok"], "failed": st["failed"]})
+
+@app.route('/api/refresh/status')
+def api_refresh_status():
+    return jsonify(engine.status())
 
 @app.route('/health')
 def health():
@@ -462,6 +464,7 @@ body::after{bottom:20px;right:20px;border-left:none;border-top:none;}
 .iconbtn:hover{background:var(--card2);border-color:var(--accent-sand);color:var(--t1);transform:translateY(-2px);}
 .iconbtn:active{transform:translateY(0);}
 .iconbtn svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;}
+.iconbtn:disabled{opacity:.5;cursor:wait;transform:none;}
 
 .badge{
     position:absolute;top:-4px;right:-4px;min-width:20px;height:20px;
@@ -536,22 +539,6 @@ body::after{bottom:20px;right:20px;border-left:none;border-top:none;}
 .pill:hover{background:var(--card2);color:var(--t1);border-color:var(--t3);}
 .pill.active{background:var(--accent-sand);border-color:var(--accent-sand);color:var(--bg);}
 
-.mobile-cats{
-    display:none;overflow-x:auto;gap:8px;padding:12px 0;margin-bottom:8px;
-    border-bottom:1px solid var(--border);scrollbar-width:none;
-}
-.mobile-cats::-webkit-scrollbar{display:none;}
-
-.mobile-cat{
-    flex-shrink:0;height:36px;padding:0 14px;border:1px solid var(--border);
-    background:var(--card);color:var(--t2);font-size:12px;font-weight:600;cursor:pointer;
-    display:flex;align-items:center;gap:8px;font-family:'JetBrains Mono', monospace;
-    transition:.2s;clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
-}
-.mobile-cat:active{background:var(--card2);transform:scale(0.96);}
-.mobile-cat.active{background:var(--accent-sand);border-color:var(--accent-sand);color:var(--bg);}
-.mobile-cat .cat-dot{width:8px;height:8px;border-radius:50%;background:var(--c);}
-
 .grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(420px, 1fr));gap:24px;}
 
 .card{
@@ -617,6 +604,10 @@ body::after{bottom:20px;right:20px;border-left:none;border-top:none;}
 .empty-state p{font-size:16px;margin-bottom:8px;}
 .empty-state button{margin-top:20px;padding:14px 28px;background:var(--accent-sand);color:var(--bg);border:none;font-weight:700;cursor:pointer;font-family:'JetBrains Mono', monospace;transition:.2s;}
 .empty-state button:hover{background:var(--accent-coral);transform:translateY(-2px);}
+.empty-state button:disabled{opacity:.6;cursor:wait;transform:none;}
+
+.spin{animation:rot 1s linear infinite;transform-origin:center;}
+@keyframes rot{to{transform:rotate(360deg);}}
 
 /* Overlay сайдбара на мобилке */
 .sidebar-overlay{
@@ -638,7 +629,6 @@ body::after{bottom:20px;right:20px;border-left:none;border-top:none;}
 }
 
 @media(max-width:1024px){
-    .mobile-cats{display:flex;}
     .burger{display:flex;}
     .sidebar{display:none !important;}
 }
@@ -679,13 +669,15 @@ body::after{bottom:20px;right:20px;border-left:none;border-top:none;}
     </div>
 </header>
 
-<div id="onboardingBanner" style="display:none; background: linear-gradient(90deg, var(--card) 0%, var(--panel) 100%); border-bottom: 1px solid var(--accent-sand); padding: 12px 32px; text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--t2); animation: slideDown 0.5s ease;">
+<div id="onboardingBanner" style="display:none; background: linear-gradient(90deg, var(--card) 0%, var(--panel) 100%); border-bottom: 1px solid var(--accent-sand); padding: 12px 32px; text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--t2);">
     <span style="color:var(--accent-sand)">👋 Привет, инженер!</span> 
     Зарегистрируйся, чтобы сохранять закладки и историю чтения на любом устройстве. 
     <button onclick="document.getElementById('avatarBtn').click()" style="margin-left:12px; background:var(--accent-sand); border:none; color:var(--bg); padding:4px 12px; font-weight:bold; cursor:pointer; font-family:inherit;">Создать аккаунт</button>
 </div>
 
-
+<div id="refreshProgress" style="display:none;height:3px;background:var(--card2);position:relative;z-index:40;">
+    <i style="display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent-emerald),var(--accent-sand),var(--accent-coral));transition:width .4s ease;"></i>
+</div>
 
 <div class="shell">
 <div class="sidebar-overlay" id="sidebarOverlay">
@@ -749,7 +741,6 @@ body::after{bottom:20px;right:20px;border-left:none;border-top:none;}
             </div>
         </div>
     {% else %}
-    
         <div class="main-head">
             <h1>Лента на сегодня</h1>
             <div class="pills">
@@ -808,56 +799,65 @@ body::after{bottom:20px;right:20px;border-left:none;border-top:none;}
 </div>
 
 <script>
-var refreshAttempts = 0;
-var maxRefreshAttempts = 10;
+var refreshTimer = null;
+var pollCount = 0;
 
-function resetRefreshState() {
-    var svg = document.querySelector('#refreshBtn svg');
-    var btn = document.querySelector('#refreshBtn');
+function setRefreshUI(running, st){
+    var btn = document.getElementById('refreshBtn');
+    var svg = btn ? btn.querySelector('svg') : null;
     var ebtn = document.querySelector('.empty-state button');
-    if (svg) svg.classList.remove('spin');
-    if (btn) btn.disabled = false;
-    if (ebtn) ebtn.disabled = false;
-    refreshAttempts = 0;
-}
-
-function doRefresh() {
-    var svg = document.querySelector('#refreshBtn svg');
-    var btn = document.querySelector('#refreshBtn');
-    var ebtn = document.querySelector('.empty-state button');
-    if (svg) svg.classList.add('spin');
-    if (btn) btn.disabled = true;
-    if (ebtn) {
-        ebtn.innerText = 'Загрузка...';
-        ebtn.disabled = true;
+    var bar = document.getElementById('refreshProgress');
+    if (running){
+        if (svg) svg.classList.add('spin');
+        if (btn) btn.disabled = true;
+        if (ebtn){ ebtn.disabled = true; ebtn.innerText = 'Обновление… ' + (st.ok||0) + '/' + (st.total||0); }
+        if (bar){
+            bar.style.display = 'block';
+            var pct = st.total ? Math.round(100 * ((st.ok||0)+(st.failed||0)) / st.total) : 0;
+            bar.querySelector('i').style.width = pct + '%';
+        }
+    } else {
+        if (svg) svg.classList.remove('spin');
+        if (btn) btn.disabled = false;
+        if (bar) bar.style.display = 'none';
     }
-    fetch('/api/refresh')
-        .then(r => r.json())
-        .then(data => {
-            if (data.count > 0) location.reload();
-            else {
-                refreshAttempts++;
-                if (refreshAttempts < maxRefreshAttempts) {
-                    if (ebtn) ebtn.innerText = 'Повтор (' + refreshAttempts + '/' + maxRefreshAttempts + ')';
-                    setTimeout(doRefresh, 4000);
-                } else {
-                    resetRefreshState();
-                    if (ebtn) ebtn.innerText = 'Ошибка. Попробовать снова';
-                }
-            }
-        })
-        .catch(() => {
-            refreshAttempts++;
-            if (refreshAttempts < maxRefreshAttempts) {
-                setTimeout(doRefresh, 4000);
-            } else {
-                resetRefreshState();
-                if (ebtn) ebtn.innerText = 'Ошибка сети';
-            }
-        });
 }
 
-document.getElementById('refreshBtn').addEventListener('click', () => { refreshAttempts = 0; doRefresh(); });
+function pollRefresh(){
+    pollCount++;
+    if (pollCount > 40){
+        setRefreshUI(false, {});
+        var eb = document.querySelector('.empty-state button');
+        if (eb){ eb.disabled = false; eb.innerText = 'Ошибка. Попробовать снова'; }
+        return;
+    }
+    fetch('/api/refresh/status').then(function(r){return r.json();}).then(function(st){
+        if (st.running){
+            setRefreshUI(true, st);
+            refreshTimer = setTimeout(pollRefresh, 2500);
+        } else {
+            setRefreshUI(false, st);
+            if (st.ok > 0){ location.reload(); }
+            else {
+                var ebtn = document.querySelector('.empty-state button');
+                if (ebtn){ ebtn.disabled = false; ebtn.innerText = 'Попробовать снова'; }
+            }
+        }
+    }).catch(function(){ refreshTimer = setTimeout(pollRefresh, 4000); });
+}
+
+function doRefresh(){
+    pollCount = 0;
+    fetch('/api/refresh', {method:'POST'}).then(function(r){return r.json();}).then(function(st){
+        setRefreshUI(true, st);
+        pollRefresh();
+    }).catch(function(){
+        var ebtn = document.querySelector('.empty-state button');
+        if (ebtn){ ebtn.disabled = false; ebtn.innerText = 'Ошибка сети'; }
+    });
+}
+
+document.getElementById('refreshBtn').addEventListener('click', doRefresh);
 var NO_INTERESTS = {{ 'true' if no_interests else 'false' }};
 if (!NO_INTERESTS && document.querySelector('.empty-state')) doRefresh();
 
@@ -926,9 +926,6 @@ function syncUI() {
     document.querySelectorAll('.side-item[data-mode]').forEach(b => {
         b.classList.toggle('active', b.getAttribute('data-mode') === mode);
     });
-    document.querySelectorAll('.cat-card').forEach(c => {
-        c.classList.toggle('active', c.getAttribute('data-group') === group);
-    });
 }
 
 function handleFilter(btn) {
@@ -937,8 +934,6 @@ function handleFilter(btn) {
     if (btn.classList.contains('pill')) {
         if (pm === 'unread') { mode = 'unread'; group = 'all'; }
         else if (pg) { group = pg; mode = 'all'; }
-    } else if (btn.classList.contains('cat-card')) {
-        group = pg; mode = 'all';
     } else if (btn.classList.contains('side-item')) {
         mode = pm; group = 'all';
     }
@@ -946,7 +941,7 @@ function handleFilter(btn) {
     apply();
 }
 
-document.querySelectorAll('.pills .pill, .cat-card, .side-item[data-mode]').forEach(btn => {
+document.querySelectorAll('.pills .pill, .side-item[data-mode]').forEach(btn => {
     btn.addEventListener('click', function() { handleFilter(btn); });
 });
 
@@ -978,30 +973,13 @@ if (burgerBtn && overlay) {
     overlay.addEventListener('click', function(e) {
         if (e.target === overlay) overlay.classList.remove('open');
     });
-    
     overlay.querySelectorAll('.side-item[data-mode]').forEach(function(b) {
         b.addEventListener('click', function() {
             handleFilter(b);
             overlay.classList.remove('open');
         });
     });
-    overlay.querySelectorAll('.cat-mobile-item').forEach(function(b) {
-        b.addEventListener('click', function() {
-            handleFilter(b);
-            overlay.classList.remove('open');
-        });
-    });
 }
-
-document.querySelectorAll('.mobile-cat').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-        var pg = btn.getAttribute('data-group');
-        group = pg;
-        mode = 'all';
-        syncUI();
-        apply();
-    });
-});
 </script>
 <!--AUTH-->
 <!--INTERESTS-->
@@ -1012,6 +990,7 @@ HTML_TEMPLATE = HTML_TEMPLATE.replace("<!--AUTH-->", AUTH_FRAGMENT)
 HTML_TEMPLATE = HTML_TEMPLATE.replace("<!--INTERESTS-->", INTERESTS_FRAGMENT)
 
 init_db()
+engine.warm_if_needed(current_sources(), parse_rss, scrape_html, enrich_items, save_to_db)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=PORT, debug=False)
