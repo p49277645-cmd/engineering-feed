@@ -87,16 +87,38 @@
   function renderSidebar(){
     var COLORS=['#10b981','#ef4444','#a855f7','#f59e0b','#14b8a6','#3b82f6','#f97316'];
     function hash(s){var x=0;for(var i=0;i<s.length;i++){x=(x*31+s.charCodeAt(i))>>>0;}return x;}
-    var ib=document.getElementById('interestsBox');
-    if(ib){ib.innerHTML='';
+    var currentInt='';
+    try{ currentInt=new URLSearchParams(location.search).get('int')||''; }catch(e){}
+    
+    // Рисуем интересы во ВСЕХ блоках #interestsBox (мобильный + десктоп)
+    document.querySelectorAll('#interestsBox').forEach(function(box){
+      box.innerHTML='';
       state.interests.forEach(function(i){
-        var b=document.createElement('button');b.type='button';b.className='cat-card';
+        var b=document.createElement('button');
+        b.type='button';
+        b.className='cat-card'+(i.slug===currentInt?' active':'');
+        b.setAttribute('data-group',i.slug);
         b.style.setProperty('--c',COLORS[hash(i.slug)%COLORS.length]);
         b.innerHTML='<span class="cat-letter">'+i.title.charAt(0).toUpperCase()+'</span><span class="cat-name">'+i.title+'</span>';
         b.addEventListener('click',function(){location.href='/?int='+encodeURIComponent(i.slug);});
-        ib.appendChild(b);
+        box.appendChild(b);
       });
-    }
+    });
+    
+    // Рисуем курсы во ВСЕХ блоках #coursesBox
+    document.querySelectorAll('#coursesBox').forEach(function(box){
+      box.innerHTML='';
+      state.courses.forEach(function(cr){
+        var a=document.createElement('a');
+        a.className='course-card';
+        a.href=cr.url;
+        a.target='_blank';
+        a.rel='noopener';
+        a.innerHTML='<span class="course-star">★</span><div class="course-info"><span class="course-title">'+cr.title+'</span><span class="course-learners">'+(cr.learners||0)+' уч.</span></div>';
+        box.appendChild(a);
+      });
+    });
+  }
     var cb=document.getElementById('coursesBox');
     if(cb){cb.innerHTML='';
       state.courses.forEach(function(cr){
