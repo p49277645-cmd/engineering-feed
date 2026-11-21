@@ -139,6 +139,14 @@ def register():
             adopt_guest_interests(uid)
         except Exception:
             pass
+
+    # После установки session['uid'] = user_id
+try:
+    from interests import adopt_guest_interests
+    adopt_guest_interests(session['uid'])
+except Exception as e:
+    import logging
+    logging.warning(f"adopt_guest_interests failed: {e}")
     return jsonify({"nick": nick, "id": uid, "created_at": time.time()})
 
 @auth_bp.post("/api/login")
