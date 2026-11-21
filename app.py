@@ -351,7 +351,238 @@ def api_refresh():
 @app.route('/api/refresh/status')
 def api_refresh_status():
     return jsonify(engine.status())
+<script>
+var refreshTimer = null;
+var pollCount = 0;
+var runStamp = 0;
+var shownDone = 0;
+var readLinks = JSON.parse(localStorage.getItem('readLinks') || '[]');
+var bookmarks = JSON.parse(localStorage.getItem('bookmarks') || '[]');
+var mode = 'all', group = 'all', query = '';
 
+function esc(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+        return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+}
+function grid(){ return document.getElementById('grid'); }
+function emptyState(){ return document.querySelector('.empty-state'); }
+function emptyBtn(){ var e = emptyState(); return e ? e.querySelector('button') : null; }
+
+function progressDone(st){
+    if (st.started_at !== runStamp){ runStamp = st.started_at; shownDone = 0; }
+    shownDone = Math.max(shownDone, (st.ok||0) + (st.failed||0));
+    return shownDone;
+}
+function setRefreshUI(running, st){
+    var btn = document.getElementById('refreshBtn');
+    var svg = btn ? btn.querySelector('svg') : null;
+    var ebtn = emptyBtn();
+    var bar = document.getElementById('refreshProgress');
+    if (running){
+        var done = progressDone(st);
+        if (svg) svg.classList.add('spin');
+        if (btn) btn.disabled = true;
+        if (ebtn){ ebtn.disabled = true; ebtn.innerText = 'Обновление… ' + done + '/' + (st.total||0); }
+        if (bar){
+            bar.style.display = 'block';
+            bar.querySelector('i').style.width = (st.total ? Math.round(100*done/st.total) : 0) + '%';
+        }
+    } else {
+        if (svg) svg.classList.remove('spin');
+        if (btn) btn.disabled = false;
+        if (bar) bar.style.display = 'none';
+    }
+}
+function ensureEmpty(title, sub, btnText){
+    var e = emptyState();
+    if (!e){
+        e = document.createElement('div');
+        e.className = 'empty-state';
+        e.innerHTML = '<p></p><p style="font-size:13px;color:var(--t3);"></p><button onclick="doRefresh()"></button>';
+        grid().parentNode.insertBefore(e, grid());
+    }
+    var ps = e.querySelectorAll('p');
+    ps[0].innerText = title;
+    ps[1].innerText = sub;
+    var b = e.querySelector('button');
+    b.disabled = false;
+    b.innerText = btnText;
+    return e;
+}
+function calmState(title){
+    ensureEmpty(title || 'Лента пока пуста',
+        'Нажми «Обновить» — опросим источники и соберём статьи', 'Обновить');
+}
+function cardHTML(it){
+    var isRead = readLinks.indexOf(it.link) !== -1;
+    var isBm = bookmarks.indexOf(it.link) !== -1;
+    return '<article class="card' + (isRead ? ' read' : '') + '" data-group="' + esc(it.group) + '" data-link="' + esc(it.link) + '" style="--c:' + esc(it.color) + '">'
+        + '<div class="card-left"><div class="card-meta"><span class="dot"></span><span class="cat">' + esc(it.group_name) + '</span><span class="time">' + esc(it.time_str) + '</span></div>'
+        + '<h2 class="card-title"><a href="' + esc(it.link) + '" target="_blank" rel="noopener">' + esc(it.title) + '</a></h2>'
+        + '<div class="src">' + esc(it.source) + '</div><p class="snippet">' + esc(it.snippet) + '</p>'
+        + '<div class="card-foot">'
+        + '<button class="act bm' + (isBm ? ' on' : '') + '" title="Закладка"><svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>'
+        + '<button class="act sh" title="Копировать"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98"/></svg></button>'
+        + '<span class="readtime">' + esc(it.read_min) + ' мин</span></div></div>'
+        + '<div class="thumb"><span class="thumb-letter">' + esc(it.letter) + '</span>'
+        + (it.image ? '<img src="' + esc(it.image) + '" loading="lazy" onerror="this.style.display=\'none\'">' : '')
+        + '</div></article>';
+}
+function renderFeed(items){
+    var e = emptyState();
+    if (e) e.remove();
+    grid().innerHTML = items.map(cardHTML).join('');
+    apply();
+    updateBadge();
+}
+function loadFeedInPlace(){
+    fetch('/api/feed' + (location.search || '')).then(function(r){return r.json();}).then(function(d){
+        if (d.news && d.news.length){ renderFeed(d.news); }
+        else if (!d.no_interests){ calmState('Источники опрошены, свежих статей по интересам пока нет'); }
+    }).catch(function(){ calmState('Не удалось получить ленту'); });
+}
+function pollRefresh(){
+    pollCount++;
+    if (pollCount > 60){ setRefreshUI(false, {}); calmState('Обновление заняло слишком долго'); return; }
+    fetch('/api/refresh/status').then(function(r){return r.json();}).then(function(st){
+        if (st.running){
+            setRefreshUI(true, st);
+            refreshTimer = setTimeout(pollRefresh, 2500);
+        } else {
+            sessionStorage.setItem('ef_run', String(Date.now()));
+            setRefreshUI(false, st);
+            loadFeedInPlace();
+        }
+    }).catch(function(){ refreshTimer = setTimeout(pollRefresh, 4000); });
+}
+function doRefresh(){
+    pollCount = 0;
+    fetch('/api/refresh', {method:'POST'}).then(function(r){return r.json();}).then(function(st){
+        setRefreshUI(true, st);
+        pollRefresh();
+    }).catch(function(){
+        var b = emptyBtn();
+        if (b){ b.disabled = false; b.innerText = 'Ошибка сети'; }
+    });
+}
+document.getElementById('refreshBtn').addEventListener('click', doRefresh);
+
+(function(){
+    if (!emptyState()) return;
+    if ({{ 'true' if no_interests else 'false' }}) return;
+    fetch('/api/refresh/status').then(function(r){return r.json();}).then(function(st){
+        if (st.running){ setRefreshUI(true, st); pollRefresh(); }
+        else { calmState('Лента пока пуста'); }
+    }).catch(function(){ calmState('Лента пока пуста'); });
+})();
+
+function apply() {
+    document.querySelectorAll('.card').forEach(card => {
+        var link = card.getAttribute('data-link');
+        var g = card.getAttribute('data-group');
+        var text = card.innerText.toLowerCase();
+        var okGroup = (group === 'all') || (g === group);
+        var okMode = mode === 'all' ? true : mode === 'unread' ? readLinks.indexOf(link) === -1 : mode === 'fav' ? bookmarks.indexOf(link) !== -1 : readLinks.indexOf(link) !== -1;
+        var okQ = !query || text.indexOf(query) !== -1;
+        card.style.display = (okGroup && okMode && okQ) ? 'flex' : 'none';
+    });
+}
+function updateBadge() {
+    var n = 0;
+    document.querySelectorAll('.card').forEach(c => { if (readLinks.indexOf(c.getAttribute('data-link')) === -1) n++; });
+    var b = document.getElementById('unreadBadge');
+    if (b) { b.innerText = n; b.style.display = n > 0 ? 'flex' : 'none'; }
+}
+function markRead(card, link){
+    if (readLinks.indexOf(link) === -1){
+        readLinks.push(link);
+        localStorage.setItem('readLinks', JSON.stringify(readLinks));
+        card.classList.add('read');
+        updateBadge();
+        if (mode === 'unread') apply();
+    }
+}
+grid().addEventListener('click', function(e){
+    var card = e.target.closest('.card');
+    if (!card) return;
+    var link = card.getAttribute('data-link');
+    if (e.target.closest('.bm')){
+        e.stopPropagation();
+        var bm = card.querySelector('.bm');
+        if (bookmarks.indexOf(link) === -1){ bookmarks.push(link); bm.classList.add('on'); }
+        else { bookmarks = bookmarks.filter(l => l !== link); bm.classList.remove('on'); }
+        localStorage.setItem('bookmarks', JSON.stringify(bookmarks));
+        if (mode === 'fav') apply();
+        return;
+    }
+    if (e.target.closest('.sh')){
+        e.stopPropagation();
+        if (navigator.clipboard) navigator.clipboard.writeText(link);
+        return;
+    }
+    markRead(card, link);
+    if (!e.target.closest('a')) window.open(link, '_blank');
+});
+
+function syncUI() {
+    document.querySelectorAll('.pills .pill').forEach(p => {
+        var pg = p.getAttribute('data-group');
+        var pm = p.getAttribute('data-mode');
+        var on = pm === 'unread' ? (mode === 'unread') : (pg && group === pg && mode === 'all');
+        p.classList.toggle('active', on);
+    });
+    document.querySelectorAll('.side-item[data-mode]').forEach(b => {
+        b.classList.toggle('active', b.getAttribute('data-mode') === mode);
+    });
+}
+function handleFilter(btn) {
+    var pg = btn.getAttribute('data-group');
+    var pm = btn.getAttribute('data-mode');
+    if (btn.classList.contains('pill')) {
+        if (pm === 'unread') { mode = 'unread'; group = 'all'; }
+        else if (pg) { group = pg; mode = 'all'; }
+    } else if (btn.classList.contains('side-item')) {
+        mode = pm; group = 'all';
+    }
+    syncUI();
+    apply();
+}
+document.querySelectorAll('.pills .pill, .side-item[data-mode]').forEach(btn => {
+    btn.addEventListener('click', function() { handleFilter(btn); });
+});
+document.getElementById('bellBtn').addEventListener('click', function() {
+    mode = (mode === 'unread') ? 'all' : 'unread';
+    if (mode === 'all') group = 'all';
+    syncUI();
+    apply();
+});
+syncUI();
+
+var searchInput = document.getElementById('search');
+searchInput.addEventListener('input', function() { query = searchInput.value.toLowerCase(); apply(); });
+document.addEventListener('keydown', function(e) {
+    if (e.key === '/' || (e.metaKey && e.key.toLowerCase() === 'k')) { e.preventDefault(); searchInput.focus(); }
+});
+updateBadge();
+
+var burgerBtn = document.getElementById('burgerBtn');
+var overlay = document.getElementById('sidebarOverlay');
+var closeBtn = document.getElementById('closeSidebar');
+if (burgerBtn && overlay) {
+    burgerBtn.addEventListener('click', function() { overlay.classList.add('open'); });
+    closeBtn.addEventListener('click', function() { overlay.classList.remove('open'); });
+    overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) overlay.classList.remove('open');
+    });
+    overlay.querySelectorAll('.side-item[data-mode]').forEach(function(b) {
+        b.addEventListener('click', function() {
+            handleFilter(b);
+            overlay.classList.remove('open');
+        });
+    });
+}
+</script>
 @app.route('/health')
 def health():
     return jsonify({"status": "ok", "sources": len(SOURCES)})
