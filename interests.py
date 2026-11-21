@@ -502,17 +502,18 @@ def save_state(feed_slugs, courses):
             session["interests"] = feed_slugs
             session["courses"] = courses
     session["onboarded"] = 1
-    
-    # Создание комнат чатов для новых интересов
+
+    # Создание комнат чатов — в ОТДЕЛЬНОМ свежем соединении (c уже закрыт выше!)
     try:
         from chat import create_room_for_interest
-        for slug in feed_slugs:
-            row = c.execute("SELECT title FROM interests WHERE slug=?", (slug,)).fetchone()
-            if row:
-                create_room_for_interest(slug, row["title"])
+        with db() as c2:
+            for slug in feed_slugs:
+                row = c2.execute("SELECT title FROM interests WHERE slug=?", (slug,)).fetchone()
+                if row:
+                    create_room_for_interest(slug, row["title"])
     except Exception as e:
         logging.warning(f"Chat room creation failed: {e}")
-        
+
     return get_state()
 
 def adopt_guest_interests(uid):
