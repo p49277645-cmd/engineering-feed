@@ -202,12 +202,23 @@ def normalize(rows):
         if not r.get("time_str"): r["time_str"] = rel_time(r.get("fetched_at") or time.time())
     return rows
 
+def load_lab():
+    try:
+        with open(os.path.join(BASE_DIR, "templates", "lab.html"), encoding="utf-8") as f:
+            return f.read()
+    except Exception as e:
+        logger.error(f"lab fragment load failed: {e}")
+        return ""
+
+LAB_FRAGMENT = load_lab()
+
 def load_template():
     try:
         with open(TPL_PATH, encoding="utf-8") as f:
             t = f.read()
         t = t.replace("<!--AUTH-->", AUTH_FRAGMENT)
         t = t.replace("<!--INTERESTS-->", INTERESTS_FRAGMENT)
+        t = t.replace("<!--LAB-->", LAB_FRAGMENT)
         return t
     except Exception as e:
         logger.error(f"template load failed: {e}")
