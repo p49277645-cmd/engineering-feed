@@ -516,7 +516,6 @@ input:autofill{box-shadow:0 0 0 1000px var(--deep) inset;-webkit-text-fill-color
     var wrap=document.createElement('div');
     wrap.style.cssText='margin:18px 0 4px;';
     for(var g=0;g<2;g++){
-      wrap.insertAdjacentHTML('beforeend',
       var ang=[-135,-101,-67,-34,0,34,67,101,135], tk='';
       ang.forEach(function(a){var r=a*Math.PI/180;
         tk+='<line x1="'+(50+Math.sin(r)*30)+'" y1="'+(50-Math.cos(r)*30)+'" x2="'+(50+Math.sin(r)*36)+'" y2="'+(50-Math.cos(r)*36)+'" stroke="'+(a>=101?'#E23B2E':'#9AA7B4')+'" stroke-width="'+(a%67===0?2.5:1.5)+'"/>';});
