@@ -621,3 +621,37 @@ input:autofill{box-shadow:0 0 0 1000px #0B0D10 inset!important;-webkit-text-fill
 .readtime{color:#FFB020!important;text-shadow:0 0 7px rgba(255,176,32,.7)!important;}
 .searchwrap input{color:#CFD8E3!important;}
 </style>
+<style id="lab-fix6">
+/* насечки CTA встают на место (справа), не липнут к рамке */
+.empty-state button::after,.int-save::after,.auth-submit::after,.int-search button::after,#crsFind::after,#editInterestsBtn::after,#saveSettingsBtn::after{
+  left:auto!important;}
+/* вместо чёрно-оранжевых лент — тонкий медный шов между стальными кромками */
+.topbar::after{height:5px!important;
+  background:linear-gradient(180deg,#0B0D10 0 1px,#23282E 1px 2px,#B87333 2px 3px,#23282E 3px 4px,#0B0D10 4px 5px)!important;
+  box-shadow:0 2px 6px rgba(0,0,0,.6)!important;-webkit-mask-image:none!important;mask-image:none!important;}
+.main-head::after{height:4px!important;
+  background:linear-gradient(180deg,#0B0D10 0 1px,#23282E 1px 2px,#B87333 2px 3px,#23282E 3px 4px)!important;}
+/* нижняя табличка — гравированная стальная плашка, не лента */
+body::after{background:linear-gradient(180deg,#3A4149,#23282E)!important;color:#E8B06B!important;
+  border:1px solid #0B0D10!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.15),0 3px 0 #0B0D10!important;
+  transform:rotate(-1deg)!important;opacity:.9!important;}
+/* единая типографическая шкала */
+.logo{font-size:21px!important;letter-spacing:.06em!important;}
+.main-head h1{font-size:21px!important;letter-spacing:.06em!important;padding:9px 16px!important;}
+.side-label{font-size:10.5px!important;letter-spacing:.12em!important;}
+.side-item{font-size:13px!important;font-weight:600!important;}
+.cat-name{font-size:12.5px!important;}
+.card-title{font-size:15px!important;line-height:1.35!important;letter-spacing:.02em!important;}
+.snippet{font-size:12.5px!important;line-height:1.55!important;}
+.src{font-size:10.5px!important;}
+.card-meta{font-size:10px!important;}
+.time,.readtime{font-size:10px!important;}
+.empty-state p:first-child{font-size:19px!important;letter-spacing:.08em!important;}
+.empty-state p:nth-child(2){font-size:12px!important;}
+.empty-state button,.int-save,.auth-submit,.int-search button,#crsFind,#editInterestsBtn,#saveSettingsBtn{
+  font-size:13px!important;letter-spacing:.06em!important;}
+.pill{font-size:12px!important;}
+.int-box h2,.auth-box h2,.cj-head h2{font-size:18px!important;letter-spacing:.05em!important;}
+.int-sub,.auth-hint,.int-count{font-size:11px!important;}
+.info-row{font-size:12px!important;}
+</style>
