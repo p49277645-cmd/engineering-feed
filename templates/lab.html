@@ -357,7 +357,15 @@ input:autofill{box-shadow:0 0 0 1000px #0B0D10 inset!important;-webkit-text-fill
     scene.add(dust);
 
     addEventListener('resize',function(){ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); },{passive:true});
-    /* сцена — только фон: никакого взаимодействия с моделью */
+    /* сцена — фон: тяжёлый демпфированный параллакс (курсор + скролл), без orbit и zoom */
+    var tYaw=0,tPitch=0,tScroll=0,cYaw=0,cPitch=0,cScroll=0;
+    if(!reduced){
+      addEventListener('pointermove',function(e){
+        tYaw=(e.clientX/innerWidth-.5)*.10;
+        tPitch=(e.clientY/innerHeight-.5)*.05;
+      },{passive:true});
+      addEventListener('scroll',function(){ tScroll=window.scrollY||0; },{passive:true});
+    }
     document.addEventListener('visibilitychange',function(){ paused=document.hidden; if(!paused) loop(); });
 
     var last=performance.now();
@@ -367,10 +375,13 @@ input:autofill{box-shadow:0 0 0 1000px #0B0D10 inset!important;-webkit-text-fill
       var now=performance.now(), raw=(now-last)/1000;
       if(raw < 1/30){ return; }
       var dt=Math.min(.05,raw); last=now; clockT+=dt;
-      if(!dragging){ sph.th=Math.sin(clockT*.07)*.16; }
-      var px=pointer.x*.35, py=pointer.y*.18;
-      var th=sph.th+px, ph=sph.ph+py, r=sph.r;
-      camera.position.set(target.x+r*Math.sin(ph)*Math.sin(th), target.y+r*Math.cos(ph)-scrollY*.0016, target.z+r*Math.sin(ph)*Math.cos(th));
+      var k=1-Math.exp(-dt*3);
+      cYaw+=(tYaw-cYaw)*k; cPitch+=(tPitch-cPitch)*k; cScroll+=(tScroll-cScroll)*k;
+      var sc=Math.min(cScroll,1200);
+      var th=Math.sin(clockT*.07)*.16+cYaw+sc*.00022;
+      var ph=sph.ph+cPitch;
+      var r=sph.r;
+      camera.position.set(target.x+r*Math.sin(ph)*Math.sin(th), target.y+r*Math.cos(ph)-sc*.0006, target.z+r*Math.sin(ph)*Math.cos(th));
       camera.lookAt(target);
       for(var i2=0;i2<impulses.length;i2++){ var o=impulses[i2]; o.t=(o.t+dt*.16)%1; o.mesh.position.copy(o.curve.getPointAt(o.t)); }
       for(var n2=0;n2<needles.length;n2++){ needles[n2].rotation.z=Math.sin(clockT*(.7+n2*.23)+n2)*.5; }
@@ -586,4 +597,27 @@ input:autofill{box-shadow:0 0 0 1000px #0B0D10 inset!important;-webkit-text-fill
   color:#CFD8E3!important;border:1px solid #0B0D10!important;border-radius:5px!important;
   box-shadow:0 0 0 2px #0B0D10,0 0 0 3px #3A4149,0 4px 0 #0B0D10,
              inset 0 1px 0 rgba(255,255,255,.25),inset 0 -3px 0 rgba(0,0,0,.35)!important;}
+</style>
+<style id="lab-fix5">
+.empty-state button,.int-save,.auth-submit,.int-search button,#crsFind,#editInterestsBtn,#saveSettingsBtn{
+  background-color:#B87333!important;
+  background-image:linear-gradient(180deg,rgba(255,255,255,.5),rgba(255,255,255,0) 46%),linear-gradient(180deg,#E8B06B 0%,#B87333 52%,#7E4A1D 100%)!important;
+  color:#201205!important;
+  text-shadow:0 1px 0 rgba(255,255,255,.35),0 -1px 0 rgba(0,0,0,.45)!important;
+  box-shadow:0 0 0 2px #0B0D10,0 0 0 3px #3A4149,0 6px 0 #0B0D10,inset 0 2px 0 rgba(255,255,255,.5),inset 0 -4px 0 rgba(0,0,0,.3),0 0 24px rgba(184,115,51,.45)!important;}
+.empty-state button:hover,.int-save:hover,.auth-submit:hover,.int-search button:hover,#crsFind:hover{
+  box-shadow:0 0 0 2px #0B0D10,0 0 0 3px #3A4149,0 6px 0 #0B0D10,inset 0 2px 0 rgba(255,255,255,.5),inset 0 -4px 0 rgba(0,0,0,.3),0 0 34px rgba(232,176,107,.7)!important;}
+.empty-state button::after,.int-save::after,.auth-submit::after,.int-search button::after,#crsFind::after,#editInterestsBtn::after,#saveSettingsBtn::after{
+  background:repeating-linear-gradient(180deg,rgba(32,18,5,.55) 0 2px,rgba(255,255,255,.28) 2px 4px)!important;}
+.side-item.active,.pill.active,.int-tab.active,.auth-tab.active{
+  background-color:#FF6A00!important;
+  background-image:linear-gradient(180deg,rgba(255,255,255,.45),rgba(255,255,255,0) 48%),linear-gradient(180deg,#FF9A4D 0%,#FF6A00 55%,#C24E00 100%)!important;
+  color:#14171B!important;text-shadow:none!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 3px 0 #0B0D10,0 0 18px rgba(255,106,0,.55)!important;}
+.int-chip,.cj-item{border-left-color:#B87333!important;}
+.cj-item input{accent-color:#B87333!important;}
+.empty-state{border-top-color:#B87333!important;}
+.lab-gauge circle:first-of-type{stroke:#B87333!important;}
+.readtime{color:#FFB020!important;text-shadow:0 0 7px rgba(255,176,32,.7)!important;}
+.searchwrap input{color:#CFD8E3!important;}
 </style>
