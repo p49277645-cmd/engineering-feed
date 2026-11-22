@@ -223,6 +223,24 @@ body{
 }
 .empty-chat p{font-size:16px;margin-bottom:8px;}
 </style>
+<style id="theme-lab">
+:root{
+  --bg:#14181c; --panel:#1b2127; --card:#20272e; --card2:#2a333c; --border:#3a454f;
+  --t1:#e6eaee; --t2:#9aa6b2; --t3:#6b7885;
+  --accent-sand:#f07d1f; --accent-emerald:#2e86c8; --accent-rust:#e3b500; --accent-coral:#cf4a2e;
+}
+body{background:var(--bg)!important;color:var(--t1)!important;}
+.chat-header{background:var(--panel)!important;border-bottom:1px solid var(--border)!important;box-shadow:none!important;}
+.chat-header h1::before{content:'● ';color:var(--accent-sand)!important;}
+.chat-header h1{font-family:'JetBrains Mono',monospace!important;}
+.chat-header .back-btn,.send-btn,.input-wrapper{border-radius:6px!important;}
+.send-btn{background:var(--accent-sand)!important;color:#14181c!important;}
+.send-btn:hover{background:var(--accent-rust)!important;}
+.message-content{border-left-color:var(--accent-emerald)!important;}
+.message.own .message-content{background:var(--accent-sand)!important;color:#14181c!important;border-right-color:var(--accent-rust)!important;}
+.message.own .message-header,.message.own .message-username,.message.own .message-time{color:#14181c!important;}
+.message-avatar{border-color:var(--accent-sand)!important;color:var(--accent-sand)!important;background:#0c0f12!important;}
+</style>
 </head>
 <body>
 <div class="chat-header">
