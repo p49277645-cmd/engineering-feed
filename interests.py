@@ -229,101 +229,35 @@ def evaluate(q, text, domain, bonus=0.0):
             "cadence": round(cadence_h, 1), "rel": round(rel, 2), "lang": lang_ok}
 
 def discover(query, force=False):
-    import globalsearch as gs
-    q = (query or "").strip()
-    slug = slugify(q)
-    now = time.time()
+    import sitegraph as sg
+    q = (query or "").strip(); slug = slugify(q); now = time.time()
     with db() as c:
         row = c.execute("SELECT * FROM interests WHERE slug=?", (slug,)).fetchone()
         if row and not force and (now - row["refreshed_at"]) < CACHE_TTL:
             srcs = c.execute("SELECT url,name,kind,domain,score FROM interest_sources WHERE slug=? AND rf_ok=1 AND stale=0 ORDER BY score DESC", (slug,)).fetchall()
             if srcs:
-                return {"slug": slug, "title": row["title"],
-                        "top_sites": json.loads(row["top_sites"] or "[]"),
+                return {"slug": slug, "title": row["title"], "top_sites": json.loads(row["top_sites"] or "[]"),
                         "sources": [dict(s) for s in srcs], "cached": True}
-
-    top_sites, accepted = [], {}
-    urls = gs.global_urls(q, 14)
-    for it in urls:
-        dom = re.sub(r"^www\.", "", urlparse(it["url"]).netloc)
-        if dom and dom not in top_sites:
-            top_sites.append(dom)
-
-    def try_url(u):
-        dom = re.sub(r"^www\.", "", urlparse(u).netloc)
-        res = gs.read_source(u)
-        if not res:
-            return None
-        if res[0] == "rss":
-            ok, lat, text = probe(res[1])
-            if not ok:
-                return None
-            m = evaluate(q, text, dom, 0.1)
-            if not m:
-                return None
-            m.update({"url": res[1], "domain": dom, "latency": lat, "kind": "rss"})
-            return m
-        arts = gs.rank_items(q, res[2])
-        good = [a for a in arts if a["score"] >= 0.15]
-        if len(good) < 3:
-            return None
-        rel = sum(a["score"] for a in good) / len(good)
-        return {"url": u, "domain": dom, "latency": 0.5, "kind": "html",
-                "score": round(0.3 + 0.5 * rel, 3), "entries": len(good),
-                "fresh": 0.5, "cadence": 24, "rel": round(rel, 2), "lang": 1}
-
-    with ThreadPoolExecutor(max_workers=8) as ex:
-        futs = [ex.submit(try_url, it["url"]) for it in urls]
-        try:
-            for fut in as_completed(futs, timeout=DISCOVER_DEADLINE):
-                m = fut.result()
-                if m and m["url"] not in accepted:
-                    accepted[m["url"]] = m
-        except Exception:
-            pass
-
-    # запросные RSS-фоллбэки
-    q_cands = [("habr.com", f"https://habr.com/ru/rss/search/?q={quote_plus(q)}&fl=ru"),
-               ("bing.com", f"https://www.bing.com/news/search?q={quote_plus(q)}&format=rss")]
-    with ThreadPoolExecutor(max_workers=4) as ex:
-        futs = {ex.submit(probe, u): (d, u) for d, u in q_cands}
-        for fut in as_completed(futs, timeout=8):
-            d, u = futs[fut]
-            try:
-                ok, lat, text = fut.result()
-            except Exception:
-                continue
-            if not ok:
-                continue
-            m = evaluate(q, text, d, 0.05)
-            if m and u not in accepted:
-                m.update({"url": u, "domain": d, "latency": lat, "kind": "rss"})
-                accepted[u] = m
-
-    ranked = sorted(accepted.values(), key=lambda m: -m["score"])[:6]
-    logging.info(f"discover '{q}': urls={len(urls)} accepted={len(ranked)}")
+    ranked = sg.discover_sources(q, 6)
+    logging.info(f"discover '{q}': accepted={len(ranked)}")
+    top_sites = []
     for m in ranked:
-        if m["domain"] not in top_sites:
-            top_sites.append(m["domain"])
+        if m["domain"] not in top_sites: top_sites.append(m["domain"])
     top_sites = top_sites[:5]
-
     with db() as c:
         c.execute("INSERT OR REPLACE INTO interests(slug,title,top_sites,created_at,refreshed_at) VALUES (?,?,?,?,?)",
                   (slug, q, json.dumps(top_sites, ensure_ascii=False), now, now))
-        if force:
-            c.execute("DELETE FROM interest_sources WHERE slug=?", (slug,))
+        if force: c.execute("DELETE FROM interest_sources WHERE slug=?", (slug,))
         for m in ranked:
             c.execute("""INSERT INTO interest_sources(slug,url,name,kind,domain,score,rf_ok,fails,latency,checked_at,entries,fresh,cadence,rel,lang,stale)
                          VALUES (?,?,?,?,?,?,1,0,?,?,?,?,?,?,?,0)
                          ON CONFLICT(url) DO UPDATE SET slug=excluded.slug, kind=excluded.kind, rf_ok=1, fails=0, stale=0, stale_rounds=0,
                          score=excluded.score, latency=excluded.latency, checked_at=excluded.checked_at,
-                         entries=excluded.entries, fresh=excluded.fresh, cadence=excluded.cadence,
-                         rel=excluded.rel, lang=excluded.lang""",
+                         entries=excluded.entries, fresh=excluded.fresh, cadence=excluded.cadence, rel=excluded.rel, lang=excluded.lang""",
                       (slug, m["url"], f"{m['domain']}: {q}", m["kind"], m["domain"], m["score"],
-                       m["latency"], now, m["entries"], m["fresh"], m["cadence"], m["rel"], m["lang"]))
+                       m["latency"], now, m["entries"], m["fresh"], m["cadence"], m["rel"], 1))
     return {"slug": slug, "title": q, "top_sites": top_sites,
-            "sources": [{"url": m["url"], "name": f"{m['domain']}: {q}", "kind": m["kind"],
-                         "domain": m["domain"], "score": m["score"]} for m in ranked],
+            "sources": [{"url": m["url"], "name": f"{m['domain']}: {q}", "kind": m["kind"], "domain": m["domain"], "score": m["score"]} for m in ranked],
             "cached": False}
 
 def rotate(slug):
