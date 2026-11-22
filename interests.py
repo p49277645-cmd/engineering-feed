@@ -229,6 +229,7 @@ def evaluate(q, text, domain, bonus=0.0):
             "cadence": round(cadence_h, 1), "rel": round(rel, 2), "lang": lang_ok}
 
 def discover(query, force=False):
+    import globalsearch as gs
     q = (query or "").strip()
     slug = slugify(q)
     now = time.time()
@@ -241,63 +242,38 @@ def discover(query, force=False):
                         "top_sites": json.loads(row["top_sites"] or "[]"),
                         "sources": [dict(s) for s in srcs], "cached": True}
 
-    top_sites, cands = [], []
-    try:
-        r = HTTP.get(f"https://html.duckduckgo.com/html/?q={quote_plus(q)}", timeout=(2.0, 3.0))
-        soup = BeautifulSoup(r.text, "html.parser")
-        links = []
-        for a in soup.find_all("a", href=True):
-            href = a["href"]
-            if "uddg=" in href:
-                href = unquote(href.split("uddg=")[1].split("&")[0])
-            if not href.startswith("http"):
-                continue
-            dom = re.sub(r"^www\.", "", urlparse(href).netloc)
-            if not dom or "duckduckgo" in dom:
-                continue
-            if dom not in top_sites:
-                top_sites.append(dom)
-            links.append((dom, href))
-        for dom, href in links:
-            if re.search(r"(rss|atom|feed|\.xml)", href, re.IGNORECASE):
-                cands.append((dom, href))
-        seen = set()
-        for dom, page in links:
-            if dom in seen:
-                continue
-            seen.add(dom)
-            for path in FEED_PATHS:
-                cands.append((dom, "https://" + dom + path))
-            if len(seen) >= 4:
-                break
-    except Exception as e:
-        logging.warning(f"DDG failed: {e}")
+    top_sites, accepted = [], {}
+    urls = gs.global_urls(q, 14)
+    for it in urls:
+        dom = re.sub(r"^www\.", "", urlparse(it["url"]).netloc)
+        if dom and dom not in top_sites:
+            top_sites.append(dom)
 
-    q_cands = [("habr.com", f"https://habr.com/ru/rss/search/?q={quote_plus(q)}&fl=ru"),
-               ("bing.com", f"https://www.bing.com/news/search?q={quote_plus(q)}&format=rss")]
-    if q.isascii():
-        q_cands.append(("arxiv.org", f"http://export.arxiv.org/api/query?search_query=all:{quote_plus(q)}&max_results=10"))
-    cands = q_cands + cands
-
-    rank_bonus = {}
-    for i, d in enumerate(top_sites[:5]):
-        rank_bonus[d] = max(0.0, 0.20 - 0.04 * i)
-
-    accepted = {}
-    def try_one(dom, url):
-        ok, lat, text = probe(url)
-        if not ok:
+    def try_url(u):
+        dom = re.sub(r"^www\.", "", urlparse(u).netloc)
+        res = gs.read_source(u)
+        if not res:
             return None
-        m = evaluate(q, text, dom, rank_bonus.get(dom, 0.0))
-        if not m:
+        if res[0] == "rss":
+            ok, lat, text = probe(res[1])
+            if not ok:
+                return None
+            m = evaluate(q, text, dom, 0.1)
+            if not m:
+                return None
+            m.update({"url": res[1], "domain": dom, "latency": lat, "kind": "rss"})
+            return m
+        arts = gs.rank_items(q, res[2])
+        good = [a for a in arts if a["score"] >= 0.15]
+        if len(good) < 3:
             return None
-        if not reprobe(url):
-            return None
-        m.update({"url": url, "domain": dom, "latency": lat})
-        return m
+        rel = sum(a["score"] for a in good) / len(good)
+        return {"url": u, "domain": dom, "latency": 0.5, "kind": "html",
+                "score": round(0.3 + 0.5 * rel, 3), "entries": len(good),
+                "fresh": 0.5, "cadence": 24, "rel": round(rel, 2), "lang": 1}
 
-    with ThreadPoolExecutor(max_workers=10) as ex:
-        futs = [ex.submit(try_one, d, u) for d, u in cands[:14]]
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        futs = [ex.submit(try_url, it["url"]) for it in urls]
         try:
             for fut in as_completed(futs, timeout=DISCOVER_DEADLINE):
                 m = fut.result()
@@ -306,38 +282,26 @@ def discover(query, force=False):
         except Exception:
             pass
 
-    ranked = sorted(accepted.values(), key=lambda m: -m["score"])[:6]
-    logging.info(f"discover '{q}': cands={len(cands)} accepted={len(ranked)}")
-    
-    if not ranked:
-        fallback = [
-            ("habr.com", f"https://habr.com/ru/rss/search/?q={quote_plus(q)}&fl=ru"),
-            ("nplus1.ru", "https://nplus1.ru/rss"),
-            ("elementy.ru", "https://elementy.ru/rss/news"),
-            ("opennet.ru", "https://www.opennet.ru/opennews/opennews_all.rss"),
-            ("cyberleninka.ru", "https://cyberleninka.ru/article/rss"),
-        ]
-        with ThreadPoolExecutor(max_workers=5) as ex_fb:
-            futs_fb = [ex_fb.submit(probe, u) for _, u in fallback]
-            for (dom, u), fut in zip(fallback, futs_fb):
-                try:
-                    ok, lat, text = fut.result(timeout=6)
-                except Exception:
-                    continue
-                if not ok:
-                    continue
-                ent = feedparser.parse(text).entries
-                if len(ent) < 3:
-                    continue
-                if not any((time.time() - time.mktime(e.published_parsed)) < 30*86400
-                           for e in ent if getattr(e, "published_parsed", None)):
-                    continue
-                accepted[u] = {"url": u, "domain": dom, "score": 0.5,
-                               "latency": lat, "entries": 3, "fresh": 0.5,
-                               "cadence": 24, "rel": 0.5, "lang": 1}
-        ranked = sorted(accepted.values(), key=lambda m: -m["score"])[:6]
-        logging.info(f"discover '{q}' FALLBACK: accepted={len(ranked)}")
+    # запросные RSS-фоллбэки
+    q_cands = [("habr.com", f"https://habr.com/ru/rss/search/?q={quote_plus(q)}&fl=ru"),
+               ("bing.com", f"https://www.bing.com/news/search?q={quote_plus(q)}&format=rss")]
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        futs = {ex.submit(probe, u): (d, u) for d, u in q_cands}
+        for fut in as_completed(futs, timeout=8):
+            d, u = futs[fut]
+            try:
+                ok, lat, text = fut.result()
+            except Exception:
+                continue
+            if not ok:
+                continue
+            m = evaluate(q, text, d, 0.05)
+            if m and u not in accepted:
+                m.update({"url": u, "domain": d, "latency": lat, "kind": "rss"})
+                accepted[u] = m
 
+    ranked = sorted(accepted.values(), key=lambda m: -m["score"])[:6]
+    logging.info(f"discover '{q}': urls={len(urls)} accepted={len(ranked)}")
     for m in ranked:
         if m["domain"] not in top_sites:
             top_sites.append(m["domain"])
@@ -351,14 +315,14 @@ def discover(query, force=False):
         for m in ranked:
             c.execute("""INSERT INTO interest_sources(slug,url,name,kind,domain,score,rf_ok,fails,latency,checked_at,entries,fresh,cadence,rel,lang,stale)
                          VALUES (?,?,?,?,?,?,1,0,?,?,?,?,?,?,?,0)
-                         ON CONFLICT(url) DO UPDATE SET rf_ok=1, fails=0, stale=0, stale_rounds=0,
+                         ON CONFLICT(url) DO UPDATE SET slug=excluded.slug, kind=excluded.kind, rf_ok=1, fails=0, stale=0, stale_rounds=0,
                          score=excluded.score, latency=excluded.latency, checked_at=excluded.checked_at,
                          entries=excluded.entries, fresh=excluded.fresh, cadence=excluded.cadence,
                          rel=excluded.rel, lang=excluded.lang""",
-                      (slug, m["url"], f"{m['domain']}: {q}", "site", m["domain"], m["score"],
+                      (slug, m["url"], f"{m['domain']}: {q}", m["kind"], m["domain"], m["score"],
                        m["latency"], now, m["entries"], m["fresh"], m["cadence"], m["rel"], m["lang"]))
     return {"slug": slug, "title": q, "top_sites": top_sites,
-            "sources": [{"url": m["url"], "name": f"{m['domain']}: {q}", "kind": "site",
+            "sources": [{"url": m["url"], "name": f"{m['domain']}: {q}", "kind": m["kind"],
                          "domain": m["domain"], "score": m["score"]} for m in ranked],
             "cached": False}
 
@@ -395,18 +359,18 @@ def report_novelty(url, new_count):
 
 def interest_source_items():
     with db() as c:
-        rows = c.execute("SELECT slug,url,name,score FROM interest_sources WHERE rf_ok=1 AND stale=0 ORDER BY score DESC").fetchall()
+        rows = c.execute("SELECT slug,url,name,score,kind FROM interest_sources WHERE rf_ok=1 AND stale=0 ORDER BY score DESC").fetchall()
     per = {}
     out = []
     for r in rows:
         k = per.get(r["slug"], 0)
-        if k >= 2:
+        if k >= 3:
             continue
         per[r["slug"]] = k + 1
-        out.append({"type": "rss", "url": r["url"], "source": r["name"],
-                    "category": "interest", "limit": 12, "interest": r["slug"]})
+        out.append({"type": "html" if r["kind"] == "html" else "rss",
+                    "url": r["url"], "source": r["name"],
+                    "category": "interest", "limit": 15, "interest": r["slug"]})
     return out
-
 def current_slugs():
     st = get_state()["interests"]
     if not st:
