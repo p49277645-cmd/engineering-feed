@@ -113,8 +113,8 @@ body::after,.shell::before,.shell::after{display:none;}
 .empty-state p:nth-child(2){color:var(--t2);font-size:12px;}
 .lab-gauge{width:86px;height:86px;margin:0 10px;vertical-align:middle;}
 .lab-gauge circle:first-of-type{stroke:var(--cu);}
-.lab-gauge .needle{transform-origin:50% 78%;transform:rotate(-52deg);transition:transform 1.1s cubic-bezier(.34,1.4,.4,1);}
-.lab-gauge.on .needle{transform:rotate(24deg);}
+.lab-gauge .needle{transform-origin:50px 50px;transform:rotate(-135deg);transition:transform 1.2s cubic-bezier(.3,1.3,.4,1);}
+.lab-gauge.on .needle{transform:rotate(55deg);}
 
 /* карточки-приборы */
 .grid{counter-reset:labn;}
@@ -516,12 +516,18 @@ input:autofill{box-shadow:0 0 0 1000px var(--deep) inset;-webkit-text-fill-color
     wrap.style.cssText='margin:18px 0 4px;';
     for(var g=0;g<2;g++){
       wrap.insertAdjacentHTML('beforeend',
+      var ang=[-135,-101,-67,-34,0,34,67,101,135], tk='';
+      ang.forEach(function(a){var r=a*Math.PI/180;
+        tk+='<line x1="'+(50+Math.sin(r)*30)+'" y1="'+(50-Math.cos(r)*30)+'" x2="'+(50+Math.sin(r)*36)+'" y2="'+(50-Math.cos(r)*36)+'" stroke="'+(a>=101?'#E23B2E':'#9AA7B4')+'" stroke-width="'+(a%67===0?2.5:1.5)+'"/>';});
+      wrap.insertAdjacentHTML('beforeend',
       '<svg class="lab-gauge" viewBox="0 0 100 100" aria-hidden="true">'
-      +'<circle cx="50" cy="50" r="44" fill="#0B0D10" stroke="#3A4149" stroke-width="4"/>'
-      +'<circle cx="50" cy="50" r="36" fill="#14171B" stroke="#8A939E" stroke-width="2"/>'
-      +'<g stroke="#9AA7B4" stroke-width="2">'+[ -52,-26,0,26,52 ].map(function(a){var r=a*Math.PI/180;return '<line x1="'+(50+Math.sin(r)*28)+'" y1="'+(50-Math.cos(r)*28)+'" x2="'+(50+Math.sin(r)*34)+'" y2="'+(50-Math.cos(r)*34)+'"/>';}).join('')+'</g>'
-      +'<g class="needle"><line x1="50" y1="50" x2="50" y2="20" stroke="#E23B2E" stroke-width="3"/></g>'
-      +'<circle cx="50" cy="50" r="5" fill="#8A939E"/></svg>');
+      +'<circle cx="50" cy="50" r="46" fill="#0B0D10" stroke="#3A4149" stroke-width="3"/>'
+      +'<circle cx="50" cy="50" r="38" fill="#14171B" stroke="#8A939E" stroke-width="1.5"/>'
+      +tk
+      +'<text x="16" y="86" font-family="monospace" font-size="7" fill="#9AA7B4">0</text>'
+      +'<text x="70" y="86" font-family="monospace" font-size="7" fill="#E23B2E">MAX</text>'
+      +'<g class="needle"><line x1="50" y1="50" x2="50" y2="16" stroke="#E23B2E" stroke-width="2.5" stroke-linecap="round"/><line x1="50" y1="50" x2="50" y2="60" stroke="#8A939E" stroke-width="2" stroke-linecap="round"/></g>'
+      +'<circle cx="50" cy="50" r="4.5" fill="#8A939E" stroke="#0B0D10" stroke-width="1"/></svg>');
     }
     es.insertBefore(wrap,btn);
   }
