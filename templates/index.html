@@ -298,6 +298,38 @@ body.locked .topbar, body.locked .shell, body.locked #onboardingBanner, body.loc
 .auth-overlay.gate .auth-close{display:none;}
 .auth-overlay.gate .auth-box{border-top:3px solid var(--accent-sand);}
 </style>
+<style id="theme-lab">
+:root{
+  --bg:#14181c; --panel:#1b2127; --card:#20272e; --card2:#2a333c; --border:#3a454f;
+  --t1:#e6eaee; --t2:#9aa6b2; --t3:#6b7885;
+  --accent-sand:#f07d1f;   /* перильный оранжевый = главный акцент */
+  --accent-emerald:#2e86c8;/* электрический синий = «включено/ок» */
+  --accent-rust:#e3b500;   /* жёлтый кабель */
+  --accent-coral:#cf4a2e;  /* аварийный красный */
+  --grid-color:rgba(240,125,31,0.05);
+}
+/* сетка-чертёж + монтажные уголки как на схемах установок */
+body{background-image:linear-gradient(var(--grid-color) 1px,transparent 1px),linear-gradient(90deg,var(--grid-color) 1px,transparent 1px)!important;background-size:40px 40px,40px 40px!important;background-attachment:fixed!important;}
+body::before,body::after{border-color:rgba(240,125,31,.45)!important;width:140px;height:140px;}
+/* убираем «хакерщину»: мигающий курсор */
+.logo::after{content:none!important;animation:none!important;}
+.logo{font-family:'JetBrains Mono',monospace!important;letter-spacing:.5px;}
+/* заголовок = лампа-индикатор установки вместо // */
+.main-head h1::before,.int-box h2::before,.cj-head h2::before,.auth-box h2::before,.chat-header h1::before{content:'● ';color:var(--accent-sand)!important;}
+/* фаски панелей (clip-path) ОСТАВЛЯЕМ — это металл с фаской, не скругляем */
+/* круглые номерные тех-маркеры как «13 / 10 / 9» на фото */
+.cat-letter{border-radius:50%!important;background:#0c0f12!important;border:1px solid var(--border)!important;color:var(--c)!important;box-shadow:0 0 0 1px rgba(255,255,255,.08)!important;}
+.thumb-letter{border-radius:50%!important;opacity:.22!important;}
+.dot{box-shadow:0 0 0 2px rgba(255,255,255,.18)!important;}
+/* акцентные состояния в новой гамме */
+.pill.active,.side-item.active,.int-tab.active{background:var(--accent-sand)!important;color:#14181c!important;border-color:var(--accent-sand)!important;}
+.auth-submit,.int-save,.stepik-btn{background:var(--accent-sand)!important;color:#14181c!important;}
+.auth-submit:hover,.int-save:hover{background:var(--accent-rust)!important;}
+.iconbtn:hover,.avatar{border-color:var(--accent-sand)!important;}
+.card:hover{box-shadow:0 14px 34px rgba(0,0,0,.55)!important;}
+.cat-card:hover,.course-card:hover{box-shadow:0 8px 20px rgba(0,0,0,.45)!important;}
+::-webkit-scrollbar-thumb{background:var(--accent-sand)!important;}
+</style>
 </head>
 <body>
 <header class="topbar">
