@@ -324,7 +324,7 @@ input:autofill{box-shadow:0 0 0 1000px var(--deep) inset;-webkit-text-fill-color
 
   var renderer, scene, camera, rafId=null, clockT=0, paused=false;
   var impulses=[], needles=[], flickLight=null, flickMat=null, dust=null, beam=null;
-  var sph={ph:1.25,r:13}, target=new THREE.Vector3(0,2.1,-4);
+  var sph={ph:1.25,r:13}, target=null;
   function ct(w,h,draw){ var c=document.createElement('canvas'); c.width=w; c.height=h; draw(c.getContext('2d'),w,h); var t=new THREE.CanvasTexture(c); t.anisotropy=4; return t; }
   function texConcrete(){ return ct(256,256,function(x,w,h){ x.fillStyle='#6E6A62'; x.fillRect(0,0,w,h); x.strokeStyle='rgba(0,0,0,.35)'; x.lineWidth=2;
       for(var i=0;i<4;i++){ x.beginPath(); x.moveTo(i*64,0); x.lineTo(i*64,h); x.stroke(); x.beginPath(); x.moveTo(0,i*64); x.lineTo(w,i*64); x.stroke(); }
@@ -338,6 +338,7 @@ input:autofill{box-shadow:0 0 0 1000px var(--deep) inset;-webkit-text-fill-color
   function texGlow(col){ return ct(64,64,function(x,w,h){ var g=x.createRadialGradient(32,32,0,32,32,32); g.addColorStop(0,col); g.addColorStop(1,'rgba(0,0,0,0)'); x.fillStyle=g; x.fillRect(0,0,w,h); }); }
 
   function init3D(){
+    target=new THREE.Vector3(0,2.1,-4);
     var cv=document.getElementById('lab-canvas');
     renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true});
     renderer.setPixelRatio(Math.min(devicePixelRatio, mobile?1:1.5));
@@ -468,8 +469,8 @@ input:autofill{box-shadow:0 0 0 1000px var(--deep) inset;-webkit-text-fill-color
   }
   var coarse = window.matchMedia && matchMedia('(pointer:coarse)').matches;
   var lite = location.search.indexOf('lite') > -1 || (coarse && innerWidth < 1024);
-  if(!webglOK() || reduced || weak || lite){ build2D(); } else { try{ init3D(); }catch(e){ build2D(); } }
-
+  var has3D = (typeof THREE !== 'undefined');
+  if(!has3D || !webglOK() || reduced || weak || lite){ build2D(); } else { try{ init3D(); }catch(e){ build2D(); } }
   /* кабели — тонкие, по краям, ПОД интерфейсом */
   var cabSvg=document.getElementById('lab-cables'), cores=[], cabRaf=false;
   function layoutCables(){
