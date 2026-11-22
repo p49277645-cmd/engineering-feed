@@ -324,7 +324,7 @@ input:autofill{box-shadow:0 0 0 1000px var(--deep) inset;-webkit-text-fill-color
 
   var renderer, scene, camera, rafId=null, clockT=0, paused=false;
   var impulses=[], needles=[], flickLight=null, flickMat=null, dust=null, beam=null;
-  var sph={ph:1.25,r:13}, target=null;
+  var sph={ph:1.25,r:13}, target=(typeof THREE!=='undefined'?new THREE.Vector3(0,2.1,-4):null);
   function ct(w,h,draw){ var c=document.createElement('canvas'); c.width=w; c.height=h; draw(c.getContext('2d'),w,h); var t=new THREE.CanvasTexture(c); t.anisotropy=4; return t; }
   function texConcrete(){ return ct(256,256,function(x,w,h){ x.fillStyle='#6E6A62'; x.fillRect(0,0,w,h); x.strokeStyle='rgba(0,0,0,.35)'; x.lineWidth=2;
       for(var i=0;i<4;i++){ x.beginPath(); x.moveTo(i*64,0); x.lineTo(i*64,h); x.stroke(); x.beginPath(); x.moveTo(0,i*64); x.lineTo(w,i*64); x.stroke(); }
