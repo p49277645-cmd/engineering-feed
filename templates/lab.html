@@ -253,7 +253,7 @@ input:autofill{box-shadow:0 0 0 1000px var(--deep) inset;-webkit-text-fill-color
   .empty-state{padding:36px 16px;width:100%;}
   .empty-state button{width:100%;padding:14px 10px;}
   .lab-gauge{width:64px;height:64px;}
-  #lab-bg{height:150px;}
+  #lab-bg{height:100dvh;}
   #lab-2d svg{opacity:.85;}
   .card{padding:16px;}
   .card-title{font-size:14px;}
@@ -314,7 +314,7 @@ input:autofill{box-shadow:0 0 0 1000px var(--deep) inset;-webkit-text-fill-color
     +'<g data-d="1"><rect x="600" y="560" width="400" height="16" fill="#FF6A00"/><g fill="#FF6A00"><rect x="610" y="576" width="8" height="60"/><rect x="790" y="576" width="8" height="60"/><rect x="980" y="576" width="8" height="60"/></g></g>'
     +'</svg>';
     if(!reduced){
-      var layers = two.querySelectorAll('[data-d]');
+    if(!reduced && !(window.matchMedia&&matchMedia('(pointer:coarse)').matches)){
       addEventListener('pointermove', function(e){
         var dx=(e.clientX/innerWidth-.5), dy=(e.clientY/innerHeight-.5);
         layers.forEach(function(l){ var d=+l.getAttribute('data-d'); l.setAttribute('transform','translate('+(-dx*26*d)+' '+(-dy*16*d)+')'); });
@@ -543,7 +543,7 @@ input:autofill{box-shadow:0 0 0 1000px var(--deep) inset;-webkit-text-fill-color
 <style id="lab-mobile-final">
 @media(max-width:767px){
   /* зал и кабели на телефоне убираем: вместо них чистая сетка фона */
-  #lab-bg,#lab-cables{display:none;}
+  #lab-bg,#lab-cables{display:block;}
 
   /* шапка: сжимается только поиск, кнопки и бургер стоят на фиксе */
   .topbar{flex-wrap:nowrap;gap:6px;padding:7px 10px;min-height:52px;}
