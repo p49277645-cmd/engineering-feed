@@ -357,13 +357,7 @@ input:autofill{box-shadow:0 0 0 1000px #0B0D10 inset!important;-webkit-text-fill
     scene.add(dust);
 
     addEventListener('resize',function(){ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); },{passive:true});
-    addEventListener('pointermove',function(e){ pointer.x=(e.clientX/innerWidth-.5); pointer.y=(e.clientY/innerHeight-.5);
-      if(dragging){ sph.th-=(e.clientX-lastPX)*.004; sph.ph=Math.min(1.45,Math.max(1.05,sph.ph-(e.clientY-lastPY)*.003)); lastPX=e.clientX; lastPY=e.clientY; } },{passive:true});
-    addEventListener('pointerdown',function(e){
-      if(e.target.closest('button,a,input,textarea,.card,.sidebar,.topbar,.pill,.side-item,.int-overlay,.auth-overlay,.cj-overlay,.int-box,.auth-box,.cj-box,.manage,.act,.thumb')) return;
-      dragging=true; lastPX=e.clientX; lastPY=e.clientY; });
-    addEventListener('pointerup',function(){ dragging=false; },{passive:true});
-    addEventListener('scroll',function(){ scrollY=window.scrollY||0; },{passive:true});
+    /* сцена — только фон: никакого взаимодействия с моделью */
     document.addEventListener('visibilitychange',function(){ paused=document.hidden; if(!paused) loop(); });
 
     var last=performance.now();
