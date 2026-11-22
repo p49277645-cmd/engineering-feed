@@ -291,6 +291,12 @@ body::after{bottom:20px;right:20px;border-left:none;border-top:none;}
     .shell{padding:16px;}
     .wiki-content{padding:24px;}
 }
+/* === Обязательный шлюз регистрации === */
+body.locked{overflow:hidden;}
+body.locked .topbar, body.locked .shell, body.locked #onboardingBanner, body.locked #refreshProgress{visibility:hidden;}
+.auth-overlay.gate{background:var(--bg);z-index:400;}
+.auth-overlay.gate .auth-close{display:none;}
+.auth-overlay.gate .auth-box{border-top:3px solid var(--accent-sand);}
 </style>
 </head>
 <body>
@@ -692,5 +698,35 @@ if (burgerBtn && overlay) {
 </script>
 <!--AUTH-->
 <!--INTERESTS-->
+<script>
+(function(){
+  var gated=false, mo=null, poll=null;
+  function lock(){
+    gated=true;
+    document.body.classList.add('locked');
+    var ov=document.getElementById('authOverlay');
+    if(!ov) return;
+    ov.classList.add('open','gate');
+    // не даём закрыть шлюз: если кто-то снимает open — возвращаем
+    mo=new MutationObserver(function(){
+      if(gated && !ov.classList.contains('open')) ov.classList.add('open','gate');
+    });
+    mo.observe(ov,{attributes:true,attributeFilter:['class']});
+    // как только появился ник (успешный вход/регистрация) — перезагружаем сайт уже под аккаунтом
+    poll=setInterval(function(){
+      fetch('/api/me').then(function(r){return r.json();}).then(function(d){
+        if(d && d.nick){
+          gated=false; clearInterval(poll); if(mo) mo.disconnect();
+          document.body.classList.remove('locked');
+          location.reload();
+        }
+      }).catch(function(){});
+    },1200);
+  }
+  fetch('/api/me').then(function(r){return r.json();}).then(function(d){
+    if(!d || !d.nick) lock();
+  }).catch(function(){});
+})();
+</script>
 </body>
 </html>
