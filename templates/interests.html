@@ -1,5 +1,5 @@
 <style>
-.int-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(8px);z-index:210;align-items:center;justify-content:center;}
+.int-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(8px);z-index:210;align-items:center;justify-content:center;padding:20px;}
 .int-overlay.open{display:flex;}
 .int-box{width:100%;max-width:600px;max-height:88vh;overflow-y:auto;background:var(--panel);border:1px solid var(--border);border-top:3px solid var(--accent-emerald);padding:28px;position:relative;}
 .int-box h2{font-family:'JetBrains Mono',monospace;font-size:20px;color:var(--accent-emerald);margin-bottom:6px;}
@@ -19,8 +19,9 @@
 .int-count{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--t2);margin-bottom:12px;}
 .int-count b{color:var(--accent-emerald);}
 .int-save{width:100%;height:44px;background:var(--accent-sand);border:none;color:var(--bg);font-weight:800;font-family:'JetBrains Mono',monospace;cursor:pointer;}
+.int-save:disabled{opacity:.5;cursor:not-allowed;}
 .int-ghost{width:100%;height:36px;margin-top:8px;background:var(--card2);border:none;color:var(--t3);font-family:'JetBrains Mono',monospace;font-size:12px;cursor:pointer;}
-.int-close{position:absolute;top:12px;right:12px;width:30px;height:30px;border:1px solid var(--border);background:var(--card);color:var(--t2);cursor:pointer;}
+.int-close{position:absolute;top:12px;right:12px;width:30px;height:30px;border:1px solid var(--border);background:var(--card);color:var(--t2);cursor:pointer;z-index:2;}
 .int-err{color:var(--accent-coral);font-size:12px;font-family:'JetBrains Mono',monospace;margin-bottom:10px;display:none;}
 .crs-row{display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--border);background:var(--card);margin-bottom:8px;}
 .crs-row .t{flex:1;font-size:12px;color:var(--t1);font-family:'JetBrains Mono',monospace;}
@@ -29,6 +30,32 @@
 .course-card{display:flex;align-items:center;gap:10px;width:100%;padding:12px;margin-bottom:8px;border:1px solid var(--border);border-left:3px solid var(--accent-sand);background:var(--card);color:var(--t1);font-size:12px;font-family:'JetBrains Mono',monospace;text-decoration:none;transition:.2s;}
 .course-card:hover{border-color:var(--accent-sand);background:var(--card2);transform:translateX(4px);}
 .course-card .star{color:var(--accent-sand);}
+.course-info{display:flex;flex-direction:column;gap:4px;min-width:0;}
+.course-title{font-size:12px;font-weight:600;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.course-learners{font-size:10px;color:var(--t3);}
+
+/* === Окно выбора чатов: прокручиваемый список + закреплённые кнопки === */
+.cj-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(8px);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px;}
+.cj-box{width:100%;max-width:520px;max-height:88vh;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--border);border-top:3px solid var(--accent-emerald);position:relative;}
+.cj-head{padding:24px 28px 12px;flex-shrink:0;}
+.cj-head h2{font-family:'JetBrains Mono',monospace;font-size:20px;color:var(--accent-emerald);margin-bottom:8px;}
+.cj-head h2::before{content:'// ';color:var(--accent-coral);}
+.cj-head p{font-size:13px;color:var(--t2);line-height:1.6;}
+.cj-meta{display:flex;justify-content:space-between;align-items:center;margin-top:12px;}
+.cj-meta span{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--t2);}
+.cj-meta span b{color:var(--accent-emerald);}
+.cj-meta button{background:none;border:1px solid var(--border);color:var(--accent-emerald);font-family:'JetBrains Mono',monospace;font-size:11px;padding:4px 10px;cursor:pointer;}
+.cj-meta button:hover{border-color:var(--accent-emerald);}
+.cj-list{overflow-y:auto;flex:1;min-height:0;padding:4px 28px 8px;}
+.cj-list::-webkit-scrollbar{width:8px;}
+.cj-list::-webkit-scrollbar-track{background:var(--card);}
+.cj-list::-webkit-scrollbar-thumb{background:var(--accent-emerald);}
+.cj-list::-webkit-scrollbar-thumb:hover{background:var(--accent-sand);}
+.cj-item{display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--border);background:var(--card);margin-bottom:8px;cursor:pointer;transition:.15s;}
+.cj-item:hover{border-color:var(--accent-emerald);background:var(--card2);}
+.cj-item input{width:18px;height:18px;accent-color:var(--accent-emerald);cursor:pointer;flex-shrink:0;}
+.cj-item span{font-size:13px;color:var(--t1);font-family:'JetBrains Mono',monospace;}
+.cj-foot{padding:16px 28px 24px;flex-shrink:0;border-top:1px solid var(--border);}
 </style>
 
 <div class="int-overlay" id="intOverlay">
@@ -59,38 +86,28 @@
 </div>
 
 <script>
-console.log("Interests script loaded!");
-
 (function(){
   var state = {interests:[], courses:[], limits:{feed_max:10, course_max:3}, is_user:false, onboarded:false, stale:false};
   var ov = document.getElementById('intOverlay');
-  
+
   function err(t){
     var e = document.getElementById('intErr');
     e.innerText = t || '';
     e.style.display = t ? 'block' : 'none';
   }
-  
+
   function load(cb){
-    console.log("Fetching /api/interests...");
     fetch('/api/interests')
       .then(function(r){ return r.json(); })
-      .then(function(d){
-        console.log("API response:", d);
-        state = d;
-        if(cb) cb();
-      })
-      .catch(function(e){
-        console.error("Fetch error:", e);
-        err("Ошибка загрузки данных");
-      });
+      .then(function(d){ state = d; if(cb) cb(); })
+      .catch(function(){ err('Ошибка загрузки данных'); });
   }
-  
+
   function counts(){
     document.getElementById('intCount').innerHTML = 'интересов: <b>'+state.interests.length+'/'+state.limits.feed_max+'</b> · курсов: <b>'+state.courses.length+'/'+state.limits.course_max+'</b>';
     document.getElementById('intMax').innerText = state.limits.feed_max;
   }
-  
+
   function renderInt(){
     var box = document.getElementById('intChips');
     box.innerHTML = '';
@@ -100,13 +117,12 @@ console.log("Interests script loaded!");
       c.innerHTML = it.title + ' <span class="rm">✕</span>';
       c.querySelector('.rm').addEventListener('click', function(){
         state.interests = state.interests.filter(function(x){ return x.slug !== it.slug; });
-        renderInt();
-        counts();
+        renderInt(); counts();
       });
       box.appendChild(c);
     });
   }
-  
+
   function renderCrs(){
     var box = document.getElementById('crsChips');
     box.innerHTML = '';
@@ -116,21 +132,18 @@ console.log("Interests script loaded!");
       c.innerHTML = '★ '+cr.title+' <span class="rm">✕</span>';
       c.querySelector('.rm').addEventListener('click', function(){
         state.courses = state.courses.filter(function(x){ return x.url !== cr.url; });
-        renderCrs();
-        counts();
+        renderCrs(); counts();
       });
       box.appendChild(c);
     });
   }
-  
+
   function renderSidebar(){
-    console.log("Rendering sidebar...");
     var COLORS = ['#10b981','#ef4444','#a855f7','#f59e0b','#14b8a6','#3b82f6','#f97316'];
     function hash(s){ var x=0; for(var i=0;i<s.length;i++){ x=(x*31+s.charCodeAt(i))>>>0; } return x; }
     var currentInt = '';
     try{ currentInt = new URLSearchParams(location.search).get('int') || ''; }catch(e){}
-    
-    // Обновляем ВСЕ блоки интересов (и в мобильном, и в десктопном сайдбаре)
+
     document.querySelectorAll('#interestsBox').forEach(function(box){
       box.innerHTML = '';
       state.interests.forEach(function(i){
@@ -145,68 +158,56 @@ console.log("Interests script loaded!");
       });
     });
 
-    // Обновляем ВСЕ блоки курсов
     document.querySelectorAll('#coursesBox').forEach(function(box){
       box.innerHTML = '';
       state.courses.forEach(function(cr){
         var a = document.createElement('a');
         a.className = 'course-card';
-        a.href = cr.url;
-        a.target = '_blank';
-        a.rel = 'noopener';
+        a.href = cr.url; a.target = '_blank'; a.rel = 'noopener';
         a.innerHTML = '<span class="star">★</span><div class="course-info"><span class="course-title">'+cr.title+'</span><span class="course-learners">'+(cr.learners||0)+' уч.</span></div>';
         box.appendChild(a);
       });
     });
-    
-    // Обновляем блок чатов, если он есть
-    var chatBox = document.getElementById('chatRoomsBox');
-    if (chatBox) {
-      fetch('/api/chat/rooms').then(r => r.json()).then(data => {
+
+    document.querySelectorAll('#chatRoomsBox').forEach(function(chatBox){
+      fetch('/api/chat/rooms').then(function(r){ return r.json(); }).then(function(data){
         chatBox.innerHTML = '';
         if (data.rooms && data.rooms.length) {
-          data.rooms.forEach(room => {
+          data.rooms.forEach(function(room){
             var a = document.createElement('a');
             a.className = 'side-item';
-            a.href = '/chat?room=' + room.slug;
+            a.href = '/chat?room=' + encodeURIComponent(room.slug);
             a.innerHTML = '<svg viewBox="0 0 24 24" style="width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span>' + room.title + '</span>' + (room.unread_count > 0 ? '<span style="margin-left:auto;background:var(--accent-coral);color:var(--bg);padding:2px 8px;font-size:10px;font-weight:700;border-radius:10px;">'+room.unread_count+'</span>' : '');
             chatBox.appendChild(a);
           });
         }
-      }).catch(e => console.error('Chat rooms load error:', e));
-    }
+      }).catch(function(){});
+    });
   }
-  
-  // Делаем функцию глобальной, чтобы onclick="openInterests()" работал из HTML
+
   window.openInterests = function(){
-    console.log("openInterests called!");
     load(function(){
-      err('');
-      renderInt();
-      renderCrs();
-      renderSidebar();
-      counts();
+      err(''); renderInt(); renderCrs(); renderSidebar(); counts();
       ov.classList.add('open');
     });
   };
-  
+
   document.getElementById('intClose').addEventListener('click', function(){ ov.classList.remove('open'); });
   ov.addEventListener('click', function(e){ if(e.target === ov) ov.classList.remove('open'); });
-  
+
   document.getElementById('tabInt').addEventListener('click', function(){
     this.classList.add('active');
     document.getElementById('tabCrs').classList.remove('active');
     document.getElementById('panInt').style.display = 'block';
     document.getElementById('panCrs').style.display = 'none';
   });
-  
   document.getElementById('tabCrs').addEventListener('click', function(){
     this.classList.add('active');
     document.getElementById('tabInt').classList.remove('active');
     document.getElementById('panCrs').style.display = 'block';
     document.getElementById('panInt').style.display = 'none';
   });
-  
+
   document.getElementById('intFind').addEventListener('click', function(){
     var q = document.getElementById('intQ').value.trim();
     if(!q) return;
@@ -222,18 +223,16 @@ console.log("Interests script loaded!");
         state.interests.push({slug:x.d.slug, title:x.d.title});
         (x.d.top_sites || []).forEach(function(s){
           var sp = document.createElement('span');
-          sp.className = 'int-top';
-          sp.innerText = s;
+          sp.className = 'int-top'; sp.innerText = s;
           document.getElementById('intTops').appendChild(sp);
         });
-        renderInt();
-        counts();
+        renderInt(); counts();
       }).catch(function(){
         document.getElementById('intTops').innerHTML = '';
         err('Ошибка сети');
       });
   });
-  
+
   document.getElementById('crsFind').addEventListener('click', function(){
     var q = document.getElementById('crsQ').value.trim();
     if(!q) return;
@@ -244,7 +243,7 @@ console.log("Interests script loaded!");
       .then(function(d){
         var box = document.getElementById('crsList');
         box.innerHTML = '';
-        if(!d.courses || !d.courses.length){ box.innerHTML = ''; err('Бесплатных курсов не найдено'); return; }
+        if(!d.courses || !d.courses.length){ err('Бесплатных курсов не найдено'); return; }
         d.courses.forEach(function(cr){
           var row = document.createElement('div');
           row.className = 'crs-row';
@@ -254,33 +253,26 @@ console.log("Interests script loaded!");
           b.addEventListener('click', function(){
             if(state.courses.length >= state.limits.course_max){ err('Максимум 3 курса'); return; }
             if(state.courses.some(function(x){ return x.url === cr.url; })){ err('Уже добавлен'); return; }
-            state.courses.push(cr);
-            renderCrs();
-            counts();
+            state.courses.push(cr); renderCrs(); counts();
           });
-          row.appendChild(b);
-          box.appendChild(row);
+          row.appendChild(b); box.appendChild(row);
         });
       }).catch(function(){
         document.getElementById('crsList').innerHTML = '';
         err('Ошибка сети');
       });
   });
-  
+
   document.getElementById('intClear').addEventListener('click', function(){
-    state.interests = [];
-    state.courses = [];
-    renderInt();
-    renderCrs();
-    counts();
-    err('');
+    state.interests = []; state.courses = [];
+    renderInt(); renderCrs(); counts(); err('');
   });
-  
+
   document.getElementById('intSkip').addEventListener('click', function(){
     sessionStorage.setItem('ef_skip', '1');
     fetch('/api/interests/skip', {method:'POST'}).then(function(){ ov.classList.remove('open'); });
   });
-  
+
   document.getElementById('intSave').addEventListener('click', function(){
     fetch('/api/interests/save', {method:'POST', headers:{'Content-Type':'application/json'},
       body:JSON.stringify({interests: state.interests.map(function(i){ return i.slug; }), courses: state.courses})})
@@ -290,9 +282,7 @@ console.log("Interests script loaded!");
       sessionStorage.removeItem('ef_skip');
       ov.classList.remove('open');
       renderSidebar();
-      
-      // Если есть интересы, предлагаем чаты
-      if (state.interests.length > 0) {
+      if (state.interests.length > 0 && state.is_user) {
         showChatJoinModal(state.interests);
       } else {
         location.reload();
@@ -300,52 +290,88 @@ console.log("Interests script loaded!");
     });
   });
 
-  function showChatJoinModal(interests) {
+  /* === Окно выбора чатов: список скроллится, кнопки закреплены снизу === */
+  function showChatJoinModal(interests){
     var modal = document.createElement('div');
-    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(8px);z-index:300;display:flex;align-items:center;justify-content:center;';
-    modal.innerHTML = '<div style="width:100%;max-width:500px;background:var(--panel);border:1px solid var(--border);border-top:3px solid var(--accent-emerald);padding:28px;position:relative;">' +
-      '<h2 style="font-family:\'JetBrains Mono\',monospace;font-size:20px;color:var(--accent-emerald);margin-bottom:16px;">// Присоединиться к чатам?</h2>' +
-      '<p style="font-size:14px;color:var(--t2);margin-bottom:20px;line-height:1.6;">По вашим интересам есть активные обсуждения. Хотите присоединиться?</p>' +
-      '<div id="chatRoomsList" style="margin-bottom:20px;"></div>' +
-      '<button id="joinChatsBtn" style="width:100%;height:44px;background:var(--accent-emerald);border:none;color:var(--bg);font-weight:700;font-family:\'JetBrains Mono\',monospace;cursor:pointer;margin-bottom:8px;">Присоединиться</button>' +
-      '<button id="skipChatsBtn" style="width:100%;height:36px;background:var(--card2);border:none;color:var(--t3);font-family:\'JetBrains Mono\',monospace;font-size:12px;cursor:pointer;">Пропустить</button>' +
+    modal.className = 'cj-overlay';
+    modal.innerHTML =
+      '<div class="cj-box">' +
+        '<button class="int-close" id="cjClose">✕</button>' +
+        '<div class="cj-head">' +
+          '<h2>Присоединиться к чатам?</h2>' +
+          '<p>По вашим интересам есть общие комнаты. Отметьте, куда вступить — список можно прокрутить.</p>' +
+          '<div class="cj-meta"><span id="cjCount"></span><button id="cjToggle" type="button">Снять все</button></div>' +
+        '</div>' +
+        '<div class="cj-list" id="cjList"></div>' +
+        '<div class="cj-foot">' +
+          '<button class="int-save" id="cjJoin" type="button">Присоединиться</button>' +
+          '<button class="int-ghost" id="cjSkip" type="button">Пропустить</button>' +
+        '</div>' +
       '</div>';
     document.body.appendChild(modal);
-    
-    var list = modal.querySelector('#chatRoomsList');
-    interests.forEach(function(interest) {
-      var item = document.createElement('label');
-      item.style.cssText = 'display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--border);background:var(--card);margin-bottom:8px;cursor:pointer;';
-      item.innerHTML = '<input type="checkbox" value="' + interest.slug + '" checked style="width:18px;height:18px;accent-color:var(--accent-emerald);"><span style="font-size:14px;color:var(--t1);font-family:\'JetBrains Mono\',monospace;">' + interest.title + '</span>';
-      list.appendChild(item);
+
+    var list = modal.querySelector('#cjList');
+    interests.forEach(function(it){
+      var label = document.createElement('label');
+      label.className = 'cj-item';
+      label.innerHTML = '<input type="checkbox" value="' + it.slug + '" checked><span>' + it.title + '</span>';
+      list.appendChild(label);
     });
-    
-    modal.querySelector('#joinChatsBtn').addEventListener('click', async function() {
-      var checkboxes = list.querySelectorAll('input[type="checkbox"]:checked');
-      var slugs = Array.from(checkboxes).map(function(cb) { return cb.value; });
-      for (var i = 0; i < slugs.length; i++) {
-        await fetch('/api/chat/rooms/' + slugs[i] + '/join', {method: 'POST'});
-      }
-      modal.remove();
-      location.href = '/chat?room=' + slugs[0];
+
+    var boxes = function(){ return list.querySelectorAll('input[type="checkbox"]'); };
+    function upd(){
+      var all = boxes(), n = 0;
+      all.forEach(function(b){ if(b.checked) n++; });
+      modal.querySelector('#cjCount').innerHTML = 'выбрано: <b>' + n + '</b> / ' + all.length;
+      modal.querySelector('#cjToggle').innerText = (n === all.length) ? 'Снять все' : 'Выбрать все';
+      modal.querySelector('#cjJoin').disabled = (n === 0);
+    }
+    list.addEventListener('change', upd);
+    modal.querySelector('#cjToggle').addEventListener('click', function(){
+      var all = boxes(), n = 0;
+      all.forEach(function(b){ if(b.checked) n++; });
+      var target = (n !== all.length);
+      all.forEach(function(b){ b.checked = target; });
+      upd();
     });
-    
-    modal.querySelector('#skipChatsBtn').addEventListener('click', function() {
+    upd();
+
+    function dismiss(reload){
+      document.removeEventListener('keydown', onKey);
       modal.remove();
-      location.reload();
+      if(reload) location.reload();
+    }
+    function onKey(e){ if(e.key === 'Escape') dismiss(true); }
+    document.addEventListener('keydown', onKey);
+    modal.addEventListener('click', function(e){ if(e.target === modal) dismiss(true); });
+    modal.querySelector('#cjClose').addEventListener('click', function(){ dismiss(true); });
+    modal.querySelector('#cjSkip').addEventListener('click', function(){ dismiss(true); });
+
+    modal.querySelector('#cjJoin').addEventListener('click', function(){
+      var slugs = [];
+      boxes().forEach(function(b){ if(b.checked) slugs.push(b.value); });
+      if(!slugs.length){ dismiss(true); return; }
+      var btn = modal.querySelector('#cjJoin');
+      btn.disabled = true; btn.innerText = 'Вступаю…';
+      var chain = Promise.resolve();
+      slugs.forEach(function(s){
+        chain = chain.then(function(){
+          return fetch('/api/chat/rooms/' + encodeURIComponent(s) + '/join', {method:'POST'}).catch(function(){});
+        });
+      });
+      chain.then(function(){
+        document.removeEventListener('keydown', onKey);
+        modal.remove();
+        location.href = '/chat?room=' + encodeURIComponent(slugs[0]);
+      });
     });
   }
-  
-  // Автозапуск при загрузке страницы
-  console.log("Initializing on load...");
+
   load(function(){
     renderSidebar();
     if(state.interests.length === 0 && !sessionStorage.getItem('ef_skip')){
-      console.log("No interests, opening modal...");
       setTimeout(function(){
-        renderInt();
-        renderCrs();
-        counts();
+        renderInt(); renderCrs(); counts();
         ov.classList.add('open');
       }, 800);
     }
