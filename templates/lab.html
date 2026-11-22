@@ -540,3 +540,16 @@ input:autofill{box-shadow:0 0 0 1000px var(--deep) inset;-webkit-text-fill-color
   if(rb){ rb.addEventListener('click',function(){ rb.classList.add('lab-spin'); setTimeout(function(){ rb.classList.remove('lab-spin'); },4000); }); }
 })();
 </script>
+<style id="lab-mobile-final">
+@media(max-width:767px){
+  /* зал и кабели на телефоне убираем: вместо них чистая сетка фона */
+  #lab-bg,#lab-cables{display:none;}
+
+  /* шапка: сжимается только поиск, кнопки и бургер стоят на фиксе */
+  .topbar{flex-wrap:nowrap;gap:6px;padding:7px 10px;min-height:52px;}
+  .logo{font-size:13px;padding:5px 8px;letter-spacing:.03em;flex:0 0 auto;}
+  .searchwrap{flex:1 1 0;min-width:0;margin:0;}
+  .burger{flex:0 0 36px;width:36px;height:36px;margin-right:0;}
+  .iconbtn,.avatar{flex:0 0 36px;width:36px;height:36px;}
+}
+</style>
