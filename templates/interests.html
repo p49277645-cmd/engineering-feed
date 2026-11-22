@@ -369,7 +369,7 @@
 
   load(function(){
     renderSidebar();
-    if(state.interests.length === 0 && !sessionStorage.getItem('ef_skip')){
+    if(state.is_user && state.interests.length === 0 && !sessionStorage.getItem('ef_skip')){
       setTimeout(function(){
         renderInt(); renderCrs(); counts();
         ov.classList.add('open');
