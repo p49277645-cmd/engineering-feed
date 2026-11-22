@@ -515,19 +515,24 @@ input:autofill{box-shadow:0 0 0 1000px var(--deep) inset;-webkit-text-fill-color
     var btn=es.querySelector('button');
     var wrap=document.createElement('div');
     wrap.style.cssText='margin:18px 0 4px;';
+    var ang=[-135,-101,-67,-34,0,34,67,101,135];
     for(var g=0;g<2;g++){
-      var ang=[-135,-101,-67,-34,0,34,67,101,135], tk='';
-      ang.forEach(function(a){var r=a*Math.PI/180;
-        tk+='<line x1="'+(50+Math.sin(r)*30)+'" y1="'+(50-Math.cos(r)*30)+'" x2="'+(50+Math.sin(r)*36)+'" y2="'+(50-Math.cos(r)*36)+'" stroke="'+(a>=101?'#E23B2E':'#9AA7B4')+'" stroke-width="'+(a%67===0?2.5:1.5)+'"/>';});
-      wrap.insertAdjacentHTML('beforeend',
-      '<svg class="lab-gauge" viewBox="0 0 100 100" aria-hidden="true">'
-      +'<circle cx="50" cy="50" r="46" fill="#0B0D10" stroke="#3A4149" stroke-width="3"/>'
-      +'<circle cx="50" cy="50" r="38" fill="#14171B" stroke="#8A939E" stroke-width="1.5"/>'
-      +tk
-      +'<text x="16" y="86" font-family="monospace" font-size="7" fill="#9AA7B4">0</text>'
-      +'<text x="70" y="86" font-family="monospace" font-size="7" fill="#E23B2E">MAX</text>'
-      +'<g class="needle"><line x1="50" y1="50" x2="50" y2="16" stroke="#E23B2E" stroke-width="2.5" stroke-linecap="round"/><line x1="50" y1="50" x2="50" y2="60" stroke="#8A939E" stroke-width="2" stroke-linecap="round"/></g>'
-      +'<circle cx="50" cy="50" r="4.5" fill="#8A939E" stroke="#0B0D10" stroke-width="1"/></svg>');
+      var tk='';
+      for(var q=0;q<ang.length;q++){
+        var a=ang[q], r=a*Math.PI/180;
+        var col=a>=101?'#E23B2E':'#9AA7B4';
+        var sw=(a%67===0)?2.5:1.5;
+        tk+='<line x1="'+(50+Math.sin(r)*30)+'" y1="'+(50-Math.cos(r)*30)+'" x2="'+(50+Math.sin(r)*36)+'" y2="'+(50-Math.cos(r)*36)+'" stroke="'+col+'" stroke-width="'+sw+'"/>';
+      }
+      var svg='<svg class="lab-gauge" viewBox="0 0 100 100" aria-hidden="true">'
+        +'<circle cx="50" cy="50" r="46" fill="#0B0D10" stroke="#3A4149" stroke-width="3"/>'
+        +'<circle cx="50" cy="50" r="38" fill="#14171B" stroke="#8A939E" stroke-width="1.5"/>'
+        +tk
+        +'<text x="16" y="86" font-family="monospace" font-size="7" fill="#9AA7B4">0</text>'
+        +'<text x="70" y="86" font-family="monospace" font-size="7" fill="#E23B2E">MAX</text>'
+        +'<g class="needle"><line x1="50" y1="50" x2="50" y2="16" stroke="#E23B2E" stroke-width="2.5" stroke-linecap="round"/><line x1="50" y1="50" x2="50" y2="60" stroke="#8A939E" stroke-width="2" stroke-linecap="round"/></g>'
+        +'<circle cx="50" cy="50" r="4.5" fill="#8A939E" stroke="#0B0D10" stroke-width="1"/></svg>';
+      wrap.insertAdjacentHTML('beforeend', svg);
     }
     es.insertBefore(wrap,btn);
   }
