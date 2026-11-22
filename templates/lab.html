@@ -392,7 +392,8 @@ input:autofill{box-shadow:0 0 0 1000px #0B0D10 inset!important;-webkit-text-fill
     }
     loop();
   }
-  var lite = location.search.indexOf('lite') > -1;
+  var coarse = window.matchMedia && matchMedia('(pointer:coarse)').matches;
+  var lite = location.search.indexOf('lite') > -1 || (coarse && innerWidth < 1024);
   if(!webglOK() || reduced || weak || lite){ build2D(); } else { try{ init3D(); }catch(e){ build2D(); } }
 
   /* ---------- КАБЕЛИ SVG ---------- */
@@ -433,7 +434,7 @@ input:autofill{box-shadow:0 0 0 1000px #0B0D10 inset!important;-webkit-text-fill
   updDim();
 
   /* ---------- МОТИВ / GSAP ---------- */
-  if(window.gsap && !reduced){
+  if(false){ /* motion отключён ради лёгкости; остаются только статику-переходы */
     gsap.from('.logo',{y:-14,rotation:-2,opacity:0,duration:.5,ease:'back.out(2.2)'});
     gsap.from('.topbar .iconbtn, .topbar .avatar',{scale:.6,opacity:0,duration:.4,stagger:.07,ease:'back.out(2.5)',delay:.15});
     gsap.from('.side-label',{x:-16,opacity:0,duration:.4,stagger:.08,ease:'power2.out',delay:.2});
@@ -658,4 +659,27 @@ body::after{background:linear-gradient(180deg,#3A4149,#23282E)!important;color:#
 <style id="lab-fix7">
 .pill::before,.pill::after{display:none!important;}
 .pill{padding-left:18px!important;padding-right:18px!important;}
+</style>
+<style id="lab-fix9">
+.card{animation:labCardIn .3s ease both!important;content-visibility:auto;contain-intrinsic-size:340px;}
+.card:nth-child(2){animation-delay:.04s!important;}
+.card:nth-child(3){animation-delay:.08s!important;}
+.card:nth-child(4){animation-delay:.12s!important;}
+.card:nth-child(5){animation-delay:.16s!important;}
+.card:nth-child(6){animation-delay:.2s!important;}
+.card:nth-child(n+7){animation-delay:.24s!important;}
+.cat-card,.course-card{animation:labCatIn .25s ease both!important;}
+@keyframes labCardIn{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:none;}}
+@keyframes labCatIn{from{opacity:0;transform:translateX(-10px);}to{opacity:1;transform:none;}}
+@keyframes labHatch{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:none;}}
+.int-overlay.open .int-box,.auth-overlay.open .auth-box,.cj-overlay .cj-box{animation:labHatch .26s cubic-bezier(.22,.9,.3,1) both!important;}
+.card-title a::after{display:block!important;width:auto!important;left:0!important;right:0!important;height:2px;bottom:-2px;
+  transform:scaleX(0);transform-origin:left center;transition:transform .22s ease!important;background:var(--sig)!important;}
+.card:hover .card-title a::after{transform:scaleX(1)!important;}
+.cat-card::before{display:block!important;transform:scaleX(0);transform-origin:left center;transition:transform .22s ease!important;box-shadow:none!important;}
+.cat-card:hover::before,.cat-card.active::before{transform:scaleX(1)!important;}
+.card,.cat-card,.course-card{transition:transform .16s ease,border-color .16s ease,background-color .16s ease!important;}
+.card:hover{transform:translateY(-3px)!important;}
+.cat-card:hover,.course-card:hover{transform:translateX(3px)!important;}
+.pill:active,.int-tab:active,.auth-tab:active,.side-item:active{transform:translateY(2px)!important;}
 </style>
