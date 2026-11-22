@@ -117,46 +117,42 @@ def parse_rss(item):
                 "snippet": clean_text(entry.get("summary", ""))[:220] + "...",
                 "image": get_entry_image(entry),
                 "pub_time": pub_time,
-                "interest": item.get("interest", "")
+                "interest": item.get("interest", ""),
+                "archival": False
             })
+        if not results:
+            return scrape_html(item)
         logger.info(f"[RSS] {item['source']}: {len(results)}")
         return results
     except Exception as e:
         logger.warning(f"[RSS] {item['source']}: {e}")
-        return []
+        return scrape_html(item)
 
 def scrape_html(item):
+    import globalsearch as gs
     try:
         resp = SESSION.get(item["url"], timeout=(3, 6))
         resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, "html.parser")
-        base_url = "/".join(item["url"].split("/")[:3])
+        arts = gs.extract_articles(resp.text, item["url"], limit=item["limit"])
+        arts = gs.rank_items(item.get("interest", "") or item["source"], arts)
         results = []
-        nodes = soup.select("h2 a, h3 a, h4 a, .news-item a, .news-list a, article a, li a")[:50]
-        seen = set()
-        for node in nodes:
-            href = node.get("href", "")
-            title = clean_text(node.get_text())
-            if not title or len(title) < 10: continue
-            if any(x in href.lower() for x in ["login", "register", "tag", "category", "javascript"]): continue
-            if href.startswith("/"): href = base_url + href
-            elif not href.startswith("http"): href = base_url + "/" + href.lstrip("/")
-            if href in seen: continue
-            seen.add(href)
+        for a in arts:
+            if a["score"] < 0.1:
+                continue
             results.append({
-                "title": title[:120],
-                "link": href,
+                "title": a["title"][:160],
+                "link": a["link"],
                 "source": item["source"],
-                "snippet": "Материалы по твоему интересу",
+                "snippet": (a["snippet"] or "Материалы по твоему интересу")[:220],
                 "image": "",
-                "pub_time": time.time(),
-                "interest": item.get("interest", "")
+                "pub_time": a["pub_time"] or time.time(),
+                "interest": item.get("interest", ""),
+                "archival": True
             })
-            if len(results) >= item["limit"]: break
-        logger.info(f"[Scrape] {item['source']}: {len(results)}")
+        logger.info(f"[HTML] {item['source']}: {len(results)}")
         return results
     except Exception as e:
-        logger.warning(f"[Scrape] {item['source']}: {e}")
+        logger.warning(f"[HTML] {item['source']}: {e}")
         return []
 
 def interest_titles():
@@ -173,7 +169,7 @@ def enrich_items(all_items):
     now = time.time()
     for it in all_items:
         ts0 = it.get("pub_time") or now
-        if ts0 < now - 45 * 86400:
+        if not it.get("archival") and ts0 < now - 45 * 86400:
             continue
         slug = it.get("interest", "") or "topic"
         title = titles.get(slug, slug)
