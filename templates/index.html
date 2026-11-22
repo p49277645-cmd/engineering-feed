@@ -330,6 +330,85 @@ body::before,body::after{border-color:rgba(240,125,31,.45)!important;width:140px
 .cat-card:hover,.course-card:hover{box-shadow:0 8px 20px rgba(0,0,0,.45)!important;}
 ::-webkit-scrollbar-thumb{background:var(--accent-sand)!important;}
 </style>
+<style id="theme-lab-v2">
+:root{
+  --bg:#14181c; --panel:#1b2127; --card:#20272e; --card2:#2a333c; --border:#3a454f;
+  --t1:#e6eaee; --t2:#9aa6b2; --t3:#6b7885;
+  --accent-sand:#f07d1f; --accent-emerald:#2e86c8; --accent-rust:#e3b500; --accent-coral:#cf4a2e;
+  --steel:linear-gradient(180deg,#39434d 0%,#2a333c 45%,#20272e 100%);
+  --brush:repeating-linear-gradient(90deg,rgba(255,255,255,.025) 0 1px,transparent 1px 3px);
+  --hazard:repeating-linear-gradient(45deg,var(--accent-sand) 0 10px,#14181c 10px 20px);
+  --bolts:radial-gradient(circle 3px at 12px 12px,#5b6672 0 1.6px,#0c0f12 1.6px 3px,transparent 3px),
+          radial-gradient(circle 3px at calc(100% - 12px) 12px,#5b6672 0 1.6px,#0c0f12 1.6px 3px,transparent 3px),
+          radial-gradient(circle 3px at 12px calc(100% - 12px),#5b6672 0 1.6px,#0c0f12 1.6px 3px,transparent 3px),
+          radial-gradient(circle 3px at calc(100% - 12px) calc(100% - 12px),#5b6672 0 1.6px,#0c0f12 1.6px 3px,transparent 3px);
+}
+/* машинный зал: чертёжная сетка + кабель-трассы + табличка ОПАСНО */
+body{background-color:var(--bg)!important;background-image:linear-gradient(rgba(240,125,31,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(240,125,31,.05) 1px,transparent 1px)!important;background-size:40px 40px,40px 40px!important;}
+body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.5;
+  background:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1600' height='900' preserveAspectRatio='none'%3E%3Cg fill='none' stroke-linecap='round'%3E%3Cpath d='M0 120 C300 60 500 180 800 120 S1300 60 1600 140' stroke='%230c0f12' stroke-width='10'/%3E%3Cpath d='M0 132 C300 72 500 192 800 132 S1300 72 1600 152' stroke='%23f07d1f' stroke-width='5'/%3E%3Cpath d='M0 150 C320 96 520 210 820 150 S1320 96 1600 170' stroke='%232e86c8' stroke-width='4'/%3E%3Cpath d='M60 0 C40 200 90 400 60 900' stroke='%230c0f12' stroke-width='9'/%3E%3Cpath d='M72 0 C52 200 102 400 72 900' stroke='%23e3b500' stroke-width='4'/%3E%3Cpath d='M1540 0 C1560 220 1510 420 1540 900' stroke='%230c0f12' stroke-width='9'/%3E%3Cpath d='M1528 0 C1548 220 1498 420 1528 900' stroke='%23cf4a2e' stroke-width='4'/%3E%3C/g%3E%3C/svg%3E") center/100% 100% no-repeat;}
+body::after{content:'⚠ ОПАСНО · HIGH VOLTAGE';position:fixed;left:18px;bottom:16px;z-index:0;pointer-events:none;
+  font:700 10px/1 'JetBrains Mono',monospace;letter-spacing:.12em;color:#14181c;background:var(--hazard);
+  padding:6px 10px;border:1px solid #0c0f12;transform:rotate(-2deg);opacity:.85;}
+/* пульт-шапка: сталь + предупреждающая кромка */
+.topbar{background:var(--steel)!important;border-bottom:none!important;box-shadow:0 6px 18px rgba(0,0,0,.5)!important;position:sticky;}
+.topbar::after{content:'';position:absolute;left:0;right:0;bottom:-6px;height:6px;background:var(--hazard);pointer-events:none;}
+.logo{font-family:'JetBrains Mono',monospace!important;background:var(--steel);border:1px solid #0c0f12;padding:6px 12px;box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 2px 0 #0c0f12;}
+.logo::after{content:none!important;animation:none!important;}
+.searchwrap input{background:#10141a!important;border:1px solid #0c0f12!important;box-shadow:inset 0 3px 8px rgba(0,0,0,.7)!important;border-radius:4px!important;}
+.iconbtn,.avatar{background:var(--steel)!important;border:1px solid #0c0f12!important;border-radius:4px!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 2px 0 #0c0f12!important;}
+.iconbtn:active{transform:translateY(2px)!important;box-shadow:inset 0 2px 6px rgba(0,0,0,.6)!important;}
+.iconbtn::after{content:'';position:absolute;top:5px;right:5px;width:5px;height:5px;border-radius:50%;background:var(--accent-emerald);box-shadow:0 0 6px var(--accent-emerald);pointer-events:none;}
+/* монтажные уголки схемы */
+.shell::before,.shell::after{content:'';position:absolute;width:70px;height:70px;border:2px solid rgba(240,125,31,.5);pointer-events:none;z-index:0;}
+.shell::before{top:8px;left:8px;border-right:none;border-bottom:none;}
+.shell::after{bottom:8px;right:8px;border-left:none;border-top:none;}
+/* стойка-шкаф слева */
+.sidebar{background:var(--steel)!important;background-image:var(--bolts),var(--brush)!important;border:1px solid #0c0f12!important;border-radius:6px!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 10px 26px rgba(0,0,0,.5)!important;position:sticky;}
+.side-label{background:#0c0f12;color:var(--accent-rust)!important;display:inline-block;padding:3px 8px;border-left:3px solid var(--accent-rust);}
+.side-item{background:#171d23;border:1px solid #0c0f12;border-left:3px solid #3a454f;margin-bottom:6px;border-radius:3px;box-shadow:inset 0 1px 0 rgba(255,255,255,.05);position:relative;}
+.side-item::before{content:'';position:absolute;left:8px;top:50%;transform:translateY(-50%);width:6px;height:6px;border-radius:50%;background:#3a454f;pointer-events:none;}
+.side-item.active{background:linear-gradient(180deg,#ff9a3d,var(--accent-sand))!important;color:#14181c!important;border-left-color:#14181c!important;box-shadow:0 0 14px rgba(240,125,31,.5),inset 0 1px 0 rgba(255,255,255,.3)!important;}
+.side-item.active::before{background:#14181c;box-shadow:0 0 6px #14181c;}
+.cat-card{background:var(--steel)!important;background-image:var(--bolts)!important;border:1px solid #0c0f12!important;border-radius:4px!important;}
+.cat-letter{border-radius:50%!important;background:#0c0f12!important;border:2px solid #fff!important;color:var(--c)!important;box-shadow:0 2px 6px rgba(0,0,0,.6)!important;}
+.course-card{background:#171d23!important;border:1px solid #0c0f12!important;border-left:4px solid var(--accent-rust)!important;border-radius:3px!important;}
+/* заголовок-шильд + лента-предупреждение */
+.main-head{border-bottom:none!important;position:relative;padding-bottom:18px!important;}
+.main-head::after{content:'';position:absolute;left:0;right:0;bottom:0;height:5px;background:var(--hazard);pointer-events:none;}
+.main-head h1{font-family:'JetBrains Mono',monospace!important;text-transform:uppercase;letter-spacing:.06em;}
+.main-head h1::before,.int-box h2::before,.cj-head h2::before,.auth-box h2::before,.chat-header h1::before{content:'● '!important;color:var(--accent-sand)!important;text-shadow:0 0 8px var(--accent-sand);}
+/* переключатели-плашки */
+.pill{background:var(--steel)!important;border:1px solid #0c0f12!important;border-radius:3px!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 2px 0 #0c0f12!important;clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)!important;}
+.pill.active{background:linear-gradient(180deg,#ff9a3d,var(--accent-sand))!important;color:#14181c!important;box-shadow:0 0 14px rgba(240,125,31,.5)!important;}
+/* карточки = приборные панели с болтами и номерным маркером */
+.grid{counter-reset:card;}
+.card{counter-increment:card;background:var(--steel)!important;background-image:var(--bolts)!important;border:1px solid #0c0f12!important;border-radius:4px!important;clip-path:none!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 8px 20px rgba(0,0,0,.45)!important;}
+.card::after{content:counter(card);position:absolute;top:12px;right:12px;width:32px;height:32px;border-radius:50%;background:#0c0f12;color:#fff;border:2px solid #fff;display:grid;place-items:center;font:700 13px 'JetBrains Mono',monospace;box-shadow:0 2px 8px rgba(0,0,0,.7);pointer-events:none;border-width:2px!important;border-style:solid!important;border-color:#fff!important;}
+.card:hover{box-shadow:0 0 0 1px var(--c),0 14px 30px rgba(0,0,0,.6)!important;}
+.dot{box-shadow:0 0 0 2px rgba(255,255,255,.2),0 0 8px var(--c)!important;}
+.act{background:var(--steel)!important;border:1px solid #0c0f12!important;border-radius:3px!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 2px 0 #0c0f12!important;}
+.act.on{background:linear-gradient(180deg,#e0603f,var(--accent-coral))!important;color:#fff!important;box-shadow:0 0 12px rgba(207,74,46,.6)!important;}
+.readtime{background:#0c0f12!important;border:1px solid #3a454f!important;color:var(--accent-rust)!important;border-radius:2px!important;}
+.thumb{border:1px solid #0c0f12!important;background:#0c0f12!important;position:relative;}
+.thumb::after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(255,255,255,.04) 0 1px,transparent 1px 3px);pointer-events:none;}
+.thumb-letter{border-radius:50%!important;opacity:.25!important;}
+/* большая аварийная кнопка пустого состояния */
+.empty-state button{background:linear-gradient(180deg,#ff9a3d,var(--accent-sand))!important;color:#14181c!important;border:2px solid #0c0f12!important;border-radius:4px!important;box-shadow:0 0 0 4px rgba(240,125,31,.25),0 4px 0 #0c0f12!important;font-family:'JetBrains Mono',monospace!important;text-transform:uppercase;}
+/* шкала-индикатор обновления */
+#refreshProgress{background:#0c0f12!important;background-image:repeating-linear-gradient(90deg,rgba(255,255,255,.12) 0 1px,transparent 1px 10px)!important;}
+#refreshProgress i{background:var(--hazard)!important;background-size:28px 28px!important;animation:hazmove 1s linear infinite;}
+@keyframes hazmove{to{background-position:28px 0;}}
+/* модалки = дверцы шкафа */
+.int-box,.auth-box,.cj-box,.wiki-content{background:var(--steel)!important;background-image:var(--bolts)!important;border:1px solid #0c0f12!important;border-top:6px solid var(--accent-sand)!important;border-radius:6px!important;clip-path:none!important;box-shadow:0 24px 60px rgba(0,0,0,.7)!important;}
+.int-search input,.auth-field input{background:#10141a!important;border:1px solid #0c0f12!important;box-shadow:inset 0 3px 8px rgba(0,0,0,.7)!important;border-radius:3px!important;}
+.int-tab,.auth-tab{background:var(--steel)!important;border:1px solid #0c0f12!important;border-radius:3px!important;}
+.int-tab.active,.auth-tab.active{background:linear-gradient(180deg,#ff9a3d,var(--accent-sand))!important;color:#14181c!important;}
+.int-save,.auth-submit,.int-search button,.cj-foot .int-save{background:linear-gradient(180deg,#ff9a3d,var(--accent-sand))!important;color:#14181c!important;border:1px solid #0c0f12!important;border-radius:3px!important;box-shadow:0 3px 0 #0c0f12!important;clip-path:none!important;font-family:'JetBrains Mono',monospace!important;text-transform:uppercase;}
+.int-close,.auth-close,.cj-box .int-close{background:var(--steel)!important;border:1px solid #0c0f12!important;border-radius:3px!important;}
+.int-chip,.cj-item{background:#171d23!important;border:1px solid #0c0f12!important;border-left:3px solid var(--accent-emerald)!important;border-radius:3px!important;}
+::-webkit-scrollbar-thumb{background:var(--accent-sand)!important;}
+</style>
 </head>
 <body>
 <header class="topbar">
