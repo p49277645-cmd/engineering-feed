@@ -100,60 +100,16 @@ def read_minutes(title):
     return 3 + h % 10
 
 def parse_rss(item):
-    try:
-        resp = SESSION.get(item["url"], timeout=(3, 6))
-        resp.raise_for_status()
-        feed = feedparser.parse(resp.content)
-        results = []
-        for entry in feed.entries[:item["limit"]]:
-            pub_time = time.time()
-            if hasattr(entry, 'published_parsed') and entry.published_parsed:
-                try: pub_time = time.mktime(entry.published_parsed)
-                except Exception: pass
-            results.append({
-                "title": clean_text(entry.get("title", "Без заголовка")),
-                "link": entry.get("link", "#"),
-                "source": item["source"],
-                "snippet": clean_text(entry.get("summary", ""))[:220] + "...",
-                "image": get_entry_image(entry),
-                "pub_time": pub_time,
-                "interest": item.get("interest", ""),
-                "archival": False
-            })
-        if not results:
-            return scrape_html(item)
-        logger.info(f"[RSS] {item['source']}: {len(results)}")
-        return results
-    except Exception as e:
-        logger.warning(f"[RSS] {item['source']}: {e}")
-        return scrape_html(item)
+    import sitegraph as sg
+    res = sg.read_stream(dict(item, kind="rss"))
+    logger.info(f"[RSS] {item['source']}: {len(res)}")
+    return res
 
 def scrape_html(item):
-    import globalsearch as gs
-    try:
-        resp = SESSION.get(item["url"], timeout=(3, 6))
-        resp.raise_for_status()
-        arts = gs.extract_articles(resp.text, item["url"], limit=item["limit"])
-        arts = gs.rank_items(item.get("interest", "") or item["source"], arts)
-        results = []
-        for a in arts:
-            if a["score"] < 0.1:
-                continue
-            results.append({
-                "title": a["title"][:160],
-                "link": a["link"],
-                "source": item["source"],
-                "snippet": (a["snippet"] or "Материалы по твоему интересу")[:220],
-                "image": "",
-                "pub_time": a["pub_time"] or time.time(),
-                "interest": item.get("interest", ""),
-                "archival": True
-            })
-        logger.info(f"[HTML] {item['source']}: {len(results)}")
-        return results
-    except Exception as e:
-        logger.warning(f"[HTML] {item['source']}: {e}")
-        return []
+    import sitegraph as sg
+    res = sg.read_stream(dict(item, kind=item.get("kind", "html")))
+    logger.info(f"[{item.get('kind','html').upper()}] {item['source']}: {len(res)}")
+    return res
 
 def interest_titles():
     try:
