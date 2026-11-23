@@ -7,6 +7,7 @@
   --ok:#35F06A; --warn:#FFB020; --danger:#FF3B30; --info:#4CC3FF;
   --t1:#E8EDF2; --t2:#9AA7B4;
   --bg:#0D1117; --card:#23282E; --deep:#0B0D10; --steel:#3A4149;
+  --hazard:none;
   --steelg:linear-gradient(180deg,#4A525B 0%,#3A4149 38%,#2C333B 72%,#23282E 100%);
   --brush:repeating-linear-gradient(90deg,rgba(255,255,255,.03) 0 1px,transparent 1px 3px);
   --bolts:radial-gradient(circle 3.5px at 12px 12px,#9AA7B4 0 1.8px,#0B0D10 1.8px 3.4px,transparent 3.4px),
@@ -20,20 +21,31 @@ body{background:var(--bg);color:var(--t1);font-family:var(--font-b);}
 ::-webkit-scrollbar-track{background:#14171B;}
 ::-webkit-scrollbar-thumb{background:var(--sig);border:2px solid var(--deep);border-radius:2px;}
 
+/* УНИЧТОЖЕНИЕ всех декоративных лент/плашек/уголков из базовых стилей */
+.topbar::after,.main-head::after,.sidebar::after,
+body::after,body::before,.shell::before,.shell::after{content:none!important;display:none!important;}
+.manage{display:none!important;}
+
 /* ЗАЛ — статичная псевдо-3D картинка */
 #lab-bg{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;}
 #lab-bg svg{position:absolute;inset:0;width:100%;height:100%;}
 
-/* шапка */
-.topbar{background:var(--steelg);background-image:var(--bolts),var(--brush);box-shadow:0 8px 22px rgba(0,0,0,.6);}
-.logo{font-family:var(--font-h);text-transform:uppercase;letter-spacing:.06em;font-size:21px;color:var(--t1);
-  background:linear-gradient(180deg,#4A525B,#2C333B);border:1px solid var(--deep);padding:8px 14px;border-radius:3px;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 3px 0 var(--deep);}
-.searchwrap input{font-family:var(--font-m);background:var(--deep);border:1px solid var(--deep);color:#CFD8E3;padding:8px 12px;border-radius:3px;
-  box-shadow:inset 0 4px 10px rgba(0,0,0,.8);}
-.iconbtn,.avatar{background:linear-gradient(180deg,#4A525B 0%,#3A4149 40%,#2C333B 100%);border:1px solid var(--deep);border-radius:4px;
+/* шапка — единый flex-ряд, ничего не наезжает */
+.topbar{display:flex;align-items:center;flex-wrap:nowrap;gap:8px;padding:8px 12px;min-height:56px;
+  background:var(--steelg);background-image:var(--bolts),var(--brush);box-shadow:0 8px 22px rgba(0,0,0,.6);}
+.logo{font-family:var(--font-h);text-transform:uppercase;letter-spacing:.06em;font-size:18px;color:var(--t1);
+  background:linear-gradient(180deg,#4A525B,#2C333B);border:1px solid var(--deep);padding:7px 12px;border-radius:3px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 3px 0 var(--deep);flex:0 0 auto;white-space:nowrap;}
+.searchwrap{position:relative;flex:1 1 120px;min-width:80px;display:flex;align-items:center;}
+.searchwrap>svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);pointer-events:none;}
+.searchwrap input{font-family:var(--font-m);background:var(--deep);border:1px solid var(--deep);color:#CFD8E3;
+  padding:8px 12px 8px 38px;border-radius:3px;width:100%;min-width:0;box-shadow:inset 0 4px 10px rgba(0,0,0,.8);}
+.kbd{font-family:var(--font-m);background:linear-gradient(180deg,#4A525B,#2C333B);border:1px solid var(--deep);border-radius:4px;
+  box-shadow:0 2px 0 var(--deep),inset 0 1px 0 rgba(255,255,255,.25);color:var(--t1);}
+.iconbtn,.avatar,.burger{flex:0 0 40px;width:40px;height:40px;padding:0;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(180deg,#4A525B 0%,#3A4149 40%,#2C333B 100%);border:1px solid var(--deep);border-radius:4px;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 3px 0 var(--deep);color:var(--t2);}
-.avatar-nick{font-family:var(--font-m);color:var(--sig);background:#14171B;border:1px solid var(--sig);padding:3px 8px;border-radius:2px;}
+.avatar-nick{font-family:var(--font-m);color:var(--sig);background:#14171B;border:1px solid var(--sig);padding:3px 8px;border-radius:2px;flex:0 0 auto;}
 
 /* сайдбар */
 .sidebar{background-color:#171C22;background-image:var(--bolts),var(--brush),linear-gradient(180deg,#23282E,#171C22);
@@ -112,14 +124,14 @@ input:-webkit-autofill{-webkit-box-shadow:0 0 0 1000px var(--deep) inset;-webkit
 @media(max-width:1024px){.shell{grid-template-columns:1fr;gap:16px;padding:16px;}}
 @media(max-width:767px){
   html,body{overflow-x:hidden;max-width:100%;}
-  .topbar{display:flex;align-items:center;flex-wrap:nowrap;gap:4px;padding:6px 8px;min-height:52px;}
-  .logo{font-size:12px;padding:5px 7px;flex:0 0 auto;white-space:nowrap;}
+  .topbar{gap:4px;padding:6px 8px;min-height:52px;}
+  .logo{font-size:12px;padding:5px 7px;}
   .kbd{display:none!important;}
   .avatar-nick{display:none!important;}
-  .searchwrap{flex:1 1 40px;min-width:40px;display:flex;align-items:center;}
-  .searchwrap input{width:100%;min-width:0;padding:6px 8px;font-size:12px;}
-  .burger{flex:0 0 32px;width:32px;height:32px;padding:0;}
-  .iconbtn,.avatar{flex:0 0 32px;width:32px;height:32px;padding:0;}
+  .searchwrap{flex:1 1 40px;min-width:40px;}
+  .searchwrap>svg{left:10px;}
+  .searchwrap input{padding:6px 8px 6px 32px;font-size:12px;}
+  .iconbtn,.avatar,.burger{flex:0 0 32px;width:32px;height:32px;}
   .main-head h1{font-size:16px;padding:8px 12px;}
   .pill{height:40px;padding:0 14px;}
   .empty-state{padding:36px 16px;width:100%;}
@@ -144,14 +156,12 @@ input:-webkit-autofill{-webkit-box-shadow:0 0 0 1000px var(--deep) inset;-webkit
 <rect y="560" width="1600" height="340" fill="#14171B"/>
 <g stroke="#3A4149" stroke-width="2" opacity=".4"><path d="M0 700 L1600 660"/><path d="M0 760 L1600 740"/><path d="M300 900 L520 560"/><path d="M1300 900 L1080 560"/></g>
 
-<!-- дальняя стена -->
 <rect x="60" y="120" width="1480" height="440" fill="#1A1F26"/>
 <rect x="60" y="120" width="1480" height="10" fill="#23282E"/>
 <rect x="180" y="180" width="320" height="96" rx="4" fill="#F5C400" filter="url(#soft)"/>
 <rect x="180" y="180" width="320" height="14" rx="4" fill="#FFE066"/>
 <text x="205" y="242" font-family="monospace" font-weight="bold" font-size="32" fill="#14171B">ВЫСОКОЕ НАПРЯЖЕНИЕ</text>
 
-<!-- магниты с гранями и тенями -->
 <g filter="url(#soft)">
   <g><rect x="180" y="470" width="240" height="120" rx="10" fill="url(#magTop)"/><rect x="180" y="590" width="240" height="26" rx="6" fill="#0B1A44"/><rect x="200" y="486" width="200" height="16" rx="8" fill="#B87333"/><text x="250" y="540" font-family="monospace" font-size="26" fill="#CFE0FF" opacity=".8">1F2</text></g>
   <g><rect x="470" y="490" width="240" height="120" rx="10" fill="url(#magTop)"/><rect x="470" y="610" width="240" height="26" rx="6" fill="#0B1A44"/><rect x="490" y="506" width="200" height="16" rx="8" fill="#B87333"/><text x="540" y="560" font-family="monospace" font-size="26" fill="#CFE0FF" opacity=".8">2D3</text></g>
@@ -159,7 +169,6 @@ input:-webkit-autofill{-webkit-box-shadow:0 0 0 1000px var(--deep) inset;-webkit
   <g><rect x="1190" y="490" width="240" height="120" rx="10" fill="url(#magTop)"/><rect x="1190" y="610" width="240" height="26" rx="6" fill="#0B1A44"/><rect x="1210" y="506" width="200" height="16" rx="8" fill="#B87333"/><text x="1260" y="560" font-family="monospace" font-size="26" fill="#CFE0FF" opacity=".8">2E3</text></g>
 </g>
 
-<!-- вакуумный цилиндр -->
 <g filter="url(#soft)">
   <ellipse cx="800" cy="430" rx="220" ry="60" fill="url(#glow)" opacity=".6"/>
   <rect x="580" y="390" width="440" height="80" rx="40" fill="url(#steelV)"/>
@@ -169,7 +178,6 @@ input:-webkit-autofill{-webkit-box-shadow:0 0 0 1000px var(--deep) inset;-webkit
   <rect x="1008" y="384" width="26" height="92" rx="6" fill="#454D56"/>
 </g>
 
-<!-- жёлтая труба -->
 <g filter="url(#soft)">
   <rect x="782" y="150" width="36" height="250" rx="10" fill="url(#pipeY)"/>
   <rect x="792" y="150" width="10" height="250" fill="#FFF3B0" opacity=".6"/>
@@ -177,13 +185,11 @@ input:-webkit-autofill{-webkit-box-shadow:0 0 0 1000px var(--deep) inset;-webkit
   <rect x="762" y="152" width="76" height="7" rx="3" fill="#FFF3B0" opacity=".6"/>
 </g>
 
-<!-- кабели объёмные -->
 <path d="M120 880 C 300 700 260 620 420 600" fill="none" stroke="#000" stroke-width="16" stroke-linecap="round"/>
 <path d="M120 876 C 300 696 260 616 420 596" fill="none" stroke="#E23B2E" stroke-width="6" stroke-linecap="round"/>
 <path d="M1480 880 C 1300 700 1340 620 1180 600" fill="none" stroke="#000" stroke-width="16" stroke-linecap="round"/>
 <path d="M1480 876 C 1300 696 1340 616 1180 596" fill="none" stroke="#2E7BE2" stroke-width="6" stroke-linecap="round"/>
 
-<!-- перила -->
 <g filter="url(#soft)">
   <rect x="560" y="640" width="480" height="14" rx="7" fill="#FF8A33"/>
   <rect x="560" y="640" width="480" height="5" rx="3" fill="#FFC08A"/>
