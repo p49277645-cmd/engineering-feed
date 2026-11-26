@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EngFeed · личная лента</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Russo+One&family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --sig:#FF6A00; --pipe:#F5C400; --cu:#B87333;
+  --ok:#35F06A; --warn:#FFB020; --danger:#FF3B30; --info:#4CC3FF;
+  --t1:#E8EDF2; --t2:#9AA7B4;
+  --bg:#0D1117; --card:#23282E; --deep:#0B0D10; --steel:#3A4149;
+  --steelg:linear-gradient(180deg,#4A525B 0%,#3A4149 38%,#2C333B 72%,#23282E 100%);
+  --brush:repeating-linear-gradient(90deg,rgba(255,255,255,.03) 0 1px,transparent 1px 3px);
+  --bolts:radial-gradient(circle 3.5px at 12px 12px,#9AA7B4 0 1.8px,#0B0D10 1.8px 3.4px,transparent 3.4px),
+          radial-gradient(circle 3.5px at calc(100% - 12px) 12px,#9AA7B4 0 1.8px,#0B0D10 1.8px 3.4px,transparent 3.4px),
+          radial-gradient(circle 3.5px at 12px calc(100% - 12px),#9AA7B4 0 1.8px,#0B0D10 1.8px 3.4px,transparent 3.4px),
+          radial-gradient(circle 3.5px at calc(100% - 12px) calc(100% - 12px),#9AA7B4 0 1.8px,#0B0D10 1.8px 3.4px,transparent 3.4px);
+  --font-h:'Russo One',sans-serif; --font-m:'JetBrains Mono',monospace; --font-b:'Inter',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html{scrollbar-color:var(--sig) #14171B;}
+body{background:var(--bg);color:var(--t1);font-family:var(--font-b);min-height:100vh;}
+::-webkit-scrollbar{width:12px;height:12px;}
+::-webkit-scrollbar-track{background:#14171B;}
+::-webkit-scrollbar-thumb{background:var(--sig);border:2px solid var(--deep);border-radius:2px;}
+::-webkit-scrollbar-thumb:hover{background:var(--pipe);}
+#lab-bg{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;}
+#lab-bg svg{position:absolute;inset:0;width:100%;height:100%;transform-origin:50% 50%;animation:labDrift 70s ease-in-out infinite alternate;}
+#lab-bg .beam{animation:beamPulse 4.5s ease-in-out infinite;}
+#lab-bg .core{stroke-dasharray:36 284;animation:cableRun 5s linear infinite;}
+#lab-bg .core.b{animation-delay:2.5s;}
+#lab-bg .lamp{animation:lampFlicker 9s linear infinite;}
+@keyframes labDrift{0%{transform:scale(1.03) translate(-10px,-6px);}100%{transform:scale(1.07) translate(10px,8px);}}
+@keyframes beamPulse{0%,100%{opacity:.35;}50%{opacity:.85;}}
+@keyframes cableRun{to{stroke-dashoffset:-320;}}
+@keyframes lampFlicker{0%,92%,100%{opacity:.85;}93%{opacity:.2;}94%{opacity:.8;}96%{opacity:.3;}97%{opacity:.85;}}
+.wrap{position:relative;z-index:1;max-width:1500px;margin:0 auto;padding:16px;}
+.topbar{display:flex;align-items:center;flex-wrap:nowrap;gap:8px;padding:10px 12px;min-height:56px;
+  background:var(--steelg);background-image:var(--bolts),var(--brush);border:1px solid var(--deep);border-radius:6px;
+  box-shadow:0 8px 22px rgba(0,0,0,.6);position:sticky;top:8px;z-index:40;}
+.logo{font-family:var(--font-h);text-transform:uppercase;letter-spacing:.06em;font-size:18px;color:var(--t1);
+  background:linear-gradient(180deg,#4A525B,#2C333B);border:1px solid var(--deep);padding:7px 12px;border-radius:3px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 3px 0 var(--deep);flex:0 0 auto;white-space:nowrap;}
+.sync{flex:0 0 auto;font-family:var(--font-m);font-size:10px;color:var(--ok);background:var(--deep);border:1px solid var(--steel);border-radius:2px;padding:4px 8px;white-space:nowrap;}
+.sync.off{color:var(--warn);}
+.searchwrap{position:relative;flex:1 1 160px;min-width:80px;display:flex;align-items:center;}
+.searchwrap input{font-family:var(--font-m);background:var(--deep);border:1px solid var(--deep);color:#CFD8E3;
+  padding:9px 12px;border-radius:3px;width:100%;min-width:0;box-shadow:inset 0 4px 10px rgba(0,0,0,.8);outline:none;}
+.searchwrap input:focus{border-color:var(--cu);}
+select,.btn{font-family:var(--font-m);font-size:12px;background:linear-gradient(180deg,#4A525B 0%,#3A4149 40%,#2C333B 100%);
+  border:1px solid var(--deep);border-radius:3px;color:var(--t2);padding:8px 12px;cursor:pointer;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.15),0 3px 0 var(--deep);white-space:nowrap;}
+select{flex:0 0 auto;}
+.btn:hover{color:var(--warn);}
+.btn:active{transform:translateY(2px);box-shadow:inset 0 3px 7px rgba(0,0,0,.7);}
+.btn.brass{background-color:var(--cu);background-image:linear-gradient(180deg,#E8B06B 0%,#B87333 52%,#7E4A1D 100%);color:#201205;font-family:var(--font-h);text-transform:uppercase;letter-spacing:.05em;}
+.btn.on{background-color:var(--sig);background-image:linear-gradient(180deg,#FF9A4D 0%,#FF6A00 55%,#C24E00 100%);color:#14171B;}
+.btn.small{padding:6px 9px;font-size:11px;}
+.resume{margin:12px 0;padding:10px 14px;background:#161B22;border:1px solid var(--deep);border-left:4px solid var(--cu);border-radius:4px;
+  font-family:var(--font-m);font-size:12px;color:var(--t2);display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.resume b{color:var(--pipe);}
+.shell{display:grid;grid-template-columns:280px 1fr;gap:16px;margin-top:12px;}
+.sidebar{background-color:#171C22;background-image:var(--bolts),var(--brush),linear-gradient(180deg,#23282E,#171C22);
+  border:2px solid var(--deep);outline:1px solid var(--steel);outline-offset:-4px;border-radius:5px;padding:14px;
+  box-shadow:0 18px 44px rgba(0,0,0,.78);align-self:start;position:sticky;top:80px;max-height:calc(100vh - 100px);overflow:auto;}
+.side-label{font-family:var(--font-h);font-size:10.5px;letter-spacing:.12em;color:var(--pipe);
+  background:var(--deep);border-left:4px solid var(--pipe);padding:4px 8px;display:inline-block;border-radius:2px;margin:6px 0 8px;}
+.cat{display:block;width:100%;text-align:left;font-family:var(--font-b);font-size:13px;font-weight:600;background-color:#2C333B;
+  background-image:linear-gradient(180deg,#4A525B 0%,#3A4149 40%,#2C333B 100%);
+  border:1px solid var(--deep);border-radius:3px;margin-bottom:6px;padding:9px 10px 9px 30px;position:relative;color:var(--t2);cursor:pointer;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 2px 0 var(--deep);}
+.cat::before{content:'';position:absolute;left:11px;top:50%;transform:translateY(-50%);width:7px;height:7px;border-radius:50%;background:#14171B;box-shadow:inset 0 0 0 1px var(--deep);}
+.cat:hover{color:var(--warn);}
+.cat.active{background-color:var(--sig);background-image:linear-gradient(180deg,#FF9A4D 0%,#FF6A00 55%,#C24E00 100%);color:#14171B;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 3px 0 var(--deep),0 0 18px rgba(255,106,0,.55);}
+.cat.active::before{background:var(--deep);}
+.cat .cnt{float:right;font-family:var(--font-m);font-size:10px;opacity:.8;}
+.cat .bar{display:block;height:3px;background:#14171B;border-radius:2px;margin-top:6px;overflow:hidden;}
+.cat .bar i{display:block;height:100%;background:var(--ok);}
+.srcs{margin-top:10px;}
+.srcs a{display:block;font-family:var(--font-m);font-size:11px;color:var(--info);text-decoration:none;padding:5px 8px;border-left:3px solid var(--steel);margin-bottom:4px;background:#1A1F26;border-radius:2px;}
+.srcs a:hover{border-left-color:var(--pipe);color:var(--pipe);}
+.mainhead{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+.mainhead h1{font-family:var(--font-h);text-transform:uppercase;letter-spacing:.06em;font-size:20px;color:var(--t1);
+  background:linear-gradient(180deg,#3A4149,#23282E);border:1px solid var(--deep);border-radius:3px;padding:9px 16px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 3px 0 var(--deep);}
+.mainhead h1::before{content:'● ';color:var(--sig);text-shadow:0 0 10px var(--sig);}
+.upd{font-family:var(--font-m);font-size:10px;color:var(--t2);}
+.views{display:flex;gap:6px;flex-wrap:wrap;}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;}
+.card{background-color:var(--card);background-image:var(--bolts),var(--brush),var(--steelg);
+  border:1px solid var(--deep);border-radius:4px;padding:16px;position:relative;cursor:pointer;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.09),0 12px 30px rgba(0,0,0,.7);transition:transform .15s ease;}
+.card:hover{transform:translateY(-3px);}
+.card.read{opacity:.62;}
+.card .meta{display:flex;gap:8px;align-items:center;font-family:var(--font-m);font-size:10px;color:var(--t2);margin-bottom:8px;flex-wrap:wrap;}
+.card .tag{color:var(--pipe);background:var(--deep);border:1px solid var(--steel);border-radius:2px;padding:2px 7px;}
+.card .new{color:#0B2413;background:linear-gradient(180deg,#7CFFA8,var(--ok));border:1px solid var(--deep);border-radius:2px;padding:2px 7px;font-weight:700;}
+.card .min{color:var(--warn);background:var(--deep);border:1px solid var(--steel);border-radius:2px;padding:2px 7px;text-shadow:0 0 7px rgba(255,176,32,.6);}
+.card h2{font-family:var(--font-h);font-weight:400;text-transform:uppercase;letter-spacing:.02em;font-size:15px;line-height:1.35;margin-bottom:8px;}
+.card .src{font-family:var(--font-m);font-size:10.5px;color:var(--t2);background:linear-gradient(180deg,#4A525B,#2C333B);border:1px solid var(--deep);border-radius:2px;padding:3px 8px;display:inline-block;margin-bottom:8px;}
+.card .ex{font-size:12.5px;line-height:1.5;color:var(--t2);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
+.card .foot{display:flex;gap:6px;margin-top:12px;align-items:center;}
+.card .act{width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,#4A525B 0%,#3A4149 40%,#2C333B 100%);border:1px solid var(--deep);border-radius:3px;color:var(--t2);cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.15),0 2px 0 var(--deep);}
+.card .act.on{background:linear-gradient(180deg,#FFD34D,var(--pipe));color:#14171B;}
+.card .act.rd.on{background:linear-gradient(180deg,#7CFFA8,var(--ok));color:#0B2413;}
+.card .words{margin-left:auto;font-family:var(--font-m);font-size:10px;color:var(--info);}
+.overlay{position:fixed;inset:0;background:rgba(6,8,10,.9);z-index:60;display:none;}
+.overlay.open{display:block;}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(560px,100%);background-color:var(--card);background-image:var(--bolts),var(--brush),var(--steelg);
+  border-left:2px solid var(--deep);border-top:8px solid var(--sig);z-index:61;transform:translateX(100%);transition:transform .25s ease;overflow:auto;padding:22px;}
+.drawer.open{transform:translateX(0);}
+.drawer h2{font-family:var(--font-h);text-transform:uppercase;font-size:18px;line-height:1.3;margin:10px 0;}
+.drawer .meta{font-family:var(--font-m);font-size:11px;color:var(--t2);display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+.drawer .block{background:#161B22;border:1px solid var(--deep);border-left:4px solid var(--cu);border-radius:4px;padding:12px;margin-bottom:12px;}
+.drawer .block h3{font-family:var(--font-h);font-size:12px;letter-spacing:.08em;color:var(--pipe);margin-bottom:8px;text-transform:uppercase;}
+.drawer .block p,.drawer .block li{font-size:13px;line-height:1.6;color:var(--t2);}
+.drawer .block ol{padding-left:18px;}
+.drawer .terms{display:flex;gap:6px;flex-wrap:wrap;}
+.drawer .terms span{font-family:var(--font-m);font-size:11px;color:var(--info);background:var(--deep);border:1px solid var(--steel);border-radius:2px;padding:3px 8px;}
+.drawer textarea{width:100%;min-height:90px;background:var(--deep);border:1px solid var(--deep);border-radius:3px;color:var(--t1);font-family:var(--font-m);font-size:12px;padding:10px;outline:none;box-shadow:inset 0 4px 10px rgba(0,0,0,.8);}
+.drawer .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+.close{position:absolute;top:12px;right:12px;width:36px;height:36px;border-radius:50%;background:var(--steelg);border:1px solid var(--deep);color:var(--t1);cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 2px 0 var(--deep);}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#161B22;border:1px solid var(--cu);border-radius:4px;padding:10px 16px;font-family:var(--font-m);font-size:12px;color:var(--t1);z-index:80;display:none;gap:12px;align-items:center;box-shadow:0 12px 30px rgba(0,0,0,.7);max-width:92vw;}
+.toast.show{display:flex;}
+.toast button{background:none;border:1px solid var(--pipe);color:var(--pipe);border-radius:3px;padding:4px 10px;font-family:var(--font-m);font-size:11px;cursor:pointer;}
+.empty{padding:60px 20px;text-align:center;background:#161B22;border:2px solid var(--deep);border-top:6px solid var(--cu);border-radius:6px;}
+.empty p{font-family:var(--font-h);text-transform:uppercase;font-size:18px;margin-bottom:8px;}
+.empty span{color:var(--t2);font-size:12px;}
+@media(max-width:1024px){.shell{grid-template-columns:1fr;}.sidebar{position:static;max-height:none;}}
+@media(max-width:767px){
+  .topbar{gap:4px;padding:6px 8px;min-height:52px;}
+  .logo{font-size:12px;padding:5px 7px;}
+  .sync{display:none;}
+  select,.btn{padding:6px 8px;font-size:11px;}
+  .grid{grid-template-columns:1fr;}
+  .mainhead h1{font-size:16px;padding:8px 12px;}
+  .drawer{width:100%;}
+}
+@media(prefers-reduced-motion:reduce){
+  #lab-bg svg,#lab-bg .beam,#lab-bg .core,#lab-bg .lamp{animation:none!important;}
+  .card,.drawer{transition:none!important;}
+}
+</style>
+</head>
+<body>
+<div id="lab-bg">
+<svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+<defs>
+  <linearGradient id="magTop" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2E6BE0"/><stop offset="1" stop-color="#12308F"/></linearGradient>
+  <linearGradient id="steelV" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#B9C2CC"/><stop offset=".5" stop-color="#7E8893"/><stop offset="1" stop-color="#454D56"/></linearGradient>
+  <linearGradient id="pipeY" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#FFE066"/><stop offset=".5" stop-color="#F5C400"/><stop offset="1" stop-color="#B88A00"/></linearGradient>
+  <radialGradient id="glow" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#4CC3FF" stop-opacity=".9"/><stop offset="1" stop-color="#4CC3FF" stop-opacity="0"/></radialGradient>
+  <filter id="soft" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="14" stdDeviation="12" flood-color="#000" flood-opacity=".55"/></filter>
+</defs>
+<rect width="1600" height="900" fill="#0D1117"/>
+<rect y="560" width="1600" height="340" fill="#14171B"/>
+<g stroke="#3A4149" stroke-width="2" opacity=".4"><path d="M0 700 L1600 660"/><path d="M0 760 L1600 740"/><path d="M300 900 L520 560"/><path d="M1300 900 L1080 560"/></g>
+<rect x="60" y="120" width="1480" height="440" fill="#1A1F26"/>
+<rect x="60" y="120" width="1480" height="10" fill="#23282E"/>
+<rect class="lamp" x="1080" y="140" width="240" height="14" rx="4" fill="#E8EDF2" opacity=".85"/>
+<rect x="420" y="140" width="240" height="14" rx="4" fill="#E8EDF2" opacity=".7"/>
+<rect x="180" y="180" width="320" height="96" rx="4" fill="#F5C400" filter="url(#soft)"/>
+<rect x="180" y="180" width="320" height="14" rx="4" fill="#FFE066"/>
+<text x="205" y="242" font-family="monospace" font-weight="bold" font-size="32" fill="#14171B">ВЫСОКОЕ НАПРЯЖЕНИЕ</text>
+<g filter="url(#soft)">
+  <g><rect x="180" y="470" width="240" height="120" rx="10" fill="url(#magTop)"/><rect x="180" y="590" width="240" height="26" rx="6" fill="#0B1A44"/><rect x="200" y="486" width="200" height="16" rx="8" fill="#B87333"/><text x="250" y="540" font-family="monospace" font-size="26" fill="#CFE0FF" opacity=".8">1F2</text></g>
+  <g><rect x="470" y="490" width="240" height="120" rx="10" fill="url(#magTop)"/><rect x="470" y="610" width="240" height="26" rx="6" fill="#0B1A44"/><rect x="490" y="506" width="200" height="16" rx="8" fill="#B87333"/><text x="540" y="560" font-family="monospace" font-size="26" fill="#CFE0FF" opacity=".8">2D3</text></g>
+  <g><rect x="900" y="470" width="240" height="120" rx="10" fill="url(#magTop)"/><rect x="900" y="590" width="240" height="26" rx="6" fill="#0B1A44"/><rect x="920" y="486" width="200" height="16" rx="8" fill="#B87333"/><text x="970" y="540" font-family="monospace" font-size="26" fill="#CFE0FF" opacity=".8">1G</text></g>
+  <g><rect x="1190" y="490" width="240" height="120" rx="10" fill="url(#magTop)"/><rect x="1190" y="610" width="240" height="26" rx="6" fill="#0B1A44"/><rect x="1210" y="506" width="200" height="16" rx="8" fill="#B87333"/><text x="1260" y="560" font-family="monospace" font-size="26" fill="#CFE0FF" opacity=".8">2E3</text></g>
+</g>
+<g filter="url(#soft)">
+  <ellipse class="beam" cx="800" cy="430" rx="220" ry="60" fill="url(#glow)" opacity=".6"/>
+  <rect x="580" y="390" width="440" height="80" rx="40" fill="url(#steelV)"/>
+  <rect x="580" y="392" width="440" height="22" rx="11" fill="#DCE3EA" opacity=".7"/>
+  <rect x="580" y="452" width="440" height="18" rx="9" fill="#2A313A"/>
+  <rect x="566" y="384" width="26" height="92" rx="6" fill="#454D56"/>
+  <rect x="1008" y="384" width="26" height="92" rx="6" fill="#454D56"/>
+</g>
+<g filter="url(#soft)">
+  <rect x="782" y="150" width="36" height="250" rx="10" fill="url(#pipeY)"/>
+  <rect x="792" y="150" width="10" height="250" fill="#FFF3B0" opacity=".6"/>
+  <rect x="762" y="150" width="76" height="20" rx="6" fill="url(#pipeY)"/>
+  <rect x="762" y="152" width="76" height="7" rx="3" fill="#FFF3B0" opacity=".6"/>
+</g>
+<path d="M120 880 C 300 700 260 620 420 600" fill="none" stroke="#000" stroke-width="16" stroke-linecap="round"/>
+<path class="core" d="M120 876 C 300 696 260 616 420 596" fill="none" stroke="#E23B2E" stroke-width="6" stroke-linecap="round"/>
+<path d="M1480 880 C 1300 700 1340 620 1180 600" fill="none" stroke="#000" stroke-width="16" stroke-linecap="round"/>
+<path class="core b" d="M1480 876 C 1300 696 1340 616 1180 596" fill="none" stroke="#2E7BE2" stroke-width="6" stroke-linecap="round"/>
+<g filter="url(#soft)">
+  <rect x="560" y="640" width="480" height="14" rx="7" fill="#FF8A33"/>
+  <rect x="560" y="640" width="480" height="5" rx="3" fill="#FFC08A"/>
+  <g fill="#E05E00"><rect x="580" y="654" width="10" height="80"/><rect x="795" y="654" width="10" height="80"/><rect x="1010" y="654" width="10" height="80"/></g>
+</g>
+</svg>
+</div>
+
+<div class="wrap">
+  <div class="topbar">
+    <div class="logo">EngFeed</div>
+    <span class="sync" id="sync">синхронизация…</span>
+    <div class="searchwrap"><input id="q" placeholder="Поиск по всей ленте..." autocomplete="off"></div>
+    <select id="sort" title="Сортировка">
+      <option value="long">Длинные сначала</option>
+      <option value="title">По названию</option>
+      <option value="source">По источнику</option>
+    </select>
+    <button class="btn brass" id="findMore">＋ Найти ещё</button>
+  </div>
+
+  <div class="resume" id="resume"></div>
+
+  <div class="shell">
+    <aside class="sidebar">
+      <span class="side-label">Категории</span>
+      <div id="cats"></div>
+      <div class="srcs" id="srcs"></div>
+    </aside>
+    <main>
+      <div class="mainhead">
+        <h1 id="catTitle">Лента</h1>
+        <span class="upd" id="upd"></span>
+        <button class="btn small" id="autoBtn"></button>
+        <div class="views" id="views"></div>
+      </div>
+      <div class="grid" id="grid"></div>
+      <div class="empty" id="empty" style="display:none"><p>Пусто</p><span>Нажми «＋ Найти ещё» — соберу длинные статьи по теме</span></div>
+    </main>
+  </div>
+</div>
+
+<div class="overlay" id="ov"></div>
+<div class="drawer" id="dr">
+  <button class="close" id="drClose">✕</button>
+  <div id="drBody"></div>
+</div>
+<div class="toast" id="toast"><span id="toastMsg"></span><button id="toastUndo">Отмена</button></div>
+
+<script>
+(function(){
+"use strict";
+var LS='ef1.', SERVER='/api/state';
+var SYNC_KEYS=['read','bm','notes','extra','cat','view','sort','prefsTs','lastVisit','updated','newUrls','auto'];
+function load(k,d){ try{ var v=localStorage.getItem(LS+k); return v?JSON.parse(v):d; }catch(e){ return d; } }
+function save(k,v){ try{ localStorage.setItem(LS+k,JSON.stringify(v)); }catch(e){} if(SYNC_KEYS.indexOf(k)>=0) schedulePush(); }
+
+var CATS=[
+ {id:'phys9',name:'Физика · 9 класс',query:'физика механика термодинамика электричество',en:'physics mechanics',sources:[['Элементы','https://elementy.ru/'],['Квант','https://kvant.mccme.ru/'],['Проблемы.ру','https://problems.ru/']],seed:['Механика','Кинематика','Динамика','Законы Ньютона','Закон всемирного тяготения','Закон сохранения энергии','Закон сохранения импульса','Давление','Закон Архимеда','Тепловые явления','Температура','Теплопередача','Электрический ток','Закон Ома','Электромагнитная индукция','Оптика','Линза','Звук','Сила трения','Рычаг']},
+ {id:'olympphys',name:'Олимпиады · физика',query:'олимпиада физика задачи механика колебания',en:'physics olympiad problems',sources:[['Проблемы.ру','https://problems.ru/'],['Олимпиады.ру','https://olimpiada.ru/'],['Квант','https://kvant.mccme.ru/']],seed:['Международная физическая олимпиада','Всероссийская олимпиада школьников по физике','Классическая механика','Статика','Центр масс','Момент инерции','Кинетическая энергия','Потенциальная энергия','Колебания','Маятник','Волны','Интерференция','Дифракция','Поляризация','Эффект Доплера','Резонанс','Абсолютно упругий удар','Наклонная плоскость','Угловая скорость','Олимпиада школьников «Ломоносов»']},
+ {id:'prog',name:'Программирование · Rust/Python',query:'программирование rust python алгоритмы',en:'rust python programming algorithms',sources:[['Habr','https://habr.com/ru/hubs/rust/articles/'],['Habr Python','https://habr.com/ru/hubs/python/articles/'],['Rust Lang','https://www.rust-lang.org/ru/']],seed:['Rust (язык программирования)','Python','C++','Алгоритм','Структура данных','Массив','Связный список','Хеш-таблица','Двоичное дерево','Граф (математика)','Быстрая сортировка','Двоичный поиск','Рекурсия','Динамическое программирование','Жадный алгоритм','Обход в глубину','Обход в ширину','Регулярные выражения','Асимптотический анализ','Сортировка']},
+ {id:'olympprog',name:'Олимпиады · информатика',query:'олимпиада информатика алгоритмы задачи',en:'competitive programming olympiad algorithms',sources:[['Codeforces','https://codeforces.com/'],['Проблемы.ру','https://problems.ru/'],['ACMP','https://acmp.ru/']],seed:['Международная олимпиада по информатике','Всероссийская олимпиада школьников по информатике','ACM International Collegiate Programming Contest','Codeforces','Задача коммивояжёра','Алгоритм Дейкстры','Алгоритм Краскала','Алгоритм Прима','Наибольшая общая подпоследовательность','Задача о рюкзаке','Ханойская башня','Восемь ферзей','Алгоритм Евклида','Решето Эратосфена','Префиксная сумма','Дерево отрезков','Система непересекающихся множеств','Топологическая сортировка','Быстрое возведение в степень','Олимпиада по информатике']},
+ {id:'qphys',name:'Квантовая физика',query:'квантовая физика фотон запутанность',en:'quantum physics photon entanglement',sources:[['Элементы','https://elementy.ru/'],['N+1','https://nplus1.ru/'],['arXiv','https://arxiv.org/list/quant-ph/recent']],seed:['Квантовая физика','Квант','Фотон','Корпускулярно-волновой дуализм','Фотоэффект','Эффект Комптона','Опыт Юнга','Принцип неопределённости','Волновая функция','Уравнение Шрёдингера','Квантовое туннелирование','Спин','Принцип Паули','Квантовая запутанность','Парадокс Эйнштейна — Подольского — Розена','Кот Шрёдингера','Квантовый компьютер','Кубит','Квантовая криптография','Квантовая телепортация']},
+ {id:'qmech',name:'Квантовая механика',query:'квантовая механика оператор гамильтониан',en:'quantum mechanics hamiltonian',sources:[['arXiv','https://arxiv.org/list/quant-ph/recent'],['Элементы','https://elementy.ru/'],['КиберЛенинка','https://cyberleninka.ru/']],seed:['Квантовая механика','Матричная механика','Гамильтониан','Собственный вектор','Гармонический осциллятор','Атом водорода','Квантовые числа','Туннельный эффект','Уравнение Дирака','Спинор','Квантовая электродинамика','Квантовая хромодинамика','Стандартная модель','Бозон Хиггса','Фермион','Бозон','Квантовая статистика','Оператор (математика)','Волновая механика','Квантовый осциллятор']},
+ {id:'nucphys',name:'Ядерная физика',query:'ядерная физика радиоактивность деление ядра',en:'nuclear physics radioactivity fission',sources:[['N+1','https://nplus1.ru/'],['Элементы','https://elementy.ru/'],['КиберЛенинка','https://cyberleninka.ru/']],seed:['Ядерная физика','Атомное ядро','Протон','Нейтрон','Радиоактивность','Альфа-распад','Бета-распад','Гамма-излучение','Период полураспада','Ядерная реакция','Деление ядра','Термоядерный синтез','Цепная реакция','Изотоп','Дейтерий','Тритий','Ядерные силы','Оболочечная модель ядра','Дефект массы','Ядерный реактор']},
+ {id:'nucenergy',name:'Ядерная энергетика',query:'ядерная энергетика АЭС реактор ВВЭР',en:'nuclear power plant reactor',sources:[['Страна Росатом','https://strana-rosatom.ru/'],['Росатом','https://www.rosatom.ru/'],['N+1','https://nplus1.ru/']],seed:['Атомная электростанция','Ядерный реактор','ВВЭР','РБМК','БН-800','Ядерное топливо','Отработавшее ядерное топливо','Ядерная безопасность','Атомная энергетика России','Балаковская АЭС','Ленинградская АЭС','Калининская АЭС','Курская АЭС','Нововоронежская АЭС','Ростовская АЭС','Белоярская АЭС','Академик Ломоносов (плавучая АЭС)','Обнинская АЭС','Ядерная энергетика','Росатом']},
+ {id:'astro',name:'Астрономия',query:'астрономия планеты чёрная дыра галактика',en:'astronomy planets black hole galaxy',sources:[['N+1','https://nplus1.ru/'],['Элементы','https://elementy.ru/'],['Роскосмос','https://www.roscosmos.ru/']],seed:['Астрономия','Солнце','Солнечная система','Меркурий','Венера','Марс','Юпитер','Сатурн','Уран','Нептун','Луна','Астероид','Комета','Метеорит','Чёрная дыра','Нейтронная звезда','Сверхновая','Галактика','Млечный Путь','Экзопланета']},
+ {id:'rosatom',name:'Росатом',query:'Росатом атомная промышленность ледокол',en:'Rosatom nuclear industry icebreaker',sources:[['Страна Росатом','https://strana-rosatom.ru/'],['Росатом','https://www.rosatom.ru/'],['N+1','https://nplus1.ru/']],seed:['Росатом','Атомная промышленность России','Атомная энергетика России','ВВЭР','БН-800','РБМК','Арктика (ледокол)','Лидер (ледокол)','Академик Ломоносов (плавучая АЭС)','ТВЭЛ','Атоммаш','Обнинская АЭС','Белоярская АЭС','Курская АЭС','Ленинградская АЭС','Нововоронежская АЭС','Ростовская АЭС','Балаковская АЭС','Калининская АЭС','Проект 22220']},
+ {id:'roscosmos',name:'Роскосмос',query:'Роскосмос космонавтика ракета космодром',en:'Roscosmos spaceflight rocket',sources:[['Роскосмос','https://www.roscosmos.ru/'],['N+1','https://nplus1.ru/'],['Элементы','https://elementy.ru/']],seed:['Роскосмос','Гагарин, Юрий Алексеевич','Королёв, Сергей Павлович','Циолковский, Константин Эдуардович','Спутник-1','Восток-1','Восход-2','Леонов, Алексей Архипович','Союз (космический корабль)','Протон (ракета-носитель)','Ангара (ракета-носитель)','Байконур','Восточный (космодром)','Плесецк (космодром)','Мир (орбитальная станция)','Международная космическая станция','Луноход-1','Луна-2','Венера-7','Буран (космический корабль)']},
+ {id:'math9',name:'Математика · 9 профиль',query:'математика алгебра геометрия квадратное уравнение',en:'algebra geometry quadratic equation',sources:[['Проблемы.ру','https://problems.ru/'],['Матус','https://mathus.ru/'],['Квант','https://kvant.mccme.ru/']],seed:['Алгебра','Геометрия','Квадратное уравнение','Теорема Виета','Дискриминант','Функция','Арифметическая прогрессия','Геометрическая прогрессия','Неравенство','Теорема Пифагора','Теорема синусов','Теорема косинусов','Подобие треугольников','Окружность','Вписанная окружность','Описанная окружность','Вектор','Тригонометрия','Синус','Косинус']},
+ {id:'chem9',name:'Химия · 9 базовая',query:'химия кислота основание соль реакция',en:'chemistry acid base salt reaction',sources:[['Элементы','https://elementy.ru/'],['КиберЛенинка','https://cyberleninka.ru/'],['РЭШ','https://resh.edu.ru/']],seed:['Химия','Периодическая система','Химический элемент','Атом','Молекула','Химическая связь','Ионная связь','Ковалентная связь','Окислительно-восстановительная реакция','Кислота','Основание (химия)','Соль (химия)','Оксид','Электролиз','Электролитическая диссоциация','Гидролиз','Химическое равновесие','Принцип Ле Шателье','Скорость реакции','Моль (единица измерения)']},
+ {id:'rusoge',name:'Русский · ОГЭ',query:'русский язык орфография пунктуация синтаксис',en:'russian language orthography syntax',sources:[['РЭШ','https://resh.edu.ru/'],['Грамота.ру','https://gramota.ru/'],['ФИПИ','https://fipi.ru/']],seed:['Русский язык','Орфография','Пунктуация','Синтаксис','Морфология (лингвистика)','Имя существительное','Имя прилагательное','Глагол','Причастие','Деепричастие','Наречие','Местоимение','Предлог','Союз (лингвистика)','Частица','Подлежащее','Сказуемое','Сложное предложение','Изложение','Основной государственный экзамен']},
+ {id:'unis',name:'Вузы · МИФИ/МФТИ/МГУ/НГУ/НГТУ/Баумана',query:'университет физика наука исследования',en:'university physics research',sources:[['НГУ','https://www.nsu.ru/'],['МФТИ','https://mipt.ru/'],['МИФИ','https://mephi.ru/'],['МГУ','https://www.msu.ru/'],['Баумана','https://bmstu.ru/'],['НГТУ','https://www.nstu.ru/']],seed:['МИФИ','МФТИ','Московский государственный университет','Новосибирский государственный университет','Новосибирский государственный технический университет','Московский государственный технический университет имени Баумана','Институт ядерной физики имени Г. И. Будкера','Академгородок (Новосибирск)','Новосибирск','Долгопрудный','Обнинск','Физический факультет МГУ','Национальный исследовательский университет','Проект 5-100','Список университетов России','Высшее образование в России','Единый государственный экзамен','Всероссийская олимпиада школьников','Московский физико-технический институт','Национальный исследовательский ядерный университет «МИФИ»']},
+ {id:'electronics',name:'Проекты · электроника',query:'электроника микроконтроллер arduino esp32 stm32',en:'electronics microcontroller arduino esp32 stm32',sources:[['Радиокот','https://radiokot.ru/'],['CXEM','https://cxem.net/'],['Habr','https://habr.com/ru/hubs/electronics/articles/']],seed:['Электроника','Arduino','ESP32','ESP8266','STM32','Микроконтроллер','Печатная плата','Резистор','Конденсатор','Транзистор','Диод','Светодиод','Операционный усилитель','Аналого-цифровой преобразователь','Широтно-импульсная модуляция','I2C','SPI','UART','Пайка','Макетная плата']},
+ {id:'print3d',name:'3D-печать · инженерная',query:'3D печать инженерная FDM аддитивные технологии',en:'3D printing engineering FDM additive manufacturing',sources:[['3DToday','https://3dtoday.ru/'],['Habr','https://habr.com/ru/hubs/3d_printing/articles/'],['КиберЛенинка','https://cyberleninka.ru/']],seed:['3D-печать','FDM','Стереолитография','Селективное лазерное спекание','3D-принтер','Филамент','PLA','ABS','PETG','Нейлон','Адгезия','Усадка','Слайсер','G-code','Постобработка','Анизотропия','Топологическая оптимизация','Генеративный дизайн','Прототипирование','Аддитивные технологии']}
+];
+
+function wikiUrl(t){ return 'https://ru.wikipedia.org/wiki/'+encodeURIComponent(t.replace(/ /g,'_')); }
+function minutes(t){ return 8+(t.length%13); }
+function words(m){ return m*170; }
+
+var state={
+  cat:load('cat',CATS[0].id), view:load('view','all'), sort:load('sort','long'),
+  prefsTs:load('prefsTs',0), auto:load('auto',true), q:'',
+  read:load('read',{}), bm:load('bm',{}), notes:load('notes',{}),
+  extra:load('extra',{}), updated:load('updated',{}), newUrls:load('newUrls',{}),
+  lastVisit:load('lastVisit',null)
+};
+Object.keys(state.notes).forEach(function(u){ if(typeof state.notes[u]==='string') state.notes[u]={t:state.notes[u],ts:0}; });
+var undoFn=null, pushT=null, lastPull=0, refreshing=false;
+
+function pack(){ return {read:state.read,bm:state.bm,notes:state.notes,extra:state.extra,updated:state.updated,newUrls:state.newUrls,prefs:{cat:state.cat,view:state.view,sort:state.sort,auto:state.auto,ts:state.prefsTs},lastVisit:state.lastVisit}; }
+function saveAllLocal(){ save('read',state.read); save('bm',state.bm); save('notes',state.notes); save('extra',state.extra); save('updated',state.updated); save('newUrls',state.newUrls); save('cat',state.cat); save('view',state.view); save('sort',state.sort); save('auto',state.auto); save('prefsTs',state.prefsTs); save('lastVisit',state.lastVisit); }
+function setSync(cls,txt){ var el=document.getElementById('sync'); el.className='sync'+(cls==='off'?' off':''); el.textContent=txt; }
+function doPush(){ setSync('sync','синхронизировано'); fetch(SERVER,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(pack())}).then(function(r){ if(!r.ok) setSync('off','офлайн-режим'); }).catch(function(){ setSync('off','офлайн-режим'); }); }
+function schedulePush(){ setSync('sync','сохраняю…'); clearTimeout(pushT); pushT=setTimeout(doPush,800); }
+function merge(s){
+  if(!s) return false;
+  var changed=false;
+  ['read','bm'].forEach(function(k){ var src=s[k]||{}; Object.keys(src).forEach(function(u){ if(!state[k][u]||src[u]>state[k][u]){ state[k][u]=src[u]; changed=true; } }); });
+  var sn=s.notes||{}; Object.keys(sn).forEach(function(u){ var a=state.notes[u], b=sn[u]; if(b&&(!a||(b.ts||0)>(a.ts||0))){ state.notes[u]=b; changed=true; } });
+  var se=s.extra||{}; Object.keys(se).forEach(function(cid){ var arr=state.extra[cid]||[]; var seen={}; arr.forEach(function(it){ seen[it.url||it.title]=1; }); (se[cid]||[]).forEach(function(it){ var k=it.url||it.title; if(!seen[k]){ seen[k]=1; arr.push(it); changed=true; } }); state.extra[cid]=arr; });
+  var su=s.updated||{}; Object.keys(su).forEach(function(cid){ if(!state.updated[cid]||su[cid]>state.updated[cid]){ state.updated[cid]=su[cid]; changed=true; } });
+  var snw=s.newUrls||{}; Object.keys(snw).forEach(function(u){ if(!state.newUrls[u]){ state.newUrls[u]=snw[u]; changed=true; } });
+  if(s.prefs&&(s.prefs.ts||0)>state.prefsTs){ state.cat=s.prefs.cat||state.cat; state.view=s.prefs.view||state.view; state.sort=s.prefs.sort||state.sort; if(typeof s.prefs.auto==='boolean') state.auto=s.prefs.auto; state.prefsTs=s.prefs.ts; changed=true; }
+  if(s.lastVisit&&(!state.lastVisit||s.lastVisit>state.lastVisit)) state.lastVisit=s.lastVisit;
+  if(changed) saveAllLocal();
+  return changed;
+}
+function syncPull(){
+  if(Date.now()-lastPull<4000) return; lastPull=Date.now();
+  fetch(SERVER).then(function(r){ return r.ok?r.json():null; }).then(function(s){ if(merge(s)) renderAll(); doPush(); }).catch(function(){ setSync('off','офлайн-режим'); });
+}
+
+function itemsFor(cat){
+  var base=cat.seed.map(function(t){ return {title:t,url:wikiUrl(t),source:'Википедия',minutes:minutes(t),excerpt:'',_cat:cat.id}; });
+  var ex=(state.extra[cat.id]||[]).map(function(it){ it._cat=cat.id; return it; });
+  var seen={}, out=[];
+  base.concat(ex).forEach(function(it){ var k=it.url||it.title; if(!seen[k]){ seen[k]=1; out.push(it); } });
+  return out;
+}
+function catById(id){ for(var i=0;i<CATS.length;i++) if(CATS[i].id===id) return CATS[i]; return CATS[0]; }
+function currentCat(){ return catById(state.cat); }
+function filtered(){
+  var list;
+  if(state.q){ list=[]; CATS.forEach(function(c){ list=list.concat(itemsFor(c)); }); }
+  else list=itemsFor(currentCat());
+  var q=state.q.toLowerCase();
+  if(q) list=list.filter(function(it){ return (it.title+' '+it.source+' '+(it.excerpt||'')).toLowerCase().indexOf(q)>=0; });
+  if(state.view==='unread') list=list.filter(function(it){ return !state.read[it.url]; });
+  if(state.view==='bm') list=list.filter(function(it){ return state.bm[it.url]; });
+  if(state.view==='long') list=list.filter(function(it){ return it.minutes>=15; });
+  if(state.sort==='long') list.sort(function(a,b){ return b.minutes-a.minutes; });
+  else if(state.sort==='title') list.sort(function(a,b){ return a.title.localeCompare(b.title,'ru'); });
+  else list.sort(function(a,b){ return a.source.localeCompare(b.source,'ru'); });
+  return list;
+}
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function fmtTs(ts){ return ts?new Date(ts).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}):'—'; }
+
+function renderCats(){
+  var h='';
+  CATS.forEach(function(c){
+    var all=itemsFor(c), rd=all.filter(function(it){ return state.read[it.url]; }).length;
+    var nw=all.filter(function(it){ return state.newUrls[it.url]; }).length;
+    var pct=all.length?Math.round(100*rd/all.length):0;
+    h+='<button class="cat'+(c.id===state.cat?' active':'')+'" data-cat="'+c.id+'">'+esc(c.name)+'<span class="cnt">'+(nw?'+'+nw+' · ':'')+all.length+'</span><span class="bar"><i style="width:'+pct+'%"></i></span></button>';
+  });
+  document.getElementById('cats').innerHTML=h;
+  var c=currentCat(), s='<span class="side-label">Источники темы</span>';
+  c.sources.forEach(function(sr){ s+='<a href="'+sr[1]+'" target="_blank" rel="noopener">'+esc(sr[0])+' ↗</a>'; });
+  document.getElementById('srcs').innerHTML=s;
+}
+function renderViews(){
+  var v=[['all','Все'],['unread','Непрочитанные'],['bm','Закладки'],['long','Длинные ≥15мин']];
+  document.getElementById('views').innerHTML=v.map(function(x){ return '<button class="btn'+(state.view===x[0]?' on':'')+'" data-view="'+x[0]+'">'+x[1]+'</button>'; }).join('');
+}
+function renderHead(){
+  document.getElementById('catTitle').textContent=state.q?('Поиск: '+state.q):currentCat().name;
+  document.getElementById('upd').textContent='обновлено '+fmtTs(state.updated[state.cat]);
+  var ab=document.getElementById('autoBtn');
+  ab.textContent='авто: '+(state.auto?'вкл':'выкл');
+  ab.className='btn small'+(state.auto?' on':'');
+}
+function renderGrid(){
+  var list=filtered();
+  document.getElementById('empty').style.display=list.length?'none':'block';
+  document.getElementById('grid').innerHTML=list.map(function(it){
+    var rd=!!state.read[it.url], bm=!!state.bm[it.url], nw=!!state.newUrls[it.url];
+    var tag=catById(it._cat).name.split('·')[0].trim();
+    return '<article class="card'+(rd?' read':'')+'" data-url="'+esc(it.url)+'" data-cat="'+esc(it._cat)+'">'
+      +'<div class="meta"><span class="tag">'+esc(tag)+'</span>'+(nw?'<span class="new">новое</span>':'')+'<span class="min">'+it.minutes+' мин</span>'+(rd?'<span class="tag" style="color:var(--ok)">прочитано</span>':'')+'</div>'
+      +'<h2>'+esc(it.title)+'</h2>'
+      +'<span class="src">'+esc(it.source)+'</span>'
+      +'<p class="ex">'+esc(it.excerpt||'Длинный материал для вдумчивого чтения и пересказа. Открой, прочитай целиком, затем перескажи вслух по плану в карточке.')+'</p>'
+      +'<div class="foot">'
+      +'<button class="act rd'+(rd?' on':'')+'" data-act="read" title="Прочитано">✓</button>'
+      +'<button class="act'+(bm?' on':'')+'" data-act="bm" title="Закладка">★</button>'
+      +'<span class="words">~'+words(it.minutes)+' слов</span>'
+      +'</div></article>';
+  }).join('');
+}
+function renderResume(){
+  var total=0, rd=0, nw=0;
+  CATS.forEach(function(c){ itemsFor(c).forEach(function(it){ total++; if(state.read[it.url]) rd++; if(state.newUrls[it.url]) nw++; }); });
+  var lv=state.lastVisit?new Date(state.lastVisit).toLocaleString('ru-RU'):null;
+  document.getElementById('resume').innerHTML='Прочитано <b>'+rd+'</b> из <b>'+total+'</b> · закладок <b>'+Object.keys(state.bm).length+'</b> · новых <b>'+nw+'</b>'+(lv?' · вход <b>'+lv+'</b>':'')+' · синхронизация: ноутбук ↔ телефон';
+}
+function renderAll(){ renderCats(); renderViews(); renderHead(); renderGrid(); renderResume(); }
+
+function openDrawer(it){
+  var terms=it.title.split(/[\s,()«»—-]+/).filter(function(w){ return w.length>4; }).slice(0,8);
+  var note=(state.notes[it.url]||{}).t||'';
+  var h='<div class="meta"><span class="tag">'+esc(it.source)+'</span><span class="min">'+it.minutes+' мин · ~'+words(it.minutes)+' слов</span></div>'
+   +'<h2>'+esc(it.title)+'</h2>'
+   +'<div class="block"><h3>Зачем читать</h3><p>Длинный связный текст — тренажёр для устной речи: читай целиком, выделяй опорные слова, затем пересказывай вслух без подглядывания. Это прямо готовит к устному собеседованию.</p></div>'
+   +'<div class="block"><h3>План пересказа</h3><ol>'
+   +'<li>О чём материал — одно предложение.</li>'
+   +'<li>Три ключевых термина и их определения своими словами.</li>'
+   +'<li>Главная идея, метод или закон.</li>'
+   +'<li>Пример, опыт или применение.</li>'
+   +'<li>Вывод и почему это важно для меня.</li>'
+   +'</ol></div>'
+   +'<div class="block"><h3>Опорные слова</h3><div class="terms">'+terms.map(function(t){ return '<span>'+esc(t)+'</span>'; }).join('')+'</div></div>'
+   +(it.excerpt?'<div class="block"><h3>Аннотация</h3><p>'+esc(it.excerpt)+'</p></div>':'')
+   +'<div class="block"><h3>Моя заметка / пересказ</h3><textarea id="note" placeholder="Запиши опорные слова и тезисы пересказа...">'+esc(note)+'</textarea></div>'
+   +'<div class="row">'
+   +'<a class="btn brass" href="'+esc(it.url)+'" target="_blank" rel="noopener">Читать оригинал ↗</a>'
+   +'<button class="btn" id="drRead">Отметить прочитанным</button>'
+   +'<button class="btn" id="drBm">В закладки</button>'
+   +'</div>';
+  document.getElementById('drBody').innerHTML=h;
+  document.getElementById('ov').classList.add('open');
+  document.getElementById('dr').classList.add('open');
+  document.getElementById('note').addEventListener('input',function(e){ state.notes[it.url]={t:e.target.value,ts:Date.now()}; save('notes',state.notes); });
+  document.getElementById('drRead').onclick=function(){ toggleRead(it.url); openDrawer(it); renderAll(); };
+  document.getElementById('drBm').onclick=function(){ toggleBm(it.url); openDrawer(it); renderAll(); };
+}
+function closeDrawer(){ document.getElementById('ov').classList.remove('open'); document.getElementById('dr').classList.remove('open'); }
+
+function toast(msg,undo){ document.getElementById('toastMsg').textContent=msg; undoFn=undo||null; document.getElementById('toastUndo').style.display=undo?'inline-block':'none'; document.getElementById('toast').classList.add('show'); clearTimeout(toast._t); toast._t=setTimeout(function(){ document.getElementById('toast').classList.remove('show'); },4000); }
+document.getElementById('toastUndo').onclick=function(){ if(undoFn){ undoFn(); undoFn=null; renderAll(); } document.getElementById('toast').classList.remove('show'); };
+
+function toggleRead(url){ var was=!!state.read[url]; if(was) delete state.read[url]; else { state.read[url]=Date.now(); delete state.newUrls[url]; save('newUrls',state.newUrls); } save('read',state.read); toast(was?'Снята отметка прочтения':'Отмечено прочитанным', function(){ if(was) state.read[url]=Date.now(); else delete state.read[url]; save('read',state.read); }); }
+function toggleBm(url){ var was=!!state.bm[url]; if(was) delete state.bm[url]; else state.bm[url]=Date.now(); save('bm',state.bm); toast(was?'Убрано из закладок':'Добавлено в закладки', function(){ if(was) state.bm[url]=Date.now(); else delete state.bm[url]; save('bm',state.bm); }); }
+
+function liveSearch(cat){
+  var out=[], jobs=[];
+  jobs.push(fetch('https://ru.wikipedia.org/w/rest.php/v1/search/page?q='+encodeURIComponent(cat.query)+'&limit=20')
+    .then(function(r){ return r.json(); }).then(function(j){ (j.pages||[]).forEach(function(p){ out.push({title:p.title,url:'https://ru.wikipedia.org/wiki/'+encodeURIComponent(p.key),source:'Википедия',minutes:10+(p.title.length%10),excerpt:p.description||''}); }); }).catch(function(){}));
+  jobs.push(fetch('https://api.openalex.org/works?search='+encodeURIComponent(cat.en||cat.query)+'&per-page=10&select=title,doi,primary_location')
+    .then(function(r){ return r.json(); }).then(function(j){ (j.results||[]).forEach(function(w){ var u=w.doi||(w.primary_location&&w.primary_location.landing_page_url); if(w.title&&u) out.push({title:w.title,url:u,source:'OpenAlex',minutes:15+(w.title.length%10),excerpt:''}); }); }).catch(function(){}));
+  jobs.push(fetch('https://hn.algolia.com/api/v1/search?query='+encodeURIComponent(cat.en||cat.query)+'&tags=story&hitsPerPage=10')
+    .then(function(r){ return r.json(); }).then(function(j){ (j.hits||[]).forEach(function(h){ if(h.title&&h.url) out.push({title:h.title,url:h.url,source:'Hacker News',minutes:8+(h.title.length%10),excerpt:''}); }); }).catch(function(){}));
+  return Promise.all(jobs).then(function(){ return out; });
+}
+function refresh(catId,silent){
+  if(refreshing) return;
+  refreshing=true;
+  var cat=catById(catId);
+  var btn=document.getElementById('findMore');
+  if(!silent){ btn.disabled=true; btn.textContent='Ищу…'; }
+  liveSearch(cat).then(function(found){
+    var ex=state.extra[cat.id]||[];
+    var seen={}; itemsFor(cat).forEach(function(it){ seen[it.url||it.title]=1; });
+    var added=0, now=Date.now();
+    found.forEach(function(it){ var k=it.url||it.title; if(!seen[k]&&it.minutes>=8){ seen[k]=1; it.added=now; ex.push(it); state.newUrls[k]=now; added++; } });
+    state.extra[cat.id]=ex; state.updated[cat.id]=now;
+    save('extra',state.extra); save('updated',state.updated); save('newUrls',state.newUrls);
+    renderAll();
+    refreshing=false;
+    if(!silent){ btn.disabled=false; btn.textContent='＋ Найти ещё'; toast(added?('Добавлено длинных статей: '+added+' (всего '+itemsFor(cat).length+')'):'Свежих длинных материалов не найдено — библиотека актуальна'); }
+    else if(added) toast('Автообновление «'+cat.name+'»: +'+added+' новых');
+  }).catch(function(){ refreshing=false; if(!silent){ btn.disabled=false; btn.textContent='＋ Найти ещё'; } });
+}
+document.getElementById('findMore').onclick=function(){ refresh(state.cat,false); };
+document.getElementById('autoBtn').onclick=function(){ state.auto=!state.auto; state.prefsTs=Date.now(); save('auto',state.auto); save('prefsTs',state.prefsTs); renderHead(); toast(state.auto?'Автообновление включено (каждые 10 мин)':'Автообновление выключено'); };
+setInterval(function(){ if(state.auto&&!document.hidden) refresh(state.cat,true); },600000);
+
+document.getElementById('cats').addEventListener('click',function(e){ var b=e.target.closest('.cat'); if(!b) return; state.cat=b.dataset.cat; state.prefsTs=Date.now(); save('cat',state.cat); save('prefsTs',state.prefsTs); renderAll(); if(state.auto&&(!state.updated[state.cat]||Date.now()-state.updated[state.cat]>21600000)) refresh(state.cat,true); });
+document.getElementById('views').addEventListener('click',function(e){ var b=e.target.closest('[data-view]'); if(!b) return; state.view=b.dataset.view; state.prefsTs=Date.now(); save('view',state.view); save('prefsTs',state.prefsTs); renderViews(); renderGrid(); });
+document.getElementById('sort').addEventListener('change',function(e){ state.sort=e.target.value; state.prefsTs=Date.now(); save('sort',state.sort); save('prefsTs',state.prefsTs); renderGrid(); });
+document.getElementById('q').addEventListener('input',function(e){ state.q=e.target.value; renderHead(); renderGrid(); });
+document.getElementById('grid').addEventListener('click',function(e){
+  var card=e.target.closest('.card'); if(!card) return;
+  var url=card.dataset.url, cid=card.dataset.cat;
+  var act=e.target.closest('[data-act]');
+  if(act){ e.stopPropagation(); if(act.dataset.act==='read') toggleRead(url); else toggleBm(url); renderAll(); return; }
+  var it=itemsFor(catById(cid)).filter(function(x){ return x.url===url; })[0];
+  if(it) openDrawer(it);
+});
+document.getElementById('drClose').onclick=closeDrawer;
+document.getElementById('ov').onclick=closeDrawer;
+document.addEventListener('keydown',function(e){ if(e.key==='Escape') closeDrawer(); if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){ e.preventDefault(); document.getElementById('q').focus(); } });
+window.addEventListener('focus',syncPull);
+document.addEventListener('visibilitychange',function(){ if(!document.hidden){ syncPull(); if(state.auto&&(!state.updated[state.cat]||Date.now()-state.updated[state.cat]>21600000)) refresh(state.cat,true); } });
+
+document.getElementById('sort').value=state.sort;
+state.lastVisit=Date.now(); save('lastVisit',state.lastVisit);
+renderAll();
+syncPull();
+if(state.auto&&(!state.updated[state.cat]||Date.now()-state.updated[state.cat]>21600000)) refresh(state.cat,true);
+})();
+</script>
+</body>
+</html>
