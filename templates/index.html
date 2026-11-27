@@ -73,6 +73,9 @@ select{flex:0 0 auto;}
 .sidebar{background-color:#171C22;background-image:var(--bolts),var(--brush),linear-gradient(180deg,#23282E,#171C22);
   border:2px solid var(--deep);outline:1px solid var(--steel);outline-offset:-4px;border-radius:5px;padding:14px;
   box-shadow:0 18px 44px rgba(0,0,0,.78);align-self:start;position:sticky;top:80px;max-height:calc(100vh - 100px);overflow:auto;}
+.sheet-handle{display:none;}
+.sheet-head{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+#catsClose{display:none;}
 .side-label{font-family:var(--font-h);font-size:10.5px;letter-spacing:.12em;color:var(--pipe);
   background:var(--deep);border-left:4px solid var(--pipe);padding:4px 8px;display:inline-block;border-radius:2px;margin:6px 0 8px;}
 .cat{display:block;width:100%;text-align:left;font-family:var(--font-b);font-size:13px;font-weight:600;background-color:#2C333B;
@@ -115,9 +118,9 @@ select{flex:0 0 auto;}
 .card .act.on{background:linear-gradient(180deg,#FFD34D,var(--pipe));color:#14171B;}
 .card .act.rd.on{background:linear-gradient(180deg,#7CFFA8,var(--ok));color:#0B2413;}
 .card .words{margin-left:auto;font-family:var(--font-m);font-size:10px;color:var(--info);}
-.overlay{position:fixed;inset:0;background:rgba(6,8,10,.9);z-index:60;display:none;}
+.overlay{position:fixed;inset:0;background:rgba(6,8,10,.8);z-index:60;display:none;}
 .overlay.open{display:block;}
-#sideOv{z-index:65;}
+#sideOv{z-index:65;background:rgba(6,8,10,.6);}
 .drawer{position:fixed;top:0;right:0;bottom:0;width:min(560px,100%);background-color:var(--card);background-image:var(--bolts),var(--brush),var(--steelg);
   border-left:2px solid var(--deep);border-top:8px solid var(--sig);z-index:61;transform:translateX(100%);transition:transform .25s ease;overflow:auto;padding:22px;}
 .drawer.open{transform:translateX(0);}
@@ -141,7 +144,7 @@ select{flex:0 0 auto;}
 .tabbar{display:none;}
 @media(max-width:1024px){.shell{grid-template-columns:1fr;}.sidebar{position:static;max-height:none;}}
 @media(max-width:767px){
-  .wrap{padding:10px 10px calc(84px + env(safe-area-inset-bottom));}
+  .wrap{z-index:auto;padding:10px 10px calc(84px + env(safe-area-inset-bottom));}
   .topbar{gap:4px;padding:6px 8px;min-height:52px;top:4px;}
   .logo{font-size:12px;padding:5px 7px;}
   .sync{display:none;}
@@ -149,8 +152,11 @@ select{flex:0 0 auto;}
   .grid{grid-template-columns:1fr;}
   .mainhead h1{font-size:16px;padding:8px 12px;}
   .sidebar{position:fixed;left:0;right:0;bottom:0;top:auto;z-index:70;max-height:72vh;border-radius:14px 14px 0 0;
-    transform:translateY(105%);transition:transform .28s ease;box-shadow:0 -18px 44px rgba(0,0,0,.8);}
+    transform:translateY(105%);transition:transform .28s ease;box-shadow:0 -18px 44px rgba(0,0,0,.8);
+    padding-bottom:calc(14px + env(safe-area-inset-bottom));}
   .sidebar.open{transform:none;}
+  .sheet-handle{display:block;width:44px;height:4px;border-radius:2px;background:var(--steel);margin:0 auto 10px;}
+  #catsClose{display:inline-block;}
   .drawer{top:auto;left:0;right:0;bottom:0;width:100%;height:88vh;border-left:none;border-radius:14px 14px 0 0;
     transform:translateY(105%);z-index:80;padding-bottom:calc(22px + env(safe-area-inset-bottom));}
   .drawer.open{transform:none;}
@@ -239,7 +245,8 @@ select{flex:0 0 auto;}
 
   <div class="shell">
     <aside class="sidebar" id="sidebar">
-      <span class="side-label">Категории</span>
+      <div class="sheet-handle"></div>
+      <div class="sheet-head"><span class="side-label">Категории</span><button class="btn small" id="catsClose">Готово</button></div>
       <div id="cats"></div>
       <div class="srcs" id="srcs"></div>
     </aside>
@@ -489,6 +496,7 @@ document.getElementById('autoBtn').onclick=function(){ state.auto=!state.auto; s
 setInterval(function(){ if(state.auto&&!document.hidden) refresh(state.cat,true); },600000);
 
 document.getElementById('cats').addEventListener('click',function(e){ var b=e.target.closest('.cat'); if(!b) return; state.cat=b.dataset.cat; state.prefsTs=Date.now(); save('cat',state.cat); save('prefsTs',state.prefsTs); closeCats(); setTab('feed'); renderAll(); if(state.auto&&(!state.updated[state.cat]||Date.now()-state.updated[state.cat]>21600000)) refresh(state.cat,true); });
+document.getElementById('catsClose').onclick=function(){ closeCats(); setTab(state.view==='bm'?'bm':'feed'); };
 document.getElementById('views').addEventListener('click',function(e){ var b=e.target.closest('[data-view]'); if(!b) return; state.view=b.dataset.view; state.prefsTs=Date.now(); save('view',state.view); save('prefsTs',state.prefsTs); renderViews(); renderGrid(); setTab(state.view==='bm'?'bm':'feed'); });
 document.getElementById('sort').addEventListener('change',function(e){ state.sort=e.target.value; state.prefsTs=Date.now(); save('sort',state.sort); save('prefsTs',state.prefsTs); renderGrid(); });
 document.getElementById('q').addEventListener('input',function(e){ state.q=e.target.value; renderHead(); renderGrid(); });
@@ -503,13 +511,17 @@ document.getElementById('grid').addEventListener('click',function(e){
 document.getElementById('tabbar').addEventListener('click',function(e){
   var b=e.target.closest('button'); if(!b) return;
   var t=b.dataset.tab;
-  if(t==='cats'){ openCats(); setTab('cats'); return; }
+  if(t==='cats'){
+    if(document.getElementById('sidebar').classList.contains('open')){ closeCats(); setTab(state.view==='bm'?'bm':'feed'); }
+    else { openCats(); setTab('cats'); }
+    return;
+  }
   closeCats();
   if(t==='feed'){ state.view='all'; state.prefsTs=Date.now(); save('view',state.view); save('prefsTs',state.prefsTs); renderViews(); renderGrid(); setTab('feed'); }
   else if(t==='bm'){ state.view='bm'; state.prefsTs=Date.now(); save('view',state.view); save('prefsTs',state.prefsTs); renderViews(); renderGrid(); setTab('bm'); }
   else if(t==='search'){ setTab('search'); window.scrollTo({top:0,behavior:'smooth'}); document.getElementById('q').focus(); }
 });
-document.getElementById('sideOv').onclick=closeCats;
+document.getElementById('sideOv').onclick=function(){ closeCats(); setTab(state.view==='bm'?'bm':'feed'); };
 document.getElementById('drClose').onclick=closeDrawer;
 document.getElementById('ov').onclick=closeDrawer;
 document.addEventListener('keydown',function(e){ if(e.key==='Escape'){ closeDrawer(); closeCats(); } if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){ e.preventDefault(); document.getElementById('q').focus(); } });
