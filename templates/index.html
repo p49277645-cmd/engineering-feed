@@ -2,8 +2,15 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>EngFeed · личная лента</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#0D1117">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="EngFeed">
+<link rel="apple-touch-icon" href="/icon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Russo+One&family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -104,12 +111,13 @@ select{flex:0 0 auto;}
 .card .src{font-family:var(--font-m);font-size:10.5px;color:var(--t2);background:linear-gradient(180deg,#4A525B,#2C333B);border:1px solid var(--deep);border-radius:2px;padding:3px 8px;display:inline-block;margin-bottom:8px;}
 .card .ex{font-size:12.5px;line-height:1.5;color:var(--t2);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
 .card .foot{display:flex;gap:6px;margin-top:12px;align-items:center;}
-.card .act{width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,#4A525B 0%,#3A4149 40%,#2C333B 100%);border:1px solid var(--deep);border-radius:3px;color:var(--t2);cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.15),0 2px 0 var(--deep);}
+.card .act{width:40px;height:40px;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,#4A525B 0%,#3A4149 40%,#2C333B 100%);border:1px solid var(--deep);border-radius:3px;color:var(--t2);cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.15),0 2px 0 var(--deep);}
 .card .act.on{background:linear-gradient(180deg,#FFD34D,var(--pipe));color:#14171B;}
 .card .act.rd.on{background:linear-gradient(180deg,#7CFFA8,var(--ok));color:#0B2413;}
 .card .words{margin-left:auto;font-family:var(--font-m);font-size:10px;color:var(--info);}
 .overlay{position:fixed;inset:0;background:rgba(6,8,10,.9);z-index:60;display:none;}
 .overlay.open{display:block;}
+#sideOv{z-index:65;}
 .drawer{position:fixed;top:0;right:0;bottom:0;width:min(560px,100%);background-color:var(--card);background-image:var(--bolts),var(--brush),var(--steelg);
   border-left:2px solid var(--deep);border-top:8px solid var(--sig);z-index:61;transform:translateX(100%);transition:transform .25s ease;overflow:auto;padding:22px;}
 .drawer.open{transform:translateX(0);}
@@ -123,26 +131,42 @@ select{flex:0 0 auto;}
 .drawer .terms span{font-family:var(--font-m);font-size:11px;color:var(--info);background:var(--deep);border:1px solid var(--steel);border-radius:2px;padding:3px 8px;}
 .drawer textarea{width:100%;min-height:90px;background:var(--deep);border:1px solid var(--deep);border-radius:3px;color:var(--t1);font-family:var(--font-m);font-size:12px;padding:10px;outline:none;box-shadow:inset 0 4px 10px rgba(0,0,0,.8);}
 .drawer .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
-.close{position:absolute;top:12px;right:12px;width:36px;height:36px;border-radius:50%;background:var(--steelg);border:1px solid var(--deep);color:var(--t1);cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 2px 0 var(--deep);}
-.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#161B22;border:1px solid var(--cu);border-radius:4px;padding:10px 16px;font-family:var(--font-m);font-size:12px;color:var(--t1);z-index:80;display:none;gap:12px;align-items:center;box-shadow:0 12px 30px rgba(0,0,0,.7);max-width:92vw;}
+.close{position:absolute;top:12px;right:12px;width:40px;height:40px;border-radius:50%;background:var(--steelg);border:1px solid var(--deep);color:var(--t1);cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 2px 0 var(--deep);}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#161B22;border:1px solid var(--cu);border-radius:4px;padding:10px 16px;font-family:var(--font-m);font-size:12px;color:var(--t1);z-index:90;display:none;gap:12px;align-items:center;box-shadow:0 12px 30px rgba(0,0,0,.7);max-width:92vw;}
 .toast.show{display:flex;}
 .toast button{background:none;border:1px solid var(--pipe);color:var(--pipe);border-radius:3px;padding:4px 10px;font-family:var(--font-m);font-size:11px;cursor:pointer;}
 .empty{padding:60px 20px;text-align:center;background:#161B22;border:2px solid var(--deep);border-top:6px solid var(--cu);border-radius:6px;}
 .empty p{font-family:var(--font-h);text-transform:uppercase;font-size:18px;margin-bottom:8px;}
 .empty span{color:var(--t2);font-size:12px;}
+.tabbar{display:none;}
 @media(max-width:1024px){.shell{grid-template-columns:1fr;}.sidebar{position:static;max-height:none;}}
 @media(max-width:767px){
-  .topbar{gap:4px;padding:6px 8px;min-height:52px;}
+  .wrap{padding:10px 10px calc(84px + env(safe-area-inset-bottom));}
+  .topbar{gap:4px;padding:6px 8px;min-height:52px;top:4px;}
   .logo{font-size:12px;padding:5px 7px;}
   .sync{display:none;}
   select,.btn{padding:6px 8px;font-size:11px;}
   .grid{grid-template-columns:1fr;}
   .mainhead h1{font-size:16px;padding:8px 12px;}
-  .drawer{width:100%;}
+  .sidebar{position:fixed;left:0;right:0;bottom:0;top:auto;z-index:70;max-height:72vh;border-radius:14px 14px 0 0;
+    transform:translateY(105%);transition:transform .28s ease;box-shadow:0 -18px 44px rgba(0,0,0,.8);}
+  .sidebar.open{transform:none;}
+  .drawer{top:auto;left:0;right:0;bottom:0;width:100%;height:88vh;border-left:none;border-radius:14px 14px 0 0;
+    transform:translateY(105%);z-index:80;padding-bottom:calc(22px + env(safe-area-inset-bottom));}
+  .drawer.open{transform:none;}
+  .tabbar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:50;
+    background:var(--steelg);background-image:var(--bolts),var(--brush);border-top:2px solid var(--deep);
+    padding-bottom:env(safe-area-inset-bottom);box-shadow:0 -8px 22px rgba(0,0,0,.6);}
+  .tabbar button{flex:1;min-height:56px;background:none;border:none;color:var(--t2);font-family:var(--font-m);font-size:11px;
+    letter-spacing:.06em;text-transform:uppercase;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;}
+  .tabbar button::before{content:'';width:7px;height:7px;border-radius:50%;background:#14171B;box-shadow:inset 0 0 0 1px var(--deep);}
+  .tabbar button.on{color:var(--pipe);}
+  .tabbar button.on::before{background:var(--sig);box-shadow:0 0 8px var(--sig);}
+  .toast{bottom:calc(70px + env(safe-area-inset-bottom));}
 }
 @media(prefers-reduced-motion:reduce){
   #lab-bg svg,#lab-bg .beam,#lab-bg .core,#lab-bg .lamp{animation:none!important;}
-  .card,.drawer{transition:none!important;}
+  .card,.drawer,.sidebar{transition:none!important;}
 }
 </style>
 </head>
@@ -214,7 +238,7 @@ select{flex:0 0 auto;}
   <div class="resume" id="resume"></div>
 
   <div class="shell">
-    <aside class="sidebar">
+    <aside class="sidebar" id="sidebar">
       <span class="side-label">Категории</span>
       <div id="cats"></div>
       <div class="srcs" id="srcs"></div>
@@ -232,6 +256,14 @@ select{flex:0 0 auto;}
   </div>
 </div>
 
+<nav class="tabbar" id="tabbar">
+  <button data-tab="feed" class="on">Лента</button>
+  <button data-tab="cats">Темы</button>
+  <button data-tab="bm">Закладки</button>
+  <button data-tab="search">Поиск</button>
+</nav>
+
+<div class="overlay" id="sideOv"></div>
 <div class="overlay" id="ov"></div>
 <div class="drawer" id="dr">
   <button class="close" id="drClose">✕</button>
@@ -262,7 +294,12 @@ var CATS=[
  {id:'math9',name:'Математика · 9 профиль',query:'математика алгебра геометрия квадратное уравнение',sources:[['Матус','https://mathus.ru/'],['Фоксфорд · учебник','https://foxford.ru/wiki/'],['ИнтернетУрок','https://interneturok.ru/'],['РЭШ','https://resh.edu.ru/'],['Олимпиады.ру','https://olimpiada.ru/']],seed:['Алгебра','Геометрия','Квадратное уравнение','Теорема Виета','Дискриминант','Функция','Арифметическая прогрессия','Геометрическая прогрессия','Неравенство','Теорема Пифагора','Теорема синусов','Теорема косинусов','Подобие треугольников','Окружность','Вписанная окружность','Описанная окружность','Вектор','Тригонометрия','Синус','Косинус']},
  {id:'chem9',name:'Химия · 9 базовая',query:'химия кислота основание соль реакция',sources:[['Фоксфорд · учебник','https://foxford.ru/wiki/'],['ИнтернетУрок','https://interneturok.ru/'],['РЭШ','https://resh.edu.ru/'],['КиберЛенинка','https://cyberleninka.ru/']],seed:['Химия','Периодическая система','Химический элемент','Атом','Молекула','Химическая связь','Ионная связь','Ковалентная связь','Окислительно-восстановительная реакция','Кислота','Основание (химия)','Соль (химия)','Оксид','Электролиз','Электролитическая диссоциация','Гидролиз','Химическое равновесие','Принцип Ле Шателье','Скорость реакции','Моль (единица измерения)']},
  {id:'rusoge',name:'Русский · ОГЭ',query:'русский язык орфография пунктуация синтаксис',sources:[['Грамота.ру','https://gramota.ru/'],['ФИПИ','https://fipi.ru/'],['РЭШ','https://resh.edu.ru/'],['Фоксфорд · учебник','https://foxford.ru/wiki/']],seed:['Русский язык','Орфография','Пунктуация','Синтаксис','Морфология (лингвистика)','Имя существительное','Имя прилагательное','Глагол','Причастие','Деепричастие','Наречие','Местоимение','Предлог','Союз (лингвистика)','Частица','Подлежащее','Сказуемое','Сложное предложение','Изложение','Основной государственный экзамен']},
- {id:'unis',name:'Вузы · МИФИ/МФТИ/МГУ/НГУ/НГТУ/Баумана',query:'университет физика наука исследования',sources:[['НГУ','https://www.nsu.ru/'],['МФТИ','https://mipt.ru/'],['МИФИ','https://mephi.ru/'],['МГУ','https://www.msu.ru/'],['Баумана','https://bmstu.ru/'],['НГТУ','https://www.nstu.ru/']],seed:['МИФИ','МФТИ','Московский государственный университет','Новосибирский государственный университет','Новосибирский государственный технический университет','Московский государственный технический университет имени Баумана','Институт ядерной физики имени Г. И. Будкера','Академгородок (Новосибирск)','Новосибирск','Долгопрудный','Обнинск','Физический факультет МГУ','Национальный исследовательский университет','Проект 5-100','Список университетов России','Высшее образование в России','Единый государственный экзамен','Всероссийская олимпиада школьников','Московский физико-технический институт','Национальный исследовательский ядерный университет «МИФИ»']},
+ {id:'mephi',name:'МИФИ',query:'МИФИ ядерный университет наука исследования',sources:[['МИФИ · сайт','https://mephi.ru/'],['МИФИ · новости','https://mephi.ru/news/'],['N+1','https://nplus1.ru/']],seed:['МИФИ','Национальный исследовательский ядерный университет «МИФИ»','Обнинск','Обнинская АЭС','Ядерная физика','Ядерный реактор','ВВЭР','РБМК','БН-800','Ядерное топливо','Радиоактивность','Изотоп','Дейтерий','Тритий','Термоядерный синтез','Ядерная энергетика','Атомная электростанция','Проект 5-100','Национальный исследовательский университет','Единый государственный экзамен']},
+ {id:'mipt',name:'МФТИ',query:'МФТИ физтех наука исследования',sources:[['МФТИ · сайт','https://mipt.ru/'],['МФТИ · новости','https://mipt.ru/news/'],['N+1','https://nplus1.ru/']],seed:['МФТИ','Московский физико-технический институт','Долгопрудный','Олимпиада школьников «Физтех»','Ландау, Лев Давидович','Капица, Пётр Леонидович','Семёнов, Николай Николаевич','Алфёров, Жорес Иванович','Квантовая физика','Квантовая механика','Туннельный эффект','Сверхпроводимость','Сверхтекучесть','Графен','Полупроводник','Лазер','Мазер','Физика твёрдого тела','Нанотехнология','Проект 5-100']},
+ {id:'msu',name:'МГУ',query:'МГУ московский университет наука',sources:[['МГУ · сайт','https://www.msu.ru/'],['МГУ · новости','https://www.msu.ru/news/'],['N+1','https://nplus1.ru/']],seed:['Московский государственный университет','Ломоносов, Михаил Васильевич','Воробьёвы горы','Физический факультет МГУ','Химический факультет МГУ','Механико-математический факультет МГУ','Олимпиада школьников «Ломоносов»','Главное здание МГУ','Императорский Московский университет','Список университетов России','Высшее образование в России','Единый государственный экзамен','Всероссийская олимпиада школьников','Наука','Научный метод','Эксперимент','Лаборатория','Профессор','Доктор наук','МГУ']},
+ {id:'nsu',name:'НГУ',query:'НГУ Новосибирский университет Академгородок наука',sources:[['НГУ · сайт','https://www.nsu.ru/'],['НГУ · новости','https://www.nsu.ru/n/media/'],['ИЯФ СО РАН','https://www.inp.nsk.su/'],['N+1','https://nplus1.ru/']],seed:['Новосибирский государственный университет','Академгородок (Новосибирск)','Новосибирск','Институт ядерной физики имени Г. И. Будкера','Институт катализа СО РАН','Институт математики СО РАН','Сибирское отделение РАН','Лаврентьев, Михаил Алексеевич','Будкер, Герш Ицкович','Квантовая физика','Ускоритель','Синхротрон','Коллайдер','Детектор частиц','Лазер на свободных электронах','Термоядерный синтез','Проект 5-100','Национальный исследовательский университет','Высшее образование в России','НГУ']},
+ {id:'nstu',name:'НГТУ',query:'НГТУ технический университет инженерия',sources:[['НГТУ · сайт','https://www.nstu.ru/'],['НГТУ · новости','https://www.nstu.ru/news/'],['Habr · электроника','https://habr.com/ru/hubs/electronics/articles/']],seed:['Новосибирский государственный технический университет','Новосибирск','Технический университет','Инженерия','Электроника','Микроконтроллер','Arduino','ESP32','STM32','Печатная плата','3D-печать','FDM','Аддитивные технологии','Робототехника','Мехатроника','Автоматизация','Система управления','Электропривод','Высшее образование в России','НГТУ']},
+ {id:'bmstu',name:'Баумана · МГТУ',query:'МГТУ Баумана инженерия ракетостроение',sources:[['Баумана · сайт','https://bmstu.ru/'],['Баумана · новости','https://bmstu.ru/news/'],['N+1','https://nplus1.ru/']],seed:['Московский государственный технический университет имени Баумана','Бауман, Николай Эрнестович','Инженерия','Машиностроение','Робототехника','Мехатроника','Ракетостроение','Королёв, Сергей Павлович','Туполев, Андрей Николаевич','Сухой, Павел Осипович','МиГ','Сухой','Ракета-носитель','Союз (ракета-носитель)','Ангара (ракета-носитель)','Протон (ракета-носитель)','3D-печать','Аддитивные технологии','Высшее образование в России','МГТУ']},
  {id:'electronics',name:'Проекты · электроника',query:'электроника микроконтроллер arduino esp32 stm32',sources:[['CXEM','https://cxem.net/'],['EasyElectronics','https://easyelectronics.ru/'],['Arduino.ru','https://arduino.ru/'],['Habr · электроника','https://habr.com/ru/hubs/electronics/articles/']],seed:['Электроника','Arduino','ESP32','ESP8266','STM32','Микроконтроллер','Печатная плата','Резистор','Конденсатор','Транзистор','Диод','Светодиод','Операционный усилитель','Аналого-цифровой преобразователь','Широтно-импульсная модуляция','I2C','SPI','UART','Пайка','Макетная плата']},
  {id:'print3d',name:'3D-печать · инженерная',query:'3D печать инженерная FDM аддитивные технологии',sources:[['3DToday','https://3dtoday.ru/'],['Habr · 3D-печать','https://habr.com/ru/hubs/3d_printing/articles/'],['КиберЛенинка','https://cyberleninka.ru/']],seed:['3D-печать','FDM','Стереолитография','Селективное лазерное спекание','3D-принтер','Филамент','PLA','ABS','PETG','Нейлон','Адгезия','Усадка','Слайсер','G-code','Постобработка','Анизотропия','Топологическая оптимизация','Генеративный дизайн','Прототипирование','Аддитивные технологии']}
 ];
@@ -379,6 +416,7 @@ function renderResume(){
   var lv=state.lastVisit?new Date(state.lastVisit).toLocaleString('ru-RU'):null;
   document.getElementById('resume').innerHTML='Прочитано <b>'+rd+'</b> из <b>'+total+'</b> · закладок <b>'+Object.keys(state.bm).length+'</b> · новых <b>'+nw+'</b>'+(lv?' · вход <b>'+lv+'</b>':'')+' · синхронизация: ноутбук ↔ телефон';
 }
+function setTab(t){ var bs=document.querySelectorAll('#tabbar button'); for(var i=0;i<bs.length;i++) bs[i].className=(bs[i].dataset.tab===t?'on':''); }
 function renderAll(){ renderCats(); renderViews(); renderHead(); renderGrid(); renderResume(); }
 
 function openDrawer(it){
@@ -410,6 +448,8 @@ function openDrawer(it){
   document.getElementById('drBm').onclick=function(){ toggleBm(it.url); openDrawer(it); renderAll(); };
 }
 function closeDrawer(){ document.getElementById('ov').classList.remove('open'); document.getElementById('dr').classList.remove('open'); }
+function openCats(){ document.getElementById('sidebar').classList.add('open'); document.getElementById('sideOv').classList.add('open'); }
+function closeCats(){ document.getElementById('sidebar').classList.remove('open'); document.getElementById('sideOv').classList.remove('open'); }
 
 function toast(msg,undo){ document.getElementById('toastMsg').textContent=msg; undoFn=undo||null; document.getElementById('toastUndo').style.display=undo?'inline-block':'none'; document.getElementById('toast').classList.add('show'); clearTimeout(toast._t); toast._t=setTimeout(function(){ document.getElementById('toast').classList.remove('show'); },4000); }
 document.getElementById('toastUndo').onclick=function(){ if(undoFn){ undoFn(); undoFn=null; renderAll(); } document.getElementById('toast').classList.remove('show'); };
@@ -448,8 +488,8 @@ document.getElementById('findMore').onclick=function(){ refresh(state.cat,false)
 document.getElementById('autoBtn').onclick=function(){ state.auto=!state.auto; state.prefsTs=Date.now(); save('auto',state.auto); save('prefsTs',state.prefsTs); renderHead(); toast(state.auto?'Автообновление включено (каждые 10 мин)':'Автообновление выключено'); };
 setInterval(function(){ if(state.auto&&!document.hidden) refresh(state.cat,true); },600000);
 
-document.getElementById('cats').addEventListener('click',function(e){ var b=e.target.closest('.cat'); if(!b) return; state.cat=b.dataset.cat; state.prefsTs=Date.now(); save('cat',state.cat); save('prefsTs',state.prefsTs); renderAll(); if(state.auto&&(!state.updated[state.cat]||Date.now()-state.updated[state.cat]>21600000)) refresh(state.cat,true); });
-document.getElementById('views').addEventListener('click',function(e){ var b=e.target.closest('[data-view]'); if(!b) return; state.view=b.dataset.view; state.prefsTs=Date.now(); save('view',state.view); save('prefsTs',state.prefsTs); renderViews(); renderGrid(); });
+document.getElementById('cats').addEventListener('click',function(e){ var b=e.target.closest('.cat'); if(!b) return; state.cat=b.dataset.cat; state.prefsTs=Date.now(); save('cat',state.cat); save('prefsTs',state.prefsTs); closeCats(); setTab('feed'); renderAll(); if(state.auto&&(!state.updated[state.cat]||Date.now()-state.updated[state.cat]>21600000)) refresh(state.cat,true); });
+document.getElementById('views').addEventListener('click',function(e){ var b=e.target.closest('[data-view]'); if(!b) return; state.view=b.dataset.view; state.prefsTs=Date.now(); save('view',state.view); save('prefsTs',state.prefsTs); renderViews(); renderGrid(); setTab(state.view==='bm'?'bm':'feed'); });
 document.getElementById('sort').addEventListener('change',function(e){ state.sort=e.target.value; state.prefsTs=Date.now(); save('sort',state.sort); save('prefsTs',state.prefsTs); renderGrid(); });
 document.getElementById('q').addEventListener('input',function(e){ state.q=e.target.value; renderHead(); renderGrid(); });
 document.getElementById('grid').addEventListener('click',function(e){
@@ -460,9 +500,19 @@ document.getElementById('grid').addEventListener('click',function(e){
   var it=itemsFor(catById(cid)).filter(function(x){ return x.url===url; })[0];
   if(it) openDrawer(it);
 });
+document.getElementById('tabbar').addEventListener('click',function(e){
+  var b=e.target.closest('button'); if(!b) return;
+  var t=b.dataset.tab;
+  if(t==='cats'){ openCats(); setTab('cats'); return; }
+  closeCats();
+  if(t==='feed'){ state.view='all'; state.prefsTs=Date.now(); save('view',state.view); save('prefsTs',state.prefsTs); renderViews(); renderGrid(); setTab('feed'); }
+  else if(t==='bm'){ state.view='bm'; state.prefsTs=Date.now(); save('view',state.view); save('prefsTs',state.prefsTs); renderViews(); renderGrid(); setTab('bm'); }
+  else if(t==='search'){ setTab('search'); window.scrollTo({top:0,behavior:'smooth'}); document.getElementById('q').focus(); }
+});
+document.getElementById('sideOv').onclick=closeCats;
 document.getElementById('drClose').onclick=closeDrawer;
 document.getElementById('ov').onclick=closeDrawer;
-document.addEventListener('keydown',function(e){ if(e.key==='Escape') closeDrawer(); if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){ e.preventDefault(); document.getElementById('q').focus(); } });
+document.addEventListener('keydown',function(e){ if(e.key==='Escape'){ closeDrawer(); closeCats(); } if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){ e.preventDefault(); document.getElementById('q').focus(); } });
 window.addEventListener('focus',syncPull);
 document.addEventListener('visibilitychange',function(){ if(!document.hidden){ syncPull(); if(state.auto&&(!state.updated[state.cat]||Date.now()-state.updated[state.cat]>21600000)) refresh(state.cat,true); } });
 
@@ -471,6 +521,7 @@ state.lastVisit=Date.now(); save('lastVisit',state.lastVisit);
 renderAll();
 syncPull();
 if(state.auto&&(!state.updated[state.cat]||Date.now()-state.updated[state.cat]>21600000)) refresh(state.cat,true);
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('/sw.js').catch(function(){}); }
 })();
 </script>
 </body>
