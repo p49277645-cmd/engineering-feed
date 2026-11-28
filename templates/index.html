@@ -109,6 +109,7 @@ select{flex:0 0 auto;}
 .card .meta{display:flex;gap:8px;align-items:center;font-family:var(--font-m);font-size:10px;color:var(--t2);margin-bottom:8px;flex-wrap:wrap;}
 .card .tag{color:var(--pipe);background:var(--deep);border:1px solid var(--steel);border-radius:2px;padding:2px 7px;}
 .card .new{color:#0B2413;background:linear-gradient(180deg,#7CFFA8,var(--ok));border:1px solid var(--deep);border-radius:2px;padding:2px 7px;font-weight:700;}
+.card .score{color:var(--ok);background:var(--deep);border:1px solid var(--steel);border-radius:2px;padding:2px 7px;}
 .card .min{color:var(--warn);background:var(--deep);border:1px solid var(--steel);border-radius:2px;padding:2px 7px;text-shadow:0 0 7px rgba(255,176,32,.6);}
 .card h2{font-family:var(--font-h);font-weight:400;text-transform:uppercase;letter-spacing:.02em;font-size:15px;line-height:1.35;margin-bottom:8px;}
 .card .src{font-family:var(--font-m);font-size:10.5px;color:var(--t2);background:linear-gradient(180deg,#4A525B,#2C333B);border:1px solid var(--deep);border-radius:2px;padding:3px 8px;display:inline-block;margin-bottom:8px;}
@@ -235,6 +236,7 @@ select{flex:0 0 auto;}
     <div class="searchwrap"><input id="q" placeholder="Поиск по всей ленте..." autocomplete="off"></div>
     <select id="sort" title="Сортировка">
       <option value="long">Длинные сначала</option>
+      <option value="score">По качеству</option>
       <option value="title">По названию</option>
       <option value="source">По источнику</option>
     </select>
@@ -368,6 +370,7 @@ function filtered(){
   if(state.view==='bm') list=list.filter(function(it){ return state.bm[it.url]; });
   if(state.view==='long') list=list.filter(function(it){ return it.minutes>=15; });
   if(state.sort==='long') list.sort(function(a,b){ return b.minutes-a.minutes; });
+  else if(state.sort==='score') list.sort(function(a,b){ return (b.score||0)-(a.score||0); });
   else if(state.sort==='title') list.sort(function(a,b){ return a.title.localeCompare(b.title,'ru'); });
   else list.sort(function(a,b){ return a.source.localeCompare(b.source,'ru'); });
   return list;
@@ -406,7 +409,7 @@ function renderGrid(){
     var rd=!!state.read[it.url], bm=!!state.bm[it.url], nw=!!state.newUrls[it.url];
     var tag=catById(it._cat).name.split('·')[0].trim();
     return '<article class="card'+(rd?' read':'')+'" data-url="'+esc(it.url)+'" data-cat="'+esc(it._cat)+'">'
-      +'<div class="meta"><span class="tag">'+esc(tag)+'</span>'+(nw?'<span class="new">новое</span>':'')+'<span class="min">'+it.minutes+' мин</span>'+(rd?'<span class="tag" style="color:var(--ok)">прочитано</span>':'')+'</div>'
+      +'<div class="meta"><span class="tag">'+esc(tag)+'</span>'+(nw?'<span class="new">новое</span>':'')+(it.score?'<span class="score">★ '+it.score+'/100</span>':'')+'<span class="min">'+it.minutes+' мин</span>'+(it.length?'<span class="min">'+Math.round(it.length/1000)+' тыс. зн.</span>':'')+(rd?'<span class="tag" style="color:var(--ok)">прочитано</span>':'')+'</div>'
       +'<h2>'+esc(it.title)+'</h2>'
       +'<span class="src">'+esc(it.source)+'</span>'
       +'<p class="ex">'+esc(it.excerpt||'Длинный материал для вдумчивого чтения и пересказа. Открой, прочитай целиком, затем перескажи вслух по плану в карточке.')+'</p>'
@@ -429,7 +432,7 @@ function renderAll(){ renderCats(); renderViews(); renderHead(); renderGrid(); r
 function openDrawer(it){
   var terms=it.title.split(/[\s,()«»—-]+/).filter(function(w){ return w.length>4; }).slice(0,8);
   var note=(state.notes[it.url]||{}).t||'';
-  var h='<div class="meta"><span class="tag">'+esc(it.source)+'</span><span class="min">'+it.minutes+' мин · ~'+words(it.minutes)+' слов</span></div>'
+  var h='<div class="meta"><span class="tag">'+esc(it.source)+'</span>'+(it.score?'<span class="score">★ '+it.score+'/100</span>':'')+'<span class="min">'+it.minutes+' мин · ~'+words(it.minutes)+' слов</span>'+(it.length?'<span class="min">'+Math.round(it.length/1000)+' тыс. знаков</span>':'')+'</div>'
    +'<h2>'+esc(it.title)+'</h2>'
    +'<div class="block"><h3>Зачем читать</h3><p>Длинный связный текст — тренажёр для устной речи: читай целиком, выделяй опорные слова, затем пересказывай вслух без подглядывания. Это прямо готовит к устному собеседованию.</p></div>'
    +'<div class="block"><h3>План пересказа</h3><ol>'
@@ -464,13 +467,24 @@ document.getElementById('toastUndo').onclick=function(){ if(undoFn){ undoFn(); u
 function toggleRead(url){ var was=!!state.read[url]; if(was) delete state.read[url]; else { state.read[url]=Date.now(); delete state.newUrls[url]; save('newUrls',state.newUrls); } save('read',state.read); toast(was?'Снята отметка прочтения':'Отмечено прочитанным', function(){ if(was) state.read[url]=Date.now(); else delete state.read[url]; save('read',state.read); }); }
 function toggleBm(url){ var was=!!state.bm[url]; if(was) delete state.bm[url]; else state.bm[url]=Date.now(); save('bm',state.bm); toast(was?'Убрано из закладок':'Добавлено в закладки', function(){ if(was) state.bm[url]=Date.now(); else delete state.bm[url]; save('bm',state.bm); }); }
 
-function liveSearch(cat){
+function wikiFallback(cat){
   var out=[], jobs=[];
   jobs.push(fetch('https://ru.wikipedia.org/w/rest.php/v1/search/page?q='+encodeURIComponent(cat.query)+'&limit=20')
     .then(function(r){ return r.json(); }).then(function(j){ (j.pages||[]).forEach(function(p){ out.push({title:p.title,url:'https://ru.wikipedia.org/wiki/'+encodeURIComponent(p.key),source:'Википедия',minutes:10+(p.title.length%10),excerpt:p.description||''}); }); }).catch(function(){}));
   jobs.push(fetch('https://ru.wikipedia.org/w/api.php?action=query&list=search&srsearch='+encodeURIComponent(cat.query)+'&srlimit=20&format=json&origin=*')
     .then(function(r){ return r.json(); }).then(function(j){ ((j.query&&j.query.search)||[]).forEach(function(p){ out.push({title:p.title,url:wikiUrl(p.title),source:'Википедия',minutes:12+(p.title.length%9),excerpt:strip(p.snippet)}); }); }).catch(function(){}));
   return Promise.all(jobs).then(function(){ return out; });
+}
+function liveSearch(cat){
+  return fetch('/api/search?cat='+encodeURIComponent(cat.id))
+    .then(function(r){ return r.ok?r.json():null; })
+    .then(function(j){
+      if(j&&j.items&&j.items.length){
+        return j.items.map(function(it){ return {title:it.title,url:it.url,source:it.source,minutes:it.minutes,excerpt:it.excerpt,score:it.score,length:it.length}; });
+      }
+      return wikiFallback(cat);
+    })
+    .catch(function(){ return wikiFallback(cat); });
 }
 function refresh(catId,silent){
   if(refreshing) return;
@@ -487,7 +501,7 @@ function refresh(catId,silent){
     save('extra',state.extra); save('updated',state.updated); save('newUrls',state.newUrls);
     renderAll();
     refreshing=false;
-    if(!silent){ btn.disabled=false; btn.textContent='＋ Найти ещё'; toast(added?('Добавлено длинных статей: '+added+' (всего '+itemsFor(cat).length+')'):'Свежих длинных материалов не найдено — библиотека актуальна'); }
+    if(!silent){ btn.disabled=false; btn.textContent='＋ Найти ещё'; toast(added?('Добавлено проверенных статей: '+added+' (всего '+itemsFor(cat).length+')'):'Новых качественных материалов не найдено — библиотека актуальна'); }
     else if(added) toast('Автообновление «'+cat.name+'»: +'+added+' новых');
   }).catch(function(){ refreshing=false; if(!silent){ btn.disabled=false; btn.textContent='＋ Найти ещё'; } });
 }
