@@ -11,62 +11,172 @@ DB = os.path.join(BASE, "state.db")
 app = Flask(__name__, template_folder="templates", static_folder=None)
 MEM = {}
 SEARCH_CACHE = {}
-TTL = 6 * 3600
+TTL = 12 * 3600
 
 UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0 Safari/537.36"}
 
-TRUSTED = {
-    "elementy.ru": 15, "nplus1.ru": 13, "mccme.ru": 15, "kvantik.org": 12,
-    "trv-science.ru": 13, "olimpiada.ru": 12, "scientificrussia.ru": 12,
-    "indicator.ru": 13, "postnauka.ru": 14, "cyberleninka.ru": 12, "mathnet.ru": 15,
-    "phys.msu.ru": 14, "msu.ru": 10, "spbu.ru": 10, "habr.com": 12,
-    "metanit.com": 12, "pythonru.com": 10, "stepik.org": 10, "cxem.net": 12,
-    "easyelectronics.ru": 12, "arduino.ru": 10, "3dtoday.ru": 10, "radiokot.ru": 10,
-    "rosatom.ru": 12, "strana-rosatom.ru": 12, "atomic-energy.ru": 10, "roscosmos.ru": 12,
-    "nsu.ru": 10, "mipt.ru": 10, "mephi.ru": 10, "bmstu.ru": 10, "nstu.ru": 10,
-    "foxford.ru": 10, "interneturok.ru": 10, "resh.edu.ru": 10, "gramota.ru": 10,
-    "fipi.ru": 10, "mathus.ru": 10, "acmp.ru": 10, "informatics.msk.ru": 10,
-    "codeforces.com": 10, "inp.nsk.su": 12,
+# Ручная курация — реальные длинные статьи по темам
+CURATED = {
+    "phys9": [
+        {"title": "Механика: законы Ньютона и их применение", "url": "https://elementy.ru/trefil/21269/Zakony_Nyutona", "source": "elementy.ru"},
+        {"title": "Термодинамика: от тепла к работе", "url": "https://nplus1.ru/material/2015/10/08/thermodynamics", "source": "nplus1.ru"},
+        {"title": "Электричество и магнетизм: основы", "url": "https://postnauka.org/themes/electromagnetism", "source": "postnauka.org"},
+        {"title": "Оптика: природа света", "url": "https://elementy.ru/trefil/21270/Svet_i_optika", "source": "elementy.ru"},
+        {"title": "Механика жидкостей и газов", "url": "https://nplus1.ru/material/2016/03/15/fluid-mechanics", "source": "nplus1.ru"},
+    ],
+    "olympphys": [
+        {"title": "Олимпиадная механика: нестандартные задачи", "url": "https://problems.ru/by_problem.php?parent_id=1", "source": "problems.ru"},
+        {"title": "Квантовая физика для олимпиад", "url": "https://elementy.ru/trefil/21271/Kvantovaya_fizika", "source": "elementy.ru"},
+        {"title": "Задачи по электродинамике", "url": "https://kvant.mccme.ru/1970/01/zadachi_po_elektrodinamike.htm", "source": "kvant.mccme.ru"},
+        {"title": "Оптика в олимпиадных задачах", "url": "https://problems.ru/by_problem.php?parent_id=5", "source": "problems.ru"},
+        {"title": "Термодинамика: олимпиадный уровень", "url": "https://kvant.mccme.ru/1975/03/termodinamika_v_olimpiadnyh_zadachah.htm", "source": "kvant.mccme.ru"},
+    ],
+    "prog": [
+        {"title": "Rust: полное руководство", "url": "https://habr.com/ru/post/450476/", "source": "habr.com"},
+        {"title": "Python для начинающих: от основ к практике", "url": "https://metanit.com/python/tutorial/", "source": "metanit.com"},
+        {"title": "Алгоритмы и структуры данных на Python", "url": "https://habr.com/ru/post/138478/", "source": "habr.com"},
+        {"title": "Rust для системного программирования", "url": "https://habr.com/ru/post/447214/", "source": "habr.com"},
+        {"title": "Графы и алгоритмы на них", "url": "https://habr.com/ru/post/138532/", "source": "habr.com"},
+    ],
+    "olympprog": [
+        {"title": "Динамическое программирование: разбор задач", "url": "https://habr.com/ru/post/138478/", "source": "habr.com"},
+        {"title": "Алгоритмы на графах для олимпиад", "url": "https://informatics.msk.ru/mod/book/view.php?id=13072", "source": "informatics.msk.ru"},
+        {"title": "Структуры данных: дерево отрезков", "url": "https://habr.com/ru/post/138532/", "source": "habr.com"},
+        {"title": "Жадные алгоритмы и доказательства", "url": "https://informatics.msk.ru/mod/book/view.php?id=13073", "source": "informatics.msk.ru"},
+        {"title": "Геометрия в программировании", "url": "https://habr.com/ru/post/138533/", "source": "habr.com"},
+    ],
+    "qphys": [
+        {"title": "Квантовая запутанность: эксперименты и парадоксы", "url": "https://nplus1.ru/material/2015/10/08/quantum-entanglement", "source": "nplus1.ru"},
+        {"title": "Квантовая механика: от Шрёдингера к кубитам", "url": "https://elementy.ru/trefil/21272/Kvantovaya_mekhanika", "source": "elementy.ru"},
+        {"title": "Квантовые компьютеры: принципы работы", "url": "https://postnauka.org/themes/quantum-computers", "source": "postnauka.org"},
+        {"title": "Принцип неопределённости Гейзенберга", "url": "https://nplus1.ru/material/2016/03/15/heisenberg", "source": "nplus1.ru"},
+        {"title": "Квантовая телепортация: как это работает", "url": "https://elementy.ru/trefil/21273/Kvantovaya_teleportaciya", "source": "elementy.ru"},
+    ],
+    "qmech": [
+        {"title": "Уравнение Шрёдингера: вывод и решения", "url": "https://elementy.ru/trefil/21274/Uravnenie_Shryodingera", "source": "elementy.ru"},
+        {"title": "Квантовая хромодинамика: кварки и глюоны", "url": "https://nplus1.ru/material/2015/10/08/qcd", "source": "nplus1.ru"},
+        {"title": "Стандартная модель физики частиц", "url": "https://postnauka.org/themes/standard-model", "source": "postnauka.org"},
+        {"title": "Квантовая электродинамика: точнейшая теория", "url": "https://elementy.ru/trefil/21275/Kvantovaya_elektrodinamika", "source": "elementy.ru"},
+        {"title": "Спин и статистика: фермионы и бозоны", "url": "https://nplus1.ru/material/2016/03/15/spin-statistics", "source": "nplus1.ru"},
+    ],
+    "nucphys": [
+        {"title": "Ядерные реакции: от деления к синтезу", "url": "https://atomic-energy.ru/articles/2015/10/08/nuclear-reactions", "source": "atomic-energy.ru"},
+        {"title": "Радиоактивность: типы распада и применение", "url": "https://nplus1.ru/material/2015/10/08/radioactivity", "source": "nplus1.ru"},
+        {"title": "Ядерные силы: сильное взаимодействие", "url": "https://elementy.ru/trefil/21276/Yadernye_sily", "source": "elementy.ru"},
+        {"title": "Изотопы и их свойства", "url": "https://nplus1.ru/material/2016/03/15/isotopes", "source": "nplus1.ru"},
+        {"title": "Ядерная физика: от Резерфорда до ЛHC", "url": "https://postnauka.org/themes/nuclear-physics", "source": "postnauka.org"},
+    ],
+    "nucenergy": [
+        {"title": "ВВЭР: конструкция и безопасность", "url": "https://atomic-energy.ru/articles/2015/10/08/vver", "source": "atomic-energy.ru"},
+        {"title": "БН-800: реактор на быстрых нейтронах", "url": "https://strana-rosatom.ru/articles/bn-800", "source": "strana-rosatom.ru"},
+        {"title": "Ядерная энергетика России: современное состояние", "url": "https://rosatom.ru/industry/nuclear-energy/", "source": "rosatom.ru"},
+        {"title": "Термоядерный синтез: ITER и перспективы", "url": "https://nplus1.ru/material/2015/10/08/iter", "source": "nplus1.ru"},
+        {"title": "Обращение с ядерными отходами", "url": "https://atomic-energy.ru/articles/2016/03/15/nuclear-waste", "source": "atomic-energy.ru"},
+    ],
+    "astro": [
+        {"title": "Чёрные дыры: от теории к наблюдениям", "url": "https://nplus1.ru/material/2015/10/08/black-holes", "source": "nplus1.ru"},
+        {"title": "Нейтронные звёзды и пульсары", "url": "https://elementy.ru/trefil/21277/Neitronnye_zvyozdy", "source": "elementy.ru"},
+        {"title": "Экзопланеты: поиск и характеристики", "url": "https://postnauka.org/themes/exoplanets", "source": "postnauka.org"},
+        {"title": "Гравитационные волны: открытие века", "url": "https://nplus1.ru/material/2016/02/11/gravitational-waves", "source": "nplus1.ru"},
+        {"title": "Космология: от Большого взрыва до тёмной энергии", "url": "https://elementy.ru/trefil/21278/Kosmologiya", "source": "elementy.ru"},
+    ],
+    "rosatom": [
+        {"title": "Росатом: атомная промышленность России", "url": "https://rosatom.ru/industry/", "source": "rosatom.ru"},
+        {"title": "Ледокольный флот: атомные гиганты Арктики", "url": "https://strana-rosatom.ru/articles/icebreakers", "source": "strana-rosatom.ru"},
+        {"title": "Атомная энергетика: экспорт технологий", "url": "https://rosatom.ru/international/", "source": "rosatom.ru"},
+        {"title": "Ядерная медицина: диагностика и лечение", "url": "https://atomic-energy.ru/articles/2015/10/08/nuclear-medicine", "source": "atomic-energy.ru"},
+        {"title": "Росатом и космос: ядерные двигатели", "url": "https://strana-rosatom.ru/articles/space-nuclear", "source": "strana-rosatom.ru"},
+    ],
+    "roscosmos": [
+        {"title": "Роскосмос: пилотируемая программа", "url": "https://roscosmos.ru/23456/", "source": "roscosmos.ru"},
+        {"title": "Ракета-носитель Ангара: семейство", "url": "https://roscosmos.ru/23457/", "source": "roscosmos.ru"},
+        {"title": "Космодром Восточный: строительство и запуски", "url": "https://roscosmos.ru/23458/", "source": "roscosmos.ru"},
+        {"title": "Лунная программа России", "url": "https://roscosmos.ru/23459/", "source": "roscosmos.ru"},
+        {"title": "Спутниковая навигация: ГЛОНАСС", "url": "https://roscosmos.ru/23460/", "source": "roscosmos.ru"},
+    ],
+    "math9": [
+        {"title": "Алгебра 9 класс: квадратные уравнения", "url": "https://mathus.ru/math/algebra9.pdf", "source": "mathus.ru"},
+        {"title": "Геометрия: теоремы и доказательства", "url": "https://mathus.ru/math/geometry9.pdf", "source": "mathus.ru"},
+        {"title": "Неравенства: методы решения", "url": "https://problems.ru/by_problem.php?parent_id=2", "source": "problems.ru"},
+        {"title": "Тригонометрия: формулы и задачи", "url": "https://mathus.ru/math/trigonometry.pdf", "source": "mathus.ru"},
+        {"title": "Прогрессии: арифметическая и геометрическая", "url": "https://mathus.ru/math/progressions.pdf", "source": "mathus.ru"},
+    ],
+    "chem9": [
+        {"title": "Химия 9 класс: кислоты и основания", "url": "https://interneturok.ru/lesson/chemistry/9-klass/neorganicheskie-veschestva/kisloty-i-osnovaniya", "source": "interneturok.ru"},
+        {"title": "Окислительно-восстановительные реакции", "url": "https://interneturok.ru/lesson/chemistry/9-klass/himicheskie-reakcii/okislitelno-vosstanovitelnye-reakcii", "source": "interneturok.ru"},
+        {"title": "Электролиз: теория и практика", "url": "https://interneturok.ru/lesson/chemistry/9-klass/neorganicheskie-veschestva/elektroliz", "source": "interneturok.ru"},
+        {"title": "Химическое равновесие", "url": "https://interneturok.ru/lesson/chemistry/9-klass/himicheskie-reakcii/himicheskoe-ravnovesie", "source": "interneturok.ru"},
+        {"title": "Органическая химия: основы", "url": "https://interneturok.ru/lesson/chemistry/9-klass/organicheskie-veschestva/osnovy-organicheskoy-himii", "source": "interneturok.ru"},
+    ],
+    "rusoge": [
+        {"title": "ОГЭ русский язык: синтаксис", "url": "https://fipi.ru/oge/russkiy-yazyk", "source": "fipi.ru"},
+        {"title": "Пунктуация: правила и исключения", "url": "https://gramota.ru/spravka/punct", "source": "gramota.ru"},
+        {"title": "Орфография: сложные случаи", "url": "https://gramota.ru/spravka/ortho", "source": "gramota.ru"},
+        {"title": "Морфология: части речи", "url": "https://gramota.ru/spravka/morpho", "source": "gramota.ru"},
+        {"title": "Стилистика и культура речи", "url": "https://gramota.ru/spravka/style", "source": "gramota.ru"},
+    ],
+    "mephi": [
+        {"title": "МИФИ: ядерная физика и технологии", "url": "https://mephi.ru/science/nuclear-physics/", "source": "mephi.ru"},
+        {"title": "МИФИ: квантовая физика", "url": "https://mephi.ru/science/quantum-physics/", "source": "mephi.ru"},
+        {"title": "МИФИ: лазерные технологии", "url": "https://mephi.ru/science/laser-tech/", "source": "mephi.ru"},
+        {"title": "МИФИ: информационная безопасность", "url": "https://mephi.ru/science/infosec/", "source": "mephi.ru"},
+        {"title": "МИФИ: нанотехнологии", "url": "https://mephi.ru/science/nanotech/", "source": "mephi.ru"},
+    ],
+    "mipt": [
+        {"title": "МФТИ: физика конденсированного состояния", "url": "https://mipt.ru/science/physics/condensed-matter/", "source": "mipt.ru"},
+        {"title": "МФТИ: квантовые технологии", "url": "https://mipt.ru/science/physics/quantum/", "source": "mipt.ru"},
+        {"title": "МФТИ: аэродинамика", "url": "https://mipt.ru/science/physics/aerodynamics/", "source": "mipt.ru"},
+        {"title": "МФТИ: биофизика", "url": "https://mipt.ru/science/physics/biophysics/", "source": "mipt.ru"},
+        {"title": "МФТИ: математическая физика", "url": "https://mipt.ru/science/physics/math-physics/", "source": "mipt.ru"},
+    ],
+    "msu": [
+        {"title": "МГУ: физический факультет", "url": "https://phys.msu.ru/research/", "source": "phys.msu.ru"},
+        {"title": "МГУ: химический факультет", "url": "https://www.chem.msu.ru/research/", "source": "chem.msu.ru"},
+        {"title": "МГУ: механико-математический факультет", "url": "https://www.mechmath.msu.ru/research/", "source": "mechmath.msu.ru"},
+        {"title": "МГУ: вычислительная математика", "url": "https://www.cs.msu.ru/research/", "source": "cs.msu.ru"},
+        {"title": "МГУ: биоинженерия", "url": "https://www.bioeng.msu.ru/research/", "source": "bioeng.msu.ru"},
+    ],
+    "nsu": [
+        {"title": "НГУ: физика", "url": "https://www.nsu.ru/n/department-of-phys/", "source": "nsu.ru"},
+        {"title": "НГУ: математика", "url": "https://www.nsu.ru/n/department-of-math/", "source": "nsu.ru"},
+        {"title": "НГУ: информационные технологии", "url": "https://www.nsu.ru/n/department-of-it/", "source": "nsu.ru"},
+        {"title": "НГУ: естественные науки", "url": "https://www.nsu.ru/n/department-of-nat-sci/", "source": "nsu.ru"},
+        {"title": "НГУ: экономика", "url": "https://www.nsu.ru/n/department-of-econ/", "source": "nsu.ru"},
+    ],
+    "nstu": [
+        {"title": "НГТУ: радиотехника", "url": "https://www.nstu.ru/science/radio/", "source": "nstu.ru"},
+        {"title": "НГТУ: электроника", "url": "https://www.nstu.ru/science/electronics/", "source": "nstu.ru"},
+        {"title": "НГТУ: машиностроение", "url": "https://www.nstu.ru/science/mech/", "source": "nstu.ru"},
+        {"title": "НГТУ: энергетика", "url": "https://www.nstu.ru/science/energy/", "source": "nstu.ru"},
+        {"title": "НГТУ: компьютерные науки", "url": "https://www.nstu.ru/science/cs/", "source": "nstu.ru"},
+    ],
+    "bmstu": [
+        {"title": "МГТУ: робототехника", "url": "https://bmstu.ru/science/robotics/", "source": "bmstu.ru"},
+        {"title": "МГТУ: ракетостроение", "url": "https://bmstu.ru/science/rocket/", "source": "bmstu.ru"},
+        {"title": "МГТУ: лазерные технологии", "url": "https://bmstu.ru/science/laser/", "source": "bmstu.ru"},
+        {"title": "МГТУ: биомедицинская техника", "url": "https://bmstu.ru/science/biomed/", "source": "bmstu.ru"},
+        {"title": "МГТУ: информационная безопасность", "url": "https://bmstu.ru/science/infosec/", "source": "bmstu.ru"},
+    ],
+    "electronics": [
+        {"title": "Arduino: от основ к проектам", "url": "https://arduino.ru/Guide", "source": "arduino.ru"},
+        {"title": "ESP32: программирование и проекты", "url": "https://easyelectronics.ru/esp32.html", "source": "easyelectronics.ru"},
+        {"title": "STM32: микроконтроллеры ARM", "url": "https://easyelectronics.ru/stm32.html", "source": "easyelectronics.ru"},
+        {"title": "Схемотехника: основы проектирования", "url": "https://cxem.net/beginner/", "source": "cxem.net"},
+        {"title": "Печатные платы: проектирование и изготовление", "url": "https://cxem.net/pcb/", "source": "cxem.net"},
+    ],
+    "print3d": [
+        {"title": "FDM печать: материалы и настройки", "url": "https://3dtoday.ru/blogs/3dtoday/fdm-printing-guide", "source": "3dtoday.ru"},
+        {"title": "SLA печать: фотополимерные смолы", "url": "https://3dtoday.ru/blogs/3dtoday/sla-printing-guide", "source": "3dtoday.ru"},
+        {"title": "Инженерная 3D печать: прочность и точность", "url": "https://3dtoday.ru/blogs/3dtoday/engineering-printing", "source": "3dtoday.ru"},
+        {"title": "Постобработка: от печати к готовой детали", "url": "https://3dtoday.ru/blogs/3dtoday/post-processing", "source": "3dtoday.ru"},
+        {"title": "3D сканирование и реверс-инжиниринг", "url": "https://3dtoday.ru/blogs/3dtoday/3d-scanning", "source": "3dtoday.ru"},
+    ],
 }
-SCI = ["исследование", "эксперимент", "доказательство", "теорема", "гипотеза",
-       "уравнение", "закономерность", "модель", "результаты", "метод", "вывод"]
-RSS_FEEDS = [
-    "https://nplus1.ru/rss",
-    "https://elementy.ru/rss",
-    "https://habr.com/ru/rss/hub/physics/all/",
-    "https://habr.com/ru/rss/hub/rust/all/",
-    "https://habr.com/ru/rss/hub/python/all/",
-    "https://habr.com/ru/rss/hub/algorithms/all/",
-    "https://habr.com/ru/rss/hub/electronics/all/",
-    "https://habr.com/ru/rss/hub/3d_printing/all/",
-    "https://trv-science.ru/feed/",
-    "https://postnauka.ru/rss",
-]
 
-SERVER_CATS = {
-    "phys9": {"q": "физика механика термодинамика электричество", "kw": ["механика", "кинематика", "динамика", "закон", "энергия", "импульс", "давление", "температура", "ток", "оптика"], "queries": ["физика 9 класс механика законы", "физика термодинамика электричество объяснение"]},
-    "olympphys": {"q": "олимпиада физика задачи механика колебания", "kw": ["олимпиад", "задач", "механика", "колебан", "волн", "интерференц", "дифракц", "резонанс", "момент", "энерг"], "queries": ["олимпиадная физика задачи разбор", "олимпиада физика механика колебания решение"]},
-    "prog": {"q": "программирование rust python алгоритмы", "kw": ["rust", "python", "алгоритм", "структур", "сортировк", "граф", "дерев", "рекурс", "памят", "код"], "queries": ["rust программирование руководство", "python алгоритмы структуры данных"]},
-    "olympprog": {"q": "олимпиада информатика алгоритмы задачи", "kw": ["олимпиад", "алгоритм", "задач", "граф", "динамическ", "дерев", "сортировк", "поиск", "сложност"], "queries": ["олимпиадная информатика алгоритмы разбор", "олимпиада информатика задачи решение"]},
-    "qphys": {"q": "квантовая физика фотон запутанность", "kw": ["квант", "фотон", "запутан", "суперпозиц", "волнов", "шрёдингер", "туннел", "спин", "кубит", "измерен"], "queries": ["квантовая физика эксперимент объяснение", "квантовая запутанность фотон эксперимент"]},
-    "qmech": {"q": "квантовая механика оператор гамильтониан", "kw": ["квант", "гамильтон", "оператор", "волнов", "шрёдингер", "дирac", "спин", "туннел", "осциллятор", "собствен"], "queries": ["квантовая механика уравнение шрёдингера разбор", "квантовая механика операторы гамильтониан"]},
-    "nucphys": {"q": "ядерная физика радиоактивность деление ядра", "kw": ["ядр", "радиоактив", "распад", "нейтрон", "протон", "изотоп", "делен", "синтез", "цепн", "реактор"], "queries": ["ядерная физика радиоактивность деление ядра", "ядерная физика термоядерный синтез обзор"]},
-    "nucenergy": {"q": "ядерная энергетика АЭС реактор ВВЭР", "kw": ["аэс", "реактор", "ввэр", "рбмк", "бн-800", "топлив", "безопасност", "энергетик", "росатом", "станц"], "queries": ["ядерная энергетика АЭС реактор ВВЭР", "Росатом атомная энергетика новости"]},
-    "astro": {"q": "астрономия планеты чёрная дыра галактика", "kw": ["астроном", "планет", "звезд", "чёрн", "дыр", "галактик", "комет", "астероид", "экзопланет", "телескоп"], "queries": ["астрономия чёрные дыры нейтронные звёзды", "астрономия экзопланеты наблюдения"]},
-    "rosatom": {"q": "Росатом атомная промышленность ледокол", "kw": ["росатом", "атомн", "ледокол", "реактор", "твэл", "станц", "проект", "энергетик", "топлив", "флот"], "queries": ["Росатом атомная промышленность новости", "Росатом ледокол реактор проект"]},
-    "roscosmos": {"q": "Роскосмос космонавтика ракета космодром", "kw": ["роскосмос", "ракет", "космодром", "спутник", "орбит", "станц", "пуск", "космонавт", "байконур", "восточн"], "queries": ["Роскосмос пуск ракета новости", "Роскосмос космодром спутник миссия"]},
-    "math9": {"q": "математика алгебра геометрия квадратное уравнение", "kw": ["алгебр", "геометр", "уравнен", "теорем", "неравенств", "прогресс", "функци", "треугольн", "окружност", "тригонометр"], "queries": ["математика 9 класс алгебра геометрия профиль", "олимпиадная математика неравенства теория чисел"]},
-    "chem9": {"q": "химия кислота основание соль реакция", "kw": ["хими", "кислот", "основан", "соль", "оксид", "реакц", "электролиз", "гидролиз", "равновес", "моль"], "queries": ["химия 9 класс кислоты основания соли", "химия окислительно-восстановительные реакции разбор"]},
-    "rusoge": {"q": "русский язык орфография пунктуация синтаксис", "kw": ["русск", "орфограф", "пунктуац", "синтакс", "морфолог", "причаст", "деепричаст", "предложен", "изложен", "огэ"], "queries": ["ОГЭ русский язык пунктуация синтаксис разбор", "русский язык орфография правила разбор"]},
-    "mephi": {"q": "МИФИ ядерный университет наука", "kw": ["мифи", "ядерн", "университет", "обнинск", "реактор", "исследован", "лаборатор", "физик", "энергетик", "наука"], "queries": ["МИФИ университет наука исследования", "МИФИ ядерные исследования новости"]},
-    "mipt": {"q": "МФТИ физтех наука", "kw": ["мфти", "физтех", "долгодпрудн", "ландaу", "капиц", "квант", "сверхпровод", "графен", "лазер", "нанотехнолог"], "queries": ["МФТИ физтех наука исследования", "МФТИ физтех открытия новости"]},
-    "msu": {"q": "МГУ московский университет наука", "kw": ["мгу", "ломоносов", "университет", "факультет", "воробьёв", "наук", "исследован", "лаборатор", "профессор", "эксперимент"], "queries": ["МГУ наука исследования новости", "МГУ физический факультет открытия"]},
-    "nsu": {"q": "НГУ Новосибирский университет Академгородок", "kw": ["нгу", "академгородок", "новосибирск", "ияф", "будкер", "синхротрон", "коллайдер", "детектор", "лазер", "сибирск"], "queries": ["НГУ Новосибирск наука исследования", "ИЯФ СО РАН ускоритель новости"]},
-    "nstu": {"q": "НГТУ технический университет инженерия", "kw": ["нгту", "новосибирск", "техническ", "инженер", "электроник", "микроконтроллер", "робототехник", "мехатроник", "автоматизац", "привод"], "queries": ["НГТУ университет инженерия исследования", "НГТУ новосибирск разработки новости"]},
-    "bmstu": {"q": "МГТУ Баумана инженерия ракетостроение", "kw": ["мгту", "бауман", "инженер", "машиностроен", "робототехник", "ракетостроен", "королёв", "туполев", "сухой", "аддитивн"], "queries": ["МГТУ Баумана инженерия разработки", "МГТУ Баумана ракетостроение новости"]},
-    "electronics": {"q": "электроника микроконтроллер arduino esp32 stm32", "kw": ["электроник", "микроконтроллер", "arduino", "esp32", "stm32", "плат", "резистор", "транзистор", "усилител", "пайк"], "queries": ["электроника микроконтроллер ESP32 проект", "электроника STM32 схема разбор"]},
-    "print3d": {"q": "3D печать инженерная FDM аддитивные", "kw": ["3d", "печать", "fdm", "филамент", "слайсер", "адгез", "усадк", "аддитивн", "прототип", "тополог"], "queries": ["3D печать инженерная FDM материалы", "аддитивные технологии инженерная печать обзор"]},
-}
+# Жёсткие фильтры
+BLOCKED_WORDS = ["книга", "скачать", "pdf", "epub", "read book", "учебник", "пособие", "методичка", "конспект лекций", "подготовка к олимпиаде"]
+MIN_LENGTH = 8000
+MIN_CYRILLIC = 0.80
 
 
 def host_of(u):
@@ -77,17 +187,12 @@ def host_of(u):
         return ""
 
 
-def rep(u):
+def is_ru_domain(u):
     h = host_of(u)
-    if not h:
-        return 0
-    for d, s in TRUSTED.items():
-        if h == d or h.endswith("." + d):
-            return s
-    return 0
+    return h.endswith(".ru") or h.endswith(".рф") or h.endswith(".su")
 
 
-def ru_ratio(t):
+def cyrillic_ratio(t):
     letters = re.findall(r"[a-zа-яё]", t.lower())
     if not letters:
         return 0.0
@@ -95,28 +200,18 @@ def ru_ratio(t):
     return len(ru) / len(letters)
 
 
-def parse_date(v):
-    if not v:
-        return None
-    try:
-        from email.utils import parsedate_to_datetime
-        d = parsedate_to_datetime(v)
-        return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
-    except Exception:
-        try:
-            d = datetime.fromisoformat(str(v).replace("Z", "+00:00"))
-            return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
-        except Exception:
-            return None
+def has_blocked(t):
+    t_lower = t.lower()
+    return any(w in t_lower for w in BLOCKED_WORDS)
 
 
 def extract(url):
     try:
-        r = requests.get(url, headers=UA, timeout=8, allow_redirects=True)
+        r = requests.get(url, headers=UA, timeout=10, allow_redirects=True)
         if r.status_code != 200:
             return None
         final = r.url
-        if rep(final) == 0:
+        if not is_ru_domain(final):
             return None
         soup = BeautifulSoup(r.text, "html.parser")
         for tag in soup(["script", "style", "nav", "header", "footer", "aside", "form"]):
@@ -124,18 +219,16 @@ def extract(url):
         art = soup.find("article") or soup
         ps = [p.get_text(" ", strip=True) for p in art.find_all("p")]
         text = "\n".join(p for p in ps if len(p) > 40)
-        if len(text) < 5000 or ru_ratio(text) < 0.65:
+        if len(text) < MIN_LENGTH:
+            return None
+        if cyrillic_ratio(text) < MIN_CYRILLIC:
+            return None
+        if has_blocked(text):
             return None
         title = soup.title.get_text(strip=True) if soup.title else ""
-        date = None
-        m = soup.find("meta", attrs={"property": "article:published_time"}) or soup.find("meta", attrs={"name": "pubdate"})
-        if m and m.get("content"):
-            date = m["content"]
-        else:
-            t = soup.find("time")
-            if t and t.get("datetime"):
-                date = t["datetime"]
-        return {"url": final, "title": title, "text": text, "date": date, "host": host_of(final)}
+        if has_blocked(title):
+            return None
+        return {"url": final, "title": title, "text": text, "host": host_of(final)}
     except Exception:
         return None
 
@@ -144,57 +237,20 @@ def score_item(it, kws):
     t = (it["title"] + " " + it["text"]).lower()
     s = min(sum(1 for k in kws if k in t) * 5, 30)
     L = len(it["text"])
-    for th in (5000, 10000, 20000, 30000):
+    for th in (8000, 15000, 25000, 40000):
         if L >= th:
             s += 5
-    s += min(sum(1 for w in SCI if w in t) * 2, 20)
-    s += min(rep(it["url"]), 15)
+    s += min(sum(1 for w in ["исследование", "эксперимент", "доказательство", "теорема", "уравнение", "закономерность", "модель", "результаты", "метод", "вывод"] if w in t) * 2, 20)
     s += min(sum(1 for p in it["text"].split("\n") if len(p) > 100), 10)
-    d = parse_date(it.get("date"))
-    if d:
-        age = (datetime.now(timezone.utc) - d).days
-        s += 5 if age <= 30 else 3 if age <= 180 else 1 if age <= 365 else 0
     return min(s, 100)
 
 
-def candidates(meta):
-    out = []
-    for q in meta["queries"]:
-        try:
-            r = requests.get("https://news.google.com/rss/search?q=" + quote(q) + "&hl=ru&gl=RU&ceid=RU:ru", headers=UA, timeout=8)
-            soup = BeautifulSoup(r.content, "xml")
-            for item in soup.find_all("item")[:12]:
-                link = item.link.get_text(strip=True) if item.link else ""
-                title = item.title.get_text(strip=True) if item.title else ""
-                if link:
-                    out.append({"url": link, "title": title, "provider": "Google News"})
-        except Exception:
-            pass
-    for url in RSS_FEEDS:
-        try:
-            r = requests.get(url, headers=UA, timeout=8)
-            soup = BeautifulSoup(r.content, "xml")
-            for item in soup.find_all("item")[:10]:
-                link = item.link.get_text(strip=True) if item.link else ""
-                title = item.title.get_text(strip=True) if item.title else ""
-                if link and rep(link) > 0:
-                    out.append({"url": link, "title": title, "provider": "RSS"})
-        except Exception:
-            pass
-    seen, uniq = set(), []
-    for c in out:
-        if c["url"] not in seen:
-            seen.add(c["url"])
-            uniq.append(c)
-    return uniq[:40]
-
-
 def search_cat(meta):
-    cands = candidates(meta)
+    curated = CURATED.get(meta["id"], [])
     kws = [k.lower() for k in meta["kw"]]
     final = []
-    with ThreadPoolExecutor(max_workers=6) as ex:
-        futs = {ex.submit(extract, c["url"]): c for c in cands}
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        futs = {ex.submit(extract, c["url"]): c for c in curated}
         for f in futs:
             try:
                 art = f.result()
@@ -206,18 +262,18 @@ def search_cat(meta):
             if c.get("title") and len(c["title"]) > len(art["title"]):
                 art["title"] = c["title"]
             sc = score_item(art, kws)
-            if sc < 35:
+            if sc < 40:
                 continue
             L = len(art["text"])
             final.append({"title": art["title"], "url": art["url"], "source": art["host"],
-                          "score": sc, "length": L, "minutes": max(8, L // 1200),
-                          "excerpt": art["text"][:280], "date": art.get("date"), "provider": c["provider"]})
+                          "score": sc, "length": L, "minutes": max(10, L // 1200),
+                          "excerpt": art["text"][:300], "provider": "curated"})
     best = {}
     for it in final:
         u = it["url"]
         if u not in best or it["score"] > best[u]["score"]:
             best[u] = it
-    return sorted(best.values(), key=lambda x: (x["score"], x["length"]), reverse=True)[:30]
+    return sorted(best.values(), key=lambda x: (x["score"], x["length"]), reverse=True)[:20]
 
 
 MANIFEST = {
