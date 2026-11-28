@@ -352,10 +352,9 @@ function syncPull(){
 }
 
 function itemsFor(cat){
-  var base=cat.seed.map(function(t){ return {title:t,url:wikiUrl(t),source:'Википедия',minutes:minutes(t),excerpt:'',_cat:cat.id}; });
   var ex=(state.extra[cat.id]||[]).map(function(it){ it._cat=cat.id; return it; });
   var seen={}, out=[];
-  base.concat(ex).forEach(function(it){ var k=it.url||it.title; if(!seen[k]){ seen[k]=1; out.push(it); } });
+  ex.forEach(function(it){ var k=it.url||it.title; if(!seen[k]){ seen[k]=1; out.push(it); } });
   return out;
 }
 function catById(id){ for(var i=0;i<CATS.length;i++) if(CATS[i].id===id) return CATS[i]; return CATS[0]; }
